@@ -1,15 +1,15 @@
 {
     "sfahelper":{
 	"urltest": "",
-        "url":"https://raw.githubusercontent.com/the-redx/EvolveRP/master/sfahelper.luac",
+        "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.luac",
         "version":"1.21"
     },
     "admintools":{
-        "url":"https://raw.githubusercontent.com/the-redx/EvolveRP/master/admintools.luac",
+        "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/admintools.luac",
         "version":"1.99999998"
     },
     "activity":{
-        "url":"https://raw.githubusercontent.com/the-redx/EvolveRP/master/activity.luac",
+        "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/activity.luac",
         "version":"1.45"
     }
 }
