@@ -1,8 +1,7 @@
 {
     "sfahelper":{
-	"urltest": "",
         "url":"https://raw.githubusercontent.com/the-redx/EvolveRP/master/sfahelper.luac",
-        "version":"1.21"
+        "version":"1.22"
     },
     "admintools":{
         "url":"https://raw.githubusercontent.com/the-redx/EvolveRP/master/admintools.luac",
