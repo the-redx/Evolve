@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3624")
-SCRIPT_ASSEMBLY = "1.36-b4"
+script_version("1.3631")
+SCRIPT_ASSEMBLY = "1.36-rc1"
 DEBUG_MODE = true -- remove
 --------------------------------------------------------------------
 local res = pcall(require, 'lib.moonloader')
@@ -463,6 +463,7 @@ function main()
     cmd_stats("checkout")
     debug_log("(info) Данные о фракции и ранге обновлены")
     secoundTimer()
+    loadAdmins()
     if pInfo.settings.hud == true then window['hud'].v = true end
     debug_log(("(debug) Конец Main функции. | (weekOnline = %d | dayOnline = %d | Время: %.3fs)"):format(pInfo.info.weekOnline, pInfo.info.dayOnline, os.clock() - mstime))
     --------------------=========----------------------
@@ -1180,6 +1181,18 @@ function clearparams()
   data.imgui.invrang = imgui.ImInt(1)
 end
 
+-- Загружаем админов из файла
+function loadAdmins()
+  local file = io.open("moonloader/SFAHelper/admins.txt", "a+")
+  for line in file:lines() do
+    local n, l = line:match("(.+)=(.+)")
+    if n ~= nil and tonumber(l) ~= nil then
+      adminsList[#adminsList + 1] = { nick = n, level = tonumber(l) }
+    end
+  end
+  file:close()
+end
+
 -- Загружаем необходимые файлы
 function loadFiles()
   lua_thread.create(function()
@@ -1240,7 +1253,7 @@ function loadPermissions(table_url)
   end)
 end
 
--- Отправляем статистику на хост
+-- Отправляем статистику на хосте (отключено)
 function sendStats(url)
   local requests = require 'requests'
   local response = requests.get(url)
