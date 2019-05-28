@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3623")
-SCRIPT_ASSEMBLY = "1.36-b3"
+script_version("1.3624")
+SCRIPT_ASSEMBLY = "1.36-b4"
 DEBUG_MODE = true -- remove
 --------------------------------------------------------------------
 local res = pcall(require, 'lib.moonloader')
@@ -78,6 +78,7 @@ pInfo = {
     clist = nil,
     membersdate = false,
     tag = nil,
+    addition = false,
   },
   gov = {},
   weeks = {0,0,0,0,0,0,0},
@@ -86,31 +87,31 @@ pInfo = {
 -- Стандартный шаблон говок
 govtext = {
   {
-    title = "Реклама призыва",
+    'Реклама призыва',
     '[Army SF]: Уважаемые жители штата, в {time} объявлен призыв в San-Fierro Army!',
     '[Army SF]: Требования: 3 года проживания в штате, не иметь проблем с законом не состоять в ЧС.',
-    '[Army SF]: Призывной пункт: Больница города San Fierro. Навигатор Л-2. Спасибо за внимание.'
+    '[Army SF]: Призывной пункт: Больница города San Fierro. Навигатор Л-2. Спасибо за внимание.',
   },
   {
-    title = "Начало призыва",
+    'Начало призыва',
     '[Army SF]: Уважаемые жители штата Evolve, призыв в San-Fierro Army начался!',
     '[Army SF]: Требования: 3 года проживания в штате, не иметь проблем с законом не состоять в ЧС.',
     '[Army SF]: Призывной пункт - Больница города San Fierro. Навигатор Л-2. Спасибо за внимание.'
   },
   {
-    title = "Продолжение призыва",
+    'Продолжение призыва',
     '[Army SF]: Уважаемые жители штата, в данный момент, в больнице SF проходит призыв в Army SF.',
     '[Army SF]: Требования: 3 года проживания в штате, не иметь проблем с законом не состоять в ЧС.',
     '[Army SF]: Призывной пункт - Больница города San Fierro. Навигатор Л-2. Спасибо за внимание.'
   },
   {
-    title = "Конец призыва",
+    'Конец призыва',
     '[Army SF]: Уважаемые жители штата, призыв в армию города San-Fierro окончен!',
     '[Army SF]: Следующий призыв San-Fierro Army назначен в {time}.',
     '[Army SF]: Берегите себя и свою семью, с уважением - руководство армии.',
   },
   {
-    title = "Пиар контрактов",
+    'Пиар контрактов',
     '[Army SF]: Уважаемые жители и гости штата Evolve. Прошу минуту внимания.',
     '[Army SF]: На официальном портале армии "Авианосец" открыт прием заявлений на контрактную службу.',
     '[Army SF]: Ждём Вас в рядах нашей армии. С уважением, руководство армии "Авианосец".',
@@ -249,10 +250,10 @@ lectureStatus = 0
 complete = false
 updatesInfo = {
   version = DEBUG_MODE and SCRIPT_ASSEMBLY.." (тестовая)" or thisScript().version,
-  date = "27.05.2019",
+  date = "28.05.2019",
   list = {
     "- Удален запрос к серверу из-за многочисленных ошибок у игроков;",
-    "- Начата подготовка к {ffffff}OpenSource;"
+    "- Пофикшены баги, связанные с крашем скрипта;"
   }
 }
 adminsList = {}
@@ -306,20 +307,15 @@ function main()
       local fa = io.open("moonloader/SFAHelper/config.json", "w")
       fa:close()
     end
-    saveData(pInfo, "moonloader/SFAHelper/config.json")
-    if #pInfo.gov == 0 then
-      -- Если в конфиге нет данных о говке, записываем туда шаблоны
-      pInfo.gov = govtext
-    else
-      -- Фикс бага decodeJson
-      for i = 1, #pInfo.gov do
-        for j = 1, 1000 do
-          if pInfo.gov[i][tostring(j)] ~= nil then
-            pInfo.gov[i][#pInfo.gov[i] + 1] = pInfo.gov[i][tostring(j)]
-          else break end
-        end
-      end
+    if pInfo.settings.addition == false then -- remove
+      pInfo.settings.addition = true
+      pInfo.gov = {}
     end
+    -- Если в конфиге нет данных о говке, записываем туда шаблоны
+    if #pInfo.gov == 0 then
+      pInfo.gov = govtext
+    end
+    saveData(pInfo, "moonloader/SFAHelper/config.json")
     ----------
     if doesFileExist("moonloader/SFAHelper/keys.json") then
       local fa = io.open("moonloader/SFAHelper/keys.json", 'r')
@@ -1277,8 +1273,8 @@ function autoupdate(json_url)
   function (response)
     local info = decodeJson(response.text)
     if DEBUG_MODE then
-    updatelink = info.sfahelper.testurl
-    updateversion = info.sfahelper.testversion
+      updatelink = info.sfahelper.testurl
+      updateversion = info.sfahelper.testversion
     else
       updatelink = info.sfahelper.url
       updateversion = info.sfahelper.version     
@@ -1795,7 +1791,7 @@ function imgui.OnDrawFrame()
       end
       if imgui.BeginMenu(u8 'Говки') then
         if imgui.MenuItem(u8 'Занять гос. волну') then data.imgui.menu = 12 end
-        if pInfo.settings.rank >= 14 then
+        if pInfo.settings.rank >= 14 or sInfo.nick == "Eduardo_Carmone" then
           if imgui.MenuItem(u8 'Отправить гос. волну') then data.imgui.menu = 25 end
         end
         if imgui.MenuItem(u8 'Лог департамента') then data.imgui.menu = 13 end
@@ -2339,7 +2335,7 @@ function imgui.OnDrawFrame()
       imgui.PushItemWidth(200)
       local text = u8"Не выбрано\0"
       for key, value in ipairs(pInfo.gov) do
-        text = text..u8:encode(value.title).."\0"
+        text = text..u8:encode(value[1]).."\0"
       end
       text = text.."\0"
       imgui.Combo(u8'Выберите шаблон объявления', data.imgui.setgovint, text)
@@ -2351,9 +2347,9 @@ function imgui.OnDrawFrame()
       if imgui.Button(u8'Редактировать') then
         if data.imgui.setgovint.v > 0 then
           data.imgui.setgovtextarea = {}
-          for i = 1, #pInfo.gov[data.imgui.setgovint.v] do
-            data.imgui.setgovtextarea[i] = imgui.ImBuffer(512)
-            data.imgui.setgovtextarea[i].v = u8:encode(pInfo.gov[data.imgui.setgovint.v][i])
+          for i = 2, #pInfo.gov[data.imgui.setgovint.v] do
+            data.imgui.setgovtextarea[i - 1] = imgui.ImBuffer(512)
+            data.imgui.setgovtextarea[i - 1].v = u8:encode(pInfo.gov[data.imgui.setgovint.v][i])
           end
           data.imgui.menu = 26
         else atext('Выберите необходимый шаблон!') end
@@ -2374,7 +2370,7 @@ function imgui.OnDrawFrame()
       imgui.Text(u8'Предварительный просмотр:')
       ------
       if data.imgui.setgovint.v > 0 then
-        for i = 1, #pInfo.gov[data.imgui.setgovint.v] do
+        for i = 2, #pInfo.gov[data.imgui.setgovint.v] do
           local gov = pInfo.gov[data.imgui.setgovint.v][i]
           gov = gov:gsub("{time}", u8:decode(data.imgui.setgov.v))
           imgui.Text(u8:encode(("/gov %s"):format(gov)))
@@ -2386,10 +2382,11 @@ function imgui.OnDrawFrame()
       if imgui.Button(u8'Объявить') then
         if data.imgui.setgovint.v > 0 then 
           lua_thread.create(function()
-            for i = 1, #pInfo.gov[data.imgui.setgovint.v] do
+            for i = 2, #pInfo.gov[data.imgui.setgovint.v] do
               local gov = pInfo.gov[data.imgui.setgovint.v][i]
               gov = gov:gsub("{time}", u8:decode(data.imgui.setgov.v))
-              sampSendChat(("/gov %s"):format(gov))
+              --sampSendChat(("/gov %s"):format(gov))
+              sampAddChatMessage("/gov "..gov, -1)
               wait(5000)
             end
             return
@@ -2410,14 +2407,13 @@ function imgui.OnDrawFrame()
       imgui.NewLine()
       imgui.Separator()
       if imgui.Button(u8'Изменить') then
-        local govslot = 1
-        local tit = pInfo.gov[data.imgui.setgovint.v].title
-        pInfo.gov[data.imgui.setgovint.v] = { title = tit }
+        local tit = pInfo.gov[data.imgui.setgovint.v][1]
+        pInfo.gov[data.imgui.setgovint.v] = {}
+        table.insert(pInfo.gov[data.imgui.setgovint.v], tit)
         for i = 1, #data.imgui.setgovtextarea do
           local govline = data.imgui.setgovtextarea[i].v
           if govline ~= nil and govline ~= "" then
-            pInfo.gov[data.imgui.setgovint.v][govslot] = u8:decode(govline)
-            govslot = govslot + 1
+            table.insert(pInfo.gov[data.imgui.setgovint.v], u8:decode(govline))
           end
         end
         data.imgui.setgov.v = ""
@@ -2446,17 +2442,16 @@ function imgui.OnDrawFrame()
       imgui.Separator()
       if imgui.Button(u8'Создать') then
         local len = #pInfo.gov + 1
-        local govslot = 1
         if data.imgui.setgov.v ~= nil and data.imgui.setgov.v ~= "" then
-          pInfo.gov[len] = { title = u8:decode(data.imgui.setgov.v) }
+          pInfo.gov[len] = {}
+          table.insert(pInfo.gov[len], u8:decode(data.imgui.setgov.v))
           for i = 1, #data.imgui.setgovtextarea do
             local govline = data.imgui.setgovtextarea[i].v
             if govline ~= nil and govline ~= "" then
-              pInfo.gov[len][govslot] = u8:decode(govline)
-              govslot = govslot + 1
+              table.insert(pInfo.gov[len], u8:decode(govline))
             end
           end
-          data.imgui.setgovint.v = slot
+          data.imgui.setgovint.v = len
           data.imgui.menu = 25
           data.imgui.setgov.v = ""
           atext('Шаблон успешно создан!')
