@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3631")
-SCRIPT_ASSEMBLY = "1.36-rc1"
+script_version("1.3641")
+SCRIPT_ASSEMBLY = "1.36-r1"
 DEBUG_MODE = true -- remove
 --------------------------------------------------------------------
 local res = pcall(require, 'lib.moonloader')
@@ -253,7 +253,9 @@ updatesInfo = {
   date = "28.05.2019",
   list = {
     "- Удален запрос к серверу из-за многочисленных ошибок у игроков;",
-    "- Пофикшены баги, связанные с крашем скрипта;"
+    "- Пофикшены баги, связанные с крашем скрипта;",
+    "- Добавлен список админов в {ffffff}'moonloader/SFAHelper/admins.txt'. {cccccc}Каждый может подстроить список под себя;",
+    "- Выпуск обновлений приостановлен на неопределенный срок;"
   }
 }
 adminsList = {}
@@ -1183,14 +1185,65 @@ end
 
 -- Загружаем админов из файла
 function loadAdmins()
+  local admlist = [[Jeysen_Prado=10
+Maxim_Kudryavtsev=10
+Ioan_Grozny=10
+Brain_Hernandez=10
+Tellarion_Foldring=10
+Sergo_Cross=10
+Dwayne_Eagle=9
+Ziggi_Shmiggi=7
+Tobey_Marshall=7
+Salvatore_Giordano=7
+Maks_Wirense=6
+Leonid_Litvinenko=6
+Butcher_Wezers=5
+Angel_Espejo=5
+Native_Pechenkov=5
+Laurence_Lawson=5
+Christian_Norton=5
+Thomas_Lawson=5
+Snoop_Noop=5
+Alvaro_Welloso=5
+Diego_Hudson=5
+Maximilliano_Asher=5
+Diego_Serrano=5
+Adolfo_Juarez=5
+Le_Ji=5
+Tofik_Dipsize=4
+Jay_Rise=4
+Sam_Teller=3
+Mihail_Klimov=3
+Sam_Teller=3
+Daniel_Molotkov=3
+Hike_Galante=3
+Vladislav_Melentyev=3
+Chester_James=2
+Vladimir_DeMont=2
+Ernesto_Gilmore=2
+Fernando_Haizenberg=2
+Guiseppe_Roell=2
+Link_Maestro=1
+Denial_Blackwood=1
+Brain_Mclaren=1
+Vincent_Vinograd=1]]
   local file = io.open("moonloader/SFAHelper/admins.txt", "a+")
+  local count = 0
   for line in file:lines() do
     local n, l = line:match("(.+)=(.+)")
     if n ~= nil and tonumber(l) ~= nil then
       adminsList[#adminsList + 1] = { nick = n, level = tonumber(l) }
+      count = count + 1
     end
   end
+  if count == 0 then
+    file:write(admlist)
+    file:close()
+    loadAdmins()
+    return
+  end
   file:close()
+  debug_log("(info) Загружено "..count.." админов", true)
 end
 
 -- Загружаем необходимые файлы
