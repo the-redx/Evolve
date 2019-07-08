@@ -1,47 +1,38 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3641")
-SCRIPT_ASSEMBLY = "1.36-r1"
-DEBUG_MODE = true -- remove
+script_version("1.3724")
+SCRIPT_ASSEMBLY = "1.37-b4"
+DEBUG_MODE = true
 --------------------------------------------------------------------
-local res = pcall(require, 'lib.moonloader')
-assert(res, "Library 'lib.moonloader' not found")
------
-local res = pcall(require, 'lib.sampfuncs')
-assert(res, "Library 'lib.sampfuncs' not found")
------
-local res, inicfg = pcall(require, 'inicfg')
-assert(res, "Library 'inicfg' not found")
------
-local lEffil, effil = pcall(require, 'effil')
-assert(res, "Library 'effil' not found")
------
-local res, sampevents = pcall(require, 'lib.samp.events')
-assert(res, "Library 'lib.samp.events' not found")
------
-local res, memory = pcall(require, 'memory')
-assert(res, "Library 'memory' not found")
------
-local res, encoding = pcall(require, 'encoding')
-assert(res, "Library 'encoding' not found")
+require 'lib.moonloader'
+require 'lib.sampfuncs'
+------------------
+local lsampev, sampevents = pcall(require, 'lib.samp.events')
+                            assert(lsampev, 'Library \'lib.samp.events\' not found')
+local lencoding, encoding = pcall(require, 'encoding')
+                            assert(lencoding, 'Library \'encoding\' not found')
+local lkey, key           = pcall(require, 'vkeys')
+                            assert(lkey, 'Library \'vkeys\' not found')
+local lmem, memory        = pcall(require, 'memory')
+                            assert(lmem, 'Library \'memory\' not found')
+local lrkeys, rkeys       = pcall(require, 'rkeys')
+                            assert(lrkeys, 'Library \'rkeys\' not found')
+local lbitex, bitex       = pcall(require, 'bitex')
+                            assert(lbitex, 'Library \'bitex\' not found')
+local lrequests, requests = pcall(require, 'requests')
+                            assert(lrequests, 'Library \'requests\' not found')
+local limgui, imgui       = pcall(require, 'imgui')
+                            assert(limgui, 'Library \'imgui\' not found')
+local limadd, imadd       = pcall(require, 'imgui_addons')
+                            assert(limadd, 'Library \'imgui_addons\' not found')
+local lcopas, copas       = pcall(require, 'copas')
+local lhttp, http         = pcall(require, 'copas.http')
+--local raknet = require "lib.samp.raknet"
+------------------
 encoding.default = 'CP1251'
 local u8 = encoding.UTF8
------
-local res, bitex = pcall(require, 'bitex')
-assert(res, "Library 'bitex' not found")
------
-local res, key = pcall(require, 'vkeys')
-assert(res, "Library 'vkeys' not found")
------
-local res, rkeys = pcall(require, 'rkeys')
-assert(res, "Library 'rkeys' not found")
------
-local res, imgui = pcall(require, 'imgui')
-assert(res, "Library 'imgui' not found")
 imgui.ToggleButton = require('imgui_addons').ToggleButton
 imgui.HotKey = require('imgui_addons').HotKey
------
---local raknet = require "lib.samp.raknet"
 --------------------------------------------------------------------
 window = {
   ['main'] = imgui.ImBool(false),
@@ -78,7 +69,6 @@ pInfo = {
     clist = nil,
     membersdate = false,
     tag = nil,
-    addition = false,
   },
   gov = {},
   weeks = {0,0,0,0,0,0,0},
@@ -239,23 +229,26 @@ tLastKeys = {}
 contractId = nil
 playersAddCounter = 1
 giveDMG = nil
+playerMarker = nil
 giveDMGTime = nil
 giveDMGSkin = nil
 targetID = nil
 contractRank = nil
-autoBP = 0
+autoBP = 1
 asyncQueue = false
 spectate_list = {}
 lectureStatus = 0
 complete = false
 updatesInfo = {
   version = DEBUG_MODE and SCRIPT_ASSEMBLY.." (тестовая)" or thisScript().version,
-  date = "28.05.2019",
+  date = "08.07.2019",
   list = {
-    "- Удален запрос к серверу из-за многочисленных ошибок у игроков;",
-    "- Пофикшены баги, связанные с крашем скрипта;",
-    "- Добавлен список админов в {ffffff}'moonloader/SFAHelper/admins.txt'. {cccccc}Каждый может подстроить список под себя;",
-    "- Выпуск обновлений приостановлен на неопределенный срок;"
+    "- Удалены пасхалочки в скрипте;",
+    "- Обновлена библиотека HTTP/S запросов;",
+    "- Для слепых изменен цвет кнопки закрытия меню;",
+    "- Пофикшен баг, когда слетали говки после обнуления онлайна;",
+    "- Добавлены тэги в лекциях;",
+    "- Добавлена команда {ffffff}/match [id]{cccccc}. Отображает местонахождение игрока меткой на карте\nИгрок должен быть в зоне стрима;",
   }
 }
 adminsList = {}
@@ -309,12 +302,8 @@ function main()
       local fa = io.open("moonloader/SFAHelper/config.json", "w")
       fa:close()
     end
-    if pInfo.settings.addition == false then -- remove
-      pInfo.settings.addition = true
-      pInfo.gov = {}
-    end
     -- Если в конфиге нет данных о говке, записываем туда шаблоны
-    if #pInfo.gov == 0 then
+    if #pInfo.gov == 0 or pInfo.gov == nil then
       pInfo.gov = govtext
     end
     saveData(pInfo, "moonloader/SFAHelper/config.json")
@@ -376,6 +365,7 @@ function main()
     sampRegisterChatCommand('addbl', cmd_addbl)
     sampRegisterChatCommand('vig', cmd_vig)
     sampRegisterChatCommand('adm', cmd_adm)
+    sampRegisterChatCommand('match', cmd_match)
     sampRegisterChatCommand('contract', cmd_contract)
     sampRegisterChatCommand('cl', function(arg) sampSendChat('/clist '..arg) end)
     sampRegisterChatCommand('inv', function(arg) sampSendChat('/invite '..arg) end)
@@ -383,10 +373,6 @@ function main()
     sampRegisterChatCommand('gr', function(arg) sampSendChat('/giverank '..arg) end)
     sampRegisterChatCommand('sfahelper', function() window['main'].v = not window['main'].v end)
     sampRegisterChatCommand('sh', function() window['main'].v = not window['main'].v end)
-    ----- Пасхалочки
-    sampRegisterChatCommand('belin', function() atext('Jonathan_Belin: Хочешь блата? Плати за блат!') end)
-    sampRegisterChatCommand('deroys', function() atext('Erik_Deroys: ты лох') end)
-    sampRegisterChatCommand('franklin', function() atext('Edward_Franklin: Нашёл пасхалочки? А ну быстро работать!') end)
     ----- Команды, для которых было лень создавать функции
     sampRegisterChatCommand('addtable', function()
       if sInfo.tablePermissions == false then atext('Для работы с данной командой необходима привязка!') return end
@@ -438,7 +424,7 @@ function main()
         debug_log("(info) Новая неделя. (weekOnline = "..secToTime(pInfo.info.weekOnline)..")")
         -- Очищаем все счётчики, кроме настроек
         for key in pairs(pInfo) do
-          if key ~= "settings" then
+          if key ~= "settings" and key ~= "gov" then
             for k in pairs(pInfo[key]) do
               pInfo[key][k] = 0
             end
@@ -535,6 +521,29 @@ function cmd_r(args)
   end
 end
 
+function cmd_match(args)
+  if #args == 0 then
+    if playerMarker ~= nil then
+      removeBlip(playerMarker)
+      playerMarker = nil
+      atext('Маркер успешно убран')
+      return
+    end
+    atext('Введите: /match [id]')
+    return
+  end
+  local id = tonumber(args)
+  if id == nil then atext('Игрок оффлайн!') return end
+  if not sampIsPlayerConnected(id) then atext('Игрок оффлайн!') return end
+  local result, ped = sampGetCharHandleBySampPlayerId(id)
+  if not result then atext('Игрок должен быть в зоне прорисовки') return end   
+  if playerMarker ~= nil then removeBlip(playerMarker) end
+  playerMarker = addBlipForChar(ped)
+  changeBlipColour(playerMarker, 1)
+  atext(('Маркер установлен на игрока %s[%d]'):format(sampGetPlayerNickname(id), id))
+  atext('Чтобы убрать маркер, введите команду /match ещё раз')
+end
+
 -- Добавление в ЧС
 function cmd_addbl(args)
   if sInfo.blPermissions == false then atext('Для работы с данной командой необходима привязка!') return end
@@ -594,8 +603,8 @@ function cmd_lecture(args)
           if string.match(data.imgui.lecturetext[lectureStatus], "^/r .+") then
             -- /r обрабатываем через свою функцию для автотэга
             local bind = string.match(data.imgui.lecturetext[lectureStatus], "^/r (.+)")
-            cmd_r(bind)  
-          else sampSendChat(data.imgui.lecturetext[lectureStatus]) end
+            cmd_r(tags(bind))  
+          else sampSendChat(tags(data.imgui.lecturetext[lectureStatus])) end
           lectureStatus = lectureStatus + 1
         end
         if lectureStatus > #data.imgui.lecturetext then
@@ -816,24 +825,24 @@ function cmd_checkrank(arg)
   sampAddChatMessage('Загрузка данных...', 0xFFFF00)
   debug_log("(debug) Отправляем асинхронку. Очередь: "..tostring(asyncQueue))
   asyncQueue = true
-  asyncHttpRequest("POST", updatelink, _,
-  function (response)
-    -- Регулярка для парсинга строчек, т.к. в запросе все приходит в 1 строчке
-    for line in response.text:gmatch('[^\r\n]+') do
-      -- Ichigo_Kurasaki	1	2	21.03.2019	Jonathan Belin	Повышение.
-      -- .tsv файлы представляют данные, которые отделяются табом
-      local arr = string.split(line, "\t")
-      tempFiles.ranks[#tempFiles.ranks + 1] = { nick = arr[1], rank1 = arr[2], rank2 = arr[3], date = arr[4], executor = arr[5], reason = arr[6] }
+  httpRequest(updatelink, nil, function(response, code, headers, status)
+    if response then
+      -- Регулярка для парсинга строчек, т.к. в запросе все приходит в 1 строчке
+      for line in response:gmatch('[^\r\n]+') do
+        -- Ichigo_Kurasaki	1	2	21.03.2019	Jonathan Belin	Повышение.
+        -- .tsv файлы представляют данные, которые отделяются табом
+        local arr = string.split(line, "\t")
+        tempFiles.ranks[#tempFiles.ranks + 1] = { nick = arr[1], rank1 = arr[2], rank2 = arr[3], date = arr[4], executor = arr[5], reason = arr[6] }
+      end
+      debug_log("(info) Обработка ответа успешно завершена", true)
+      asyncQueue = false
+      -- Обновляем время, возвращаемся в функцию
+      tempFiles.ranksTime = os.time()
+      cmd_checkrank(arg)
+    else
+      debug_log("(info) Ответ был получен с ошибкой", true)
+      asyncQueue = false
     end
-    debug_log("(info) Обработка ответа успешно завершена", true)
-    asyncQueue = false
-    -- Обновляем время, возвращаемся в функцию
-    tempFiles.ranksTime = os.time()
-    cmd_checkrank(arg)
-  end,
-  function (err)
-    debug_log("(info) Ответ был получен с ошибкой", true)
-    asyncQueue = false
   end)
 end
 
@@ -876,26 +885,26 @@ function cmd_checkbl(arg)
   sampAddChatMessage('Загрузка данных...', 0xFFFF00)
   debug_log("(debug) Отправляем асинхронку. Очередь: "..tostring(asyncQueue))
   asyncQueue = true
-  asyncHttpRequest("POST", updatelink, _,
-  function (response)
-    -- Регулярка для парсинга строчек, т.к. в запросе все приходит в 1 строчке
-    for line in response.text:gmatch('[^\r\n]+') do
-      -- Jayden Ray	Vladimit_Rodionov	Потеря формы , ТК	22.07.2017	http://imgur.com/a/q2w6J  3
-      -- .tsv файлы представляют данные, которые отделяются табом
-      local arr = string.split(line, "\t")
-      local step = arr[6]
-      if arr[6] ~= nil and arr[7] ~= nil then step = arr[7] end
-      tempFiles.blacklist[#tempFiles.blacklist + 1] = { nick = arr[2], stepen = tonumber(step), date = arr[4], executor = arr[1], reason = arr[3] }
+  httpRequest(updatelink, nil, function(response, code, headers, status)
+    if response then
+      -- Регулярка для парсинга строчек, т.к. в запросе все приходит в 1 строчке
+      for line in response:gmatch('[^\r\n]+') do
+        -- Jayden Ray	Vladimit_Rodionov	Потеря формы , ТК	22.07.2017	http://imgur.com/a/q2w6J  3
+        -- .tsv файлы представляют данные, которые отделяются табом
+        local arr = string.split(line, "\t")
+        local step = arr[6]
+        if arr[6] ~= nil and arr[7] ~= nil then step = arr[7] end
+        tempFiles.blacklist[#tempFiles.blacklist + 1] = { nick = arr[2], stepen = tonumber(step), date = arr[4], executor = arr[1], reason = arr[3] }
+      end
+      debug_log("(info) Обработка ответа успешно завершена", true)
+      asyncQueue = false
+      -- Обновляем время, возвращаемся в функцию
+      tempFiles.blacklistTime = os.time()
+      cmd_checkbl(arg)
+    else
+      debug_log("(info) Ответ был получен с ошибкой", true)
+      asyncQueue = false
     end
-    debug_log("(info) Обработка ответа успешно завершена", true)
-    asyncQueue = false
-    -- Обновляем время, возвращаемся в функцию
-    tempFiles.blacklistTime = os.time()
-    cmd_checkbl(arg)
-  end,
-  function (err)
-    debug_log("(info) Ответ был получен с ошибкой", true)
-    asyncQueue = false
   end)
 end
 
@@ -1041,6 +1050,12 @@ function secoundTimer()
   lua_thread.create(function()
     local updatecount = 0
     while true do
+      -- Маркер
+      if playerMarker ~= nil and not doesBlipExist(playerMarker) then
+        atext('Игрок покинул зону прорисовки. Маркер отключен')
+        removeBlip(playerMarker)
+        playerMarker = nil        
+      end
       -- Счётчики онлайна
       if sInfo.isWorking == true then
         pInfo.info.weekWorkOnline = pInfo.info.weekWorkOnline + 1
@@ -1138,24 +1153,24 @@ function punaccept()
   if punkeyActive == 0 then return
   elseif punkeyActive == 1 then
     if punkey[1].nick then
-      if punkey[1].time >= os.time() - 1 then atext("Не флуди!") return end
-      if punkey[1].time >= os.time() - 10 then
+      if punkey[1].time > os.time() - 1 then atext("Не флуди!") return end
+      if punkey[1].time > os.time() - 15 then
         cmd_r('Боец '..string.gsub(punkey[1].nick, "_", " ")..' уволен из армии. Причина: '..punkey[1].reason)
       end
       punkey[1].nick, punkey[1].reason, punkey[1].time = nil, nil, nil
     end
   elseif punkeyActive == 2 then
     if punkey[2].nick then
-      if punkey[2].time >= os.time() - 1 then atext("Не флуди!") return end
-      if punkey[2].time >= os.time() - 10 then
+      if punkey[2].time > os.time() - 1 then atext("Не флуди!") return end
+      if punkey[2].time > os.time() - 15 then
         sampSendChat(('/me достал %s %sа, и передал их человеку напротив'):format(punkey[2].rank > 6 and "погоны" or "лычки", rankings[punkey[2].rank]))
       end
       punkey[2].nick, punkey[2].rank, punkey[2].time = nil, nil, nil
     end
   elseif punkeyActive == 3 then
     if punkey[3].text ~= nil then
-      if punkey[3].time >= os.time() - 1 then atext("Не флуди!") return end
-      if punkey[3].time >= os.time() - 10 then
+      if punkey[3].time > os.time() - 1 then atext("Не флуди!") return end
+      if punkey[3].time > os.time() - 15 then
         cmd_r(punkey[3].text)
         --------
         if punkey[3].text:match("Состояние %- 300%/300") then
@@ -1249,6 +1264,35 @@ end
 -- Загружаем необходимые файлы
 function loadFiles()
   lua_thread.create(function()
+    --- Загрузка библиотек
+    if not lcopas or not lhttp then
+      atext('Необходимые для работы библиотеки не были найдены. Скачиваем...')
+      local direct = {'copas'}
+      local files = {'copas.lua', "copas/ftp.lua", 'copas/http.lua', 'copas/limit.lua', 'copas/smtp.lua', 'requests.lua'}
+      for k, v in pairs(direct) do if not doesDirectoryExist("moonloader/lib/"..v) then createDirectory("moonloader/lib/"..v) end end
+      for k, v in pairs(files) do
+        copas_download_status = 'proccess'
+        downloadUrlToFile('https://raw.githubusercontent.com/WhackerH/kirya/master/lib/'..v, 'moonloader/lib/'..v, function(id, status, p1, p2)
+          if status == dlstatus.STATUS_DOWNLOADINGDATA then
+            copas_download_status = 'proccess'
+            print(string.format('Загружено %d килобайт из %d килобайт.', p1, p2))
+          elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
+            copas_download_status = 'succ'
+          elseif status == 64 then
+            copas_download_status = 'failed'
+          end
+        end)
+        while copas_download_status == 'proccess' do wait(0) end
+        if copas_download_status == 'failed' then
+          atext('Не удалось загрузить библиотеку \'copas\'')
+          thisScript():unload()
+        else
+          print(v..' был загружен')
+        end
+      end
+      atext('Все необходимые библиотеки были загружены')
+      reloadScripts()
+    end
     if not doesDirectoryExist("moonloader\\SFAHelper\\lectures") then
       createDirectory("moonloader\\SFAHelper\\lectures")
       debug_log("(info) Директория 'moonloader/SFAHelper/lectures' успешно создана")
@@ -1283,26 +1327,26 @@ function loadPermissions(table_url)
   local nick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(playerPed)))
   debug_log("(debug) Проверяем права доступа. Очередь: "..tostring(asyncQueue))
   asyncQueue = true
-  asyncHttpRequest("GET", table_url, _,
-  function(response)
-    for line in response.text:gmatch('[^\r\n]+') do
-      if line:match("^blacklist\t"..nick.."$") then
-        sInfo.blPermissions = true
+  httpRequest(table_url, nil, function(response, code, headers, status)
+    if response then
+      for line in response:gmatch('[^\r\n]+') do
+        if line:match("^blacklist\t"..nick.."$") then
+          sInfo.blPermissions = true
+        end
+        if line:match("^logs_table\t"..nick.."$") then
+          sInfo.tablePermissions = true
+        end
       end
-      if line:match("^logs_table\t"..nick.."$") then
-        sInfo.tablePermissions = true
-      end
+      debug_log("(info) Права пользователей успешно загружены")
+      complete = true
+      asyncQueue = false
+      return
+    else
+      debug_log("(info) Права пользователей не загружены")
+      complete = true
+      asyncQueue = false
+      return
     end
-    debug_log("(info) Права пользователей успешно загружены")
-    complete = true
-    asyncQueue = false
-    return
-  end,
-  function(err)
-    debug_log("(info) Права пользователей не загружены")
-    complete = true
-    asyncQueue = false
-    return
   end)
 end
 
@@ -1335,51 +1379,51 @@ end
 function autoupdate(json_url)
   debug_log("(debug) Проверяем наличие обновлений. Очередь: "..tostring(asyncQueue))
   asyncQueue = true
-  asyncHttpRequest("GET", json_url, _,
-  function (response)
-    local info = decodeJson(response.text)
-    if DEBUG_MODE then
-      updatelink = info.sfahelper.testurl
-      updateversion = info.sfahelper.testversion
-    else
-      updatelink = info.sfahelper.url
-      updateversion = info.sfahelper.version     
-    end
-    if updateversion > thisScript().version then
-      lua_thread.create(function()
-        atext('Обнаружено обновление. Пытаюсь обновиться c '..thisScript().version..' на '..updateversion)
-        debug_log("(info) Обнаружено обновление. Версия: "..updateversion, true)
-        wait(250)
-        local dlstatus = require('moonloader').download_status
-        downloadUrlToFile(updatelink, thisScript().path,
-          function(id, status, p1, p2)
-            if status == dlstatus.STATUS_DOWNLOADINGDATA then
-              print(string.format('Загружено %d из %d.', p1, p2))
-            elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
-              debug_log('(info) Загрузка обновления успешно завершена', true)
-              atext('Обновление завершено. Просмотреть список изменений: /shupd')
-              goupdatestatus = true
-              lua_thread.create(function() wait(500) thisScript():reload() end)
-            end
-            if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-              if goupdatestatus == nil then
-                debug_log('(info) Обновление прошло неудачно', true)
-                atext('Обновление прошло неудачно. Запускаю устаревшую версию..')
-                complete = true
+  httpRequest(json_url, nil, function(response, code, headers, status)
+    if response then
+      local info = decodeJson(response)
+      if DEBUG_MODE then
+        updatelink = info.sfahelper.testurl
+        updateversion = info.sfahelper.testversion
+      else
+        updatelink = info.sfahelper.url
+        updateversion = info.sfahelper.version     
+      end
+      if updateversion > thisScript().version then
+        lua_thread.create(function()
+          atext('Обнаружено обновление. Пытаюсь обновиться c '..thisScript().version..' на '..updateversion)
+          debug_log("(info) Обнаружено обновление. Версия: "..updateversion, true)
+          wait(250)
+          local dlstatus = require('moonloader').download_status
+          downloadUrlToFile(updatelink, thisScript().path,
+            function(id, status, p1, p2)
+              if status == dlstatus.STATUS_DOWNLOADINGDATA then
+                print(string.format('Загружено %d из %d.', p1, p2))
+              elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
+                debug_log('(info) Загрузка обновления успешно завершена', true)
+                atext('Обновление завершено. Просмотреть список изменений: /shupd')
+                goupdatestatus = true
+                lua_thread.create(function() wait(500) thisScript():reload() end)
+              end
+              if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+                if goupdatestatus == nil then
+                  debug_log('(info) Обновление прошло неудачно', true)
+                  atext('Обновление прошло неудачно. Запускаю устаревшую версию..')
+                  complete = true
+                end
               end
             end
-          end
-        )
-        return
-      end)
-    else debug_log("(info) Доступных обновлений нет", true) complete = true end
-    asyncQueue = false
-  end,
-  function (err)
-    debug_log("(debug) Ответ был получен с ошибкой", true)
-    asyncQueue = false
-    atext('Не удалось проверить обновления')
-    complete = true
+          )
+          return
+        end)
+      else debug_log("(info) Доступных обновлений нет", true) complete = true end
+      asyncQueue = false 
+    else
+      debug_log("(debug) Ответ был получен с ошибкой", true)
+      asyncQueue = false
+      atext('Не удалось проверить обновления')
+      complete = true      
+    end
   end)
 end
 
@@ -1456,16 +1500,16 @@ end
 function sampevents.onShowDialog(dialogid, style, title, button1, button2, text)
   if pInfo.settings.autobp == true and dialogid == 5225 then
     -- 0 - deagle, 1 - shot, 3 - m4, 4 - rifle, 5 - bron'
+    local guns = {0, 0, 1, 1, 3, 3, 4, 4, 5}
     lua_thread.create(function()
       wait(250)
-      if autoBP == 6 then
-        autoBP = 0
+      if autoBP == #guns + 1 then
+        autoBP = 1
         sampCloseCurrentDialogWithButton(0)
         return
       end
-      sampSendDialogResponse(5225, 1, autoBP, "")
+      sampSendDialogResponse(5225, 1, guns[autoBP], "")
       autoBP = autoBP + 1
-      if autoBP == 2 then autoBP = 3 end
       return
     end)
   end
@@ -2195,6 +2239,7 @@ function imgui.OnDrawFrame()
       imgui.TextColoredRGB("/blag [ид] [фракция] [тип]{CCCCCC} - Выразить игроку благодарность в департамент")
       imgui.TextColoredRGB("/abp{CCCCCC} - Включить/Выключить автомитическое взятие БП")
       imgui.TextColoredRGB("/shud{CCCCCC} - Включить/Выключить худ")
+      imgui.TextColoredRGB("/match [id/nick]{CCCCCC} - Отображает местонаождение игрока на радаре")
     elseif data.imgui.menu == 20 then
       atext("Перезагружаемся...")
       showCursor(false)
@@ -2451,8 +2496,8 @@ function imgui.OnDrawFrame()
             for i = 2, #pInfo.gov[data.imgui.setgovint.v] do
               local gov = pInfo.gov[data.imgui.setgovint.v][i]
               gov = gov:gsub("{time}", u8:decode(data.imgui.setgov.v))
-              --sampSendChat(("/gov %s"):format(gov))
-              sampAddChatMessage("/gov "..gov, -1)
+              sampSendChat(("/gov %s"):format(gov))
+              --sampAddChatMessage("/gov "..gov, -1)
               wait(5000)
             end
             return
@@ -3935,9 +3980,9 @@ function apply_custom_style()
   colors[clr.ResizeGrip] = ImVec4(1.00, 1.00, 1.00, 0.30)
   colors[clr.ResizeGripHovered] = ImVec4(1.00, 1.00, 1.00, 0.60)
   colors[clr.ResizeGripActive] = ImVec4(1.00, 1.00, 1.00, 0.90)
-  colors[clr.CloseButton] = ImVec4(0.40, 0.39, 0.38, 0.16)
-  colors[clr.CloseButtonHovered] = ImVec4(0.06, 0.05, 0.07, 1.00)
-  colors[clr.CloseButtonActive] = ImVec4(0.06, 0.05, 0.07, 1.00)
+  colors[clr.CloseButton] = ImVec4(0.56, 0.56, 0.58, 0.75)
+  colors[clr.CloseButtonHovered] = ImVec4(0.56, 0.56, 0.58, 1.00)
+  colors[clr.CloseButtonActive] = ImVec4(0.56, 0.56, 0.58, 1.00)
   colors[clr.PlotLines] = ImVec4(0.00, 0.00, 0.00, 0.00)
   colors[clr.PlotLinesHovered] = ImVec4(0.00, 0.00, 0.00, 0.00)
   colors[clr.PlotHistogram] = ImVec4(0.00, 0.00, 0.00, 0.00)
@@ -4112,43 +4157,33 @@ function getTargetBlipCoordinatesFixed()
   return bool, x, y, z
 end
 
-function asyncHttpRequest(method, url, args, resolve, reject)
-  local request_thread = effil.thread(function (method, url, args)
-    local requests = require 'requests'
-    local result, response = pcall(requests.request, method, url, args)
-    if result then
-      response.json, response.xml = nil, nil
-      return true, response
-    else
-      return false, response
-    end
-  end)(method, url, args)
-  -- Если запрос без функций обработки ответа и ошибок.
-  if not resolve then resolve = function() end end
-  if not reject then reject = function() end end
-  -- Проверка выполнения потока
-  lua_thread.create(function()
-    local runner = request_thread
-    while true do
-      local status, err = runner:status()
-      if not err then
-        if status == 'completed' then
-          local result, response = runner:get()
-          if result then
-            resolve(response)
-          else
-            reject(response)
-          end
-          return
-        elseif status == 'canceled' then
-          return reject(status)
-        end
-      else
-        return reject(err)
-      end
+function httpRequest(request, body, handler) -- copas.http
+  -- start polling task
+  if not copas.running then
+    copas.running = true
+    lua_thread.create(function()
       wait(0)
-    end
-
-    return
-  end)
+      while not copas.finished() do
+        local ok, err = copas.step(0)
+        if ok == nil then error(err) end
+        wait(0)
+      end
+      copas.running = false
+    end)
+  end
+  -- do request
+  if handler then
+    return copas.addthread(function(r, b, h)
+      copas.setErrorHandler(function(err) h(nil, err) end)
+      h(http.request(r, b))
+    end, request, body, handler)
+  else
+    local results
+    local thread = copas.addthread(function(r, b)
+      copas.setErrorHandler(function(err) results = {nil, err} end)
+      results = table.pack(http.request(r, b))
+    end, request, body)
+    while coroutine.status(thread) ~= 'dead' do wait(0) end
+    return table.unpack(results)
+  end
 end
