@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3728")
-SCRIPT_ASSEMBLY = "1.37-b8"
+script_version("1.3731")
+SCRIPT_ASSEMBLY = "1.37-rc1"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -245,7 +245,7 @@ lectureStatus = 0
 complete = false
 updatesInfo = {
   version = DEBUG_MODE and SCRIPT_ASSEMBLY.." (тестовая)" or thisScript().version,
-  date = "08.07.2019",
+  date = "10.07.2019",
   list = {
     "- Удалены пасхалочки в скрипте;",
     "- Обновлена библиотека HTTP/S запросов;",
@@ -279,7 +279,7 @@ function main()
     --------------------=========----------------------
     -- Подгружаем необходимые функции, останавливая основной поток до конца выполнения
     local mstime = os.clock()
-    loadFiles()
+    --[[loadFiles()
     while complete ~= true do wait(0) end
     debug_log(("(debug) Библиотеки | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
@@ -288,7 +288,7 @@ function main()
     debug_log(("(debug) Авто-обновления | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
     loadPermissions("https://docs.google.com/spreadsheets/d/1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y/export?format=tsv&id=1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y&gid=1568566199") -- remove
-    while complete ~= true do wait(0) end
+    while complete ~= true do wait(0) end]]
     complete = false
     --------------------=========----------------------
     -- Загружаем конфиги
@@ -561,7 +561,11 @@ function cmd_match(args)
   if not sampIsPlayerConnected(id) then atext('Игрок оффлайн!') return end
   local result, ped = sampGetCharHandleBySampPlayerId(id)
   if not result then atext('Игрок должен быть в зоне прорисовки') return end   
-  if playerMarker ~= nil then removeBlip(playerMarker) end
+  if playerMarker ~= nil then
+    removeBlip(playerMarker)
+    removeBlip(playerRadar)
+    playerMarkerId = nil
+  end
   playerMarkerId = id
   playerMarker = addBlipForChar(ped)
   --changeBlipColour(playerMarker, 0xFF0000FF)
