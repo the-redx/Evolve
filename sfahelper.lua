@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3731")
-SCRIPT_ASSEMBLY = "1.37-rc1"
+script_version("1.3732")
+SCRIPT_ASSEMBLY = "1.37-rc2"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -233,6 +233,7 @@ giveDMG = nil
 playerMarker = nil
 playerMarkerId = nil
 playerRadar = nil
+selectedContext = nil
 giveDMGTime = nil
 giveDMGSkin = nil
 targetID = nil
@@ -254,6 +255,8 @@ updatesInfo = {
     "- Пофикшен баг, когда слетали говки после обнуления онлайна;",
     "- Добавлены тэги в лекциях;",
     "- Добавлена команда {ffffff}/match [id]{cccccc}. Отображает местонахождение игрока меткой на карте\nИгрок должен быть в зоне стрима;",
+    "- Добавлены новые тэги для биндера, которые взаимодействуют с игроком, выбранным через {ffffff}/match;",
+    "- В окне {ffffff}/members 2{cccccc} добавлено контекстное меню. Для вызова меню нажмите {FFFFFF}ПКМ{cccccc} на нике игрока;",
   }
 }
 adminsList = {}
@@ -279,7 +282,7 @@ function main()
     --------------------=========----------------------
     -- Подгружаем необходимые функции, останавливая основной поток до конца выполнения
     local mstime = os.clock()
-    --[[loadFiles()
+    loadFiles()
     while complete ~= true do wait(0) end
     debug_log(("(debug) Библиотеки | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
@@ -288,7 +291,7 @@ function main()
     debug_log(("(debug) Авто-обновления | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
     loadPermissions("https://docs.google.com/spreadsheets/d/1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y/export?format=tsv&id=1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y&gid=1568566199") -- remove
-    while complete ~= true do wait(0) end]]
+    while complete ~= true do wait(0) end
     complete = false
     --------------------=========----------------------
     -- Загружаем конфиги
@@ -941,6 +944,7 @@ end
 
 -- Запрос эвакуации
 function cmd_ev(arg)
+  if sInfo.isWorking == false then atext('Необходимо начать рабочий день!') return end
   if #arg == 0 then
     atext("Введите: /ev [0-1] [кол-во мест]")
     return
@@ -974,6 +978,7 @@ end
 
 -- Запрос местоположения
 function cmd_loc(args)
+  if sInfo.isWorking == false then atext('Необходимо начать рабочий день!') return end
   args = string.split(args, " ")
   if #args ~= 2 then
     atext('Введите: /loc [id/nick] [секунды]')
@@ -2758,6 +2763,12 @@ function imgui.OnDrawFrame()
       str = str.."{tfullname} - Вывести РП ник игрока\n"
       str = str.."{tname} - Вывести имя игрока\n"
       str = str.."{tsurname} - Вывести фамилию игрока\n"
+      str = str.."Следующие параметры работают над выбранным игроком через \"/match\":\n"
+      str = str.."{mID} - Вывести ID игрока\n"
+      str = str.."{mnick} - Вывести ник игрока\n"
+      str = str.."{mfullname} - Вывести РП ник игрока\n"
+      str = str.."{mname} - Вывести имя игрока\n"
+      str = str.."{msurname} - Вывести фамилию игрока\n"
       imgui.TextQuestion(u8:encode(str))
       imgui.Separator()
 			imgui.BeginChild("##cmdlist", imgui.ImVec2(970, 442))
@@ -2911,6 +2922,7 @@ function imgui.OnDrawFrame()
     -----
     if membersInfo.mode == 0 and #membersInfo.players > 0 then
       imgui.Text(u8:encode(('Онлайн фракции: %d | На работе: %d | Выходной: %d'):format(membersInfo.online, membersInfo.work, membersInfo.nowork)))
+      imgui.LabelText(u8 'Поиск по нику/ID', u8 'Поиск по нику/ID')
       imgui.InputText(u8 'Поиск по нику/ID', membersInfo.imgui)
       imgui.Columns(6)
       imgui.Separator()
@@ -2933,6 +2945,21 @@ function imgui.OnDrawFrame()
       imgui.Columns(1)
     else imgui.Text(u8 'Формирование списка...') end
     -----
+    if imgui.BeginPopupContextItem('ContextMenu', 1) then
+      imgui.PushItemWidth(150)
+      if selectedContext ~= nil then
+        imgui.Text(u8:encode(("Игрок: %s[%d]"):format(sampGetPlayerNickname(selectedContext), selectedContext)))
+      else
+        imgui.Text(u8 "Игрок: Не выбрано")
+      end
+      if imgui.Button(u8'Местоположение', imgui.ImVec2(-0.1, 20)) then
+        cmd_loc(selectedContext.." 60")
+      end
+      if imgui.Button(u8'Закрыть', imgui.ImVec2(-0.1, 20)) then
+        imgui.CloseCurrentPopup()
+      end
+      imgui.EndPopup()
+    end
 		imgui.Separator()
 		imgui.End()
   end
@@ -3146,7 +3173,12 @@ function drawMembersPlayer(table)
 	  distance = ("%0.2f"):format(getDistanceBetweenCoords3d(mx, my, mz,cx, cy, xz))
 	end
 	imgui.Text(tostring(table.mid)); imgui.NextColumn()
-	imgui.TextColored(imgui_RGBA, nickname); imgui.NextColumn()
+  imgui.TextColored(imgui_RGBA, nickname)
+  if imgui.IsItemClicked(1) then
+    selectedContext = table.mid
+    imgui.OpenPopup("ContextMenu")
+  end
+  imgui.NextColumn()
 	imgui.Text(u8:encode(("%s[%d]"):format(rankings[table.mrank], table.mrank))); imgui.NextColumn()
 	imgui.Text(u8:encode(table.mstatus and "На работе" or "Выходной")); imgui.NextColumn()
 	imgui.Text(u8:encode(table.mafk ~= nil and table.mafk.." секунд" or "")); imgui.NextColumn()
@@ -3430,7 +3462,14 @@ function tags(args, param)
 		args = args:gsub("{tname}", tostring(sampGetPlayerNickname(targetID):gsub("_.*", "")))
 		args = args:gsub("{tsurname}", tostring(sampGetPlayerNickname(targetID):gsub(".*_", "")))
 		args = args:gsub("{tnick}", tostring(sampGetPlayerNickname(targetID)))
-	end
+  end
+  if playerMarkerId ~= nil then
+    args = args:gsub("{mID}", tostring(playerMarkerId))
+		args = args:gsub("{mfullname}", tostring(sampGetPlayerNickname(playerMarkerId):gsub("_", " ")))
+		args = args:gsub("{mname}", tostring(sampGetPlayerNickname(playerMarkerId):gsub("_.*", "")))
+		args = args:gsub("{msurname}", tostring(sampGetPlayerNickname(playerMarkerId):gsub(".*_", "")))
+		args = args:gsub("{mnick}", tostring(sampGetPlayerNickname(playerMarkerId)))    
+  end
 	return args
 end
 
