@@ -2209,17 +2209,17 @@ function imgui.OnDrawFrame()
       imgui.SameLine(); imgui.Text(u8 'Отображение чата в консоле SAMPFUNCS') 
       if imgui.Button(u8'Обновить список админов') then
         atext('Запрос отправлен. Ожидание ответа от сервера...')
+        debug_log('Отправен запрос на обновление админов')
         local ip, port = sampGetCurrentServerAddress()
         httpRequest('http://opentest3.000webhostapp.com/api.php?act=getadmins&server='..ip..':'..port, nil, function(response, code, headers, status)
           if response then
-            print(code, headers, status)
+            debug_log("Ответ получен. Код: "..code..", Статус: "..status)
             local info = decodeJson(response)
             if info.success == true then
               local output = ""
               local count = 0
               for key, value in ipairs(info.answer) do
                 output = output..string.format("%s=%s\n", value.nick, value.level)
-                print(value.nick, value.level)
                 count = count + 1
               end
               local file = io.open("moonloader/SFAHelper/admins.txt", "w+")
@@ -2228,14 +2228,14 @@ function imgui.OnDrawFrame()
               atext('Список админов успешно обновлен! Загружено '..count..' админов')
               loadAdmins()
             else
+              debug_log(string.format("Ошибка сервера: ", info.error == nil and "Подробности не были получены" or info.error))
               atext(string.format('Ошибка сервера: ', info.error == nil and "Подробности не были получены" or info.error))
             end
           else
+            debug_log("Ответ не получен. Код: "..code..", Статус: "..status)
             atext('При обработке запроса произошла ошибка. Попробуйте позже')
           end
         end)
-        --function loadAdmins()
-        --local file = io.open("moonloader/SFAHelper/admins.txt", "a+")
       end
     elseif data.imgui.menu == 18 then
       imgui.PushItemWidth(100)
