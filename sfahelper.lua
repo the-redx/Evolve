@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3724")
-SCRIPT_ASSEMBLY = "1.37-b4"
+script_version("1.3727")
+SCRIPT_ASSEMBLY = "1.37-b7"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -31,6 +31,7 @@ local lhttp, http         = pcall(require, 'copas.http')
 ------------------
 encoding.default = 'CP1251'
 local u8 = encoding.UTF8
+dlstatus = require('moonloader').download_status
 imgui.ToggleButton = require('imgui_addons').ToggleButton
 imgui.HotKey = require('imgui_addons').HotKey
 --------------------------------------------------------------------
@@ -230,12 +231,15 @@ contractId = nil
 playersAddCounter = 1
 giveDMG = nil
 playerMarker = nil
+playerMarkerId = nil
+playerRadar = nil
 giveDMGTime = nil
 giveDMGSkin = nil
 targetID = nil
 contractRank = nil
 autoBP = 1
 asyncQueue = false
+searchlight = nil
 spectate_list = {}
 lectureStatus = 0
 complete = false
@@ -246,6 +250,7 @@ updatesInfo = {
     "- Удалены пасхалочки в скрипте;",
     "- Обновлена библиотека HTTP/S запросов;",
     "- Для слепых изменен цвет кнопки закрытия меню;",
+    "- Пофикшен баг с крашем скрипта после включения автодоклада;",
     "- Пофикшен баг, когда слетали говки после обнуления онлайна;",
     "- Добавлены тэги в лекциях;",
     "- Добавлена команда {ffffff}/match [id]{cccccc}. Отображает местонахождение игрока меткой на карте\nИгрок должен быть в зоне стрима;",
@@ -274,7 +279,7 @@ function main()
     --------------------=========----------------------
     -- Подгружаем необходимые функции, останавливая основной поток до конца выполнения
     local mstime = os.clock()
-    loadFiles()
+    --[[loadFiles()
     while complete ~= true do wait(0) end
     debug_log(("(debug) Библиотеки | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
@@ -283,7 +288,7 @@ function main()
     debug_log(("(debug) Авто-обновления | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
     loadPermissions("https://docs.google.com/spreadsheets/d/1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y/export?format=tsv&id=1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y&gid=1568566199") -- remove
-    while complete ~= true do wait(0) end
+    while complete ~= true do wait(0) end]]
     complete = false
     --------------------=========----------------------
     -- Загружаем конфиги
@@ -367,6 +372,21 @@ function main()
     sampRegisterChatCommand('adm', cmd_adm)
     sampRegisterChatCommand('match', cmd_match)
     sampRegisterChatCommand('contract', cmd_contract)
+    sampRegisterChatCommand('light', function(arg)
+      if searchlight == nil then
+        local px, py, pz = getCharCoordinates(PLAYER_PED)
+        if not isCharInArea3d(PLAYER_PED, -1332.45 - 100.0, 493.31 - 100.0, 48.15 - 100.0, -1332.45 + 100.0, 493.31 + 100.0, 48.15 + 100.0, false) then
+          atext('Нужно быть на авианосце =)')
+          return
+        end
+        searchlight = createSearchlight(-1332.45, 493.31, 48.15, px, py, pz, 1.0, 1.0)
+        pointSearchlightAtChar(searchlight, PLAYER_PED, 1.0)
+        sampAddChatMessage('Searchlight создан. Для удаления введите: /light', 0xffff00)
+      else
+        deleteSearchlight(searchlight)
+        sampAddChatMessage('Searchlight удален', 0xffff00)
+      end
+    end)
     sampRegisterChatCommand('cl', function(arg) sampSendChat('/clist '..arg) end)
     sampRegisterChatCommand('inv', function(arg) sampSendChat('/invite '..arg) end)
     sampRegisterChatCommand('uinv', function(arg) sampSendChat('/uninvite '..arg) end)
@@ -522,10 +542,14 @@ function cmd_r(args)
 end
 
 function cmd_match(args)
+  -- https://blast.hk/wiki/lua:processlineofsight
   if #args == 0 then
     if playerMarker ~= nil then
       removeBlip(playerMarker)
+      removeBlip(playerRadar)
       playerMarker = nil
+      playerRadar = nil
+      playerMarkerId = nil
       atext('Маркер успешно убран')
       return
     end
@@ -538,8 +562,11 @@ function cmd_match(args)
   local result, ped = sampGetCharHandleBySampPlayerId(id)
   if not result then atext('Игрок должен быть в зоне прорисовки') return end   
   if playerMarker ~= nil then removeBlip(playerMarker) end
+  playerMarkerId = id
   playerMarker = addBlipForChar(ped)
-  changeBlipColour(playerMarker, 1)
+  --changeBlipColour(playerMarker, 0xFF0000FF)
+  local px, py, pz = getCharCoordinates(ped)
+  playerRadar = addSpriteBlipForContactPoint(px, py, pz, 14)
   atext(('Маркер установлен на игрока %s[%d]'):format(sampGetPlayerNickname(id), id))
   atext('Чтобы убрать маркер, введите команду /match ещё раз')
 end
@@ -1051,10 +1078,20 @@ function secoundTimer()
     local updatecount = 0
     while true do
       -- Маркер
-      if playerMarker ~= nil and not doesBlipExist(playerMarker) then
-        atext('Игрок покинул зону прорисовки. Маркер отключен')
-        removeBlip(playerMarker)
-        playerMarker = nil        
+      if playerMarker ~= nil then
+        if doesBlipExist(playerMarker) and doesBlipExist(playerRadar) then
+          local result, ped = sampGetCharHandleBySampPlayerId(playerMarkerId)
+          if result then
+            local sx, sy, sz = getCharCoordinates(ped)
+            local result2 = setBlipCoordinates(playerRadar, sx, sy, sz)
+          end
+        else
+          atext('Игрок покинул зону прорисовки. Маркер отключен')   
+          removeBlip(playerMarker)
+          removeBlip(playerRadar)
+          playerMarker = nil
+          playerRadar = nil
+        end
       end
       -- Счётчики онлайна
       if sInfo.isWorking == true then
@@ -1070,9 +1107,10 @@ function secoundTimer()
       ----------==============----------
       -- Автдоклады
       if post.active == true and sInfo.isWorking == true then
+        local cx, cy, cz = getCharCoordinates(PLAYER_PED)
         for i = 1, #postInfo do
           local pi = postInfo[i]
-          if isCharInArea3d(PLAYER_PED, pi.coordX - pi.radius, pi.coordY - pi.radius, pi.coordZ - pi.radius, pi.coordX + pi.radius, pi.coordY + pi.radius, pi.coordZ + pi.radius, false) then
+          if cx >= pi.coordX - pi.radius and cx <= pi.coordX + pi.radius and cy >= pi.coordY - pi.radius and cy <= pi.coordY + pi.radius and cz >= pi.coordZ - pi.radius and cz <= pi.coordZ + pi.radius then
             if pi.name == "КПП" then addcounter(6, 1)
             else addcounter(5, 1) end
             if post.lastpost ~= i then
@@ -1087,8 +1125,12 @@ function secoundTimer()
               for i = 0, 1001 do
                 if sampIsPlayerConnected(i) then
                   if sampGetFraktionBySkin(i) == "Army" then
-                    if isCharInArea3d(ped, pi.coordX - pi.radius, pi.coordY - pi.radius, pi.coordZ - pi.radius, pi.coordX + pi.radius, pi.coordY + pi.radius, pi.coordZ + pi.radius, false) then
-                      count = count + 1
+                    local result, ped = sampGetCharHandleBySampPlayerId(i)
+                    if result then
+                      local px, py, pz = getCharCoordinates(ped)
+                      if px >= pi.coordX - pi.radius and px <= pi.coordX + pi.radius and py >= pi.coordY - pi.radius and py <= pi.coordY + pi.radius and pz >= pi.coordZ - pi.radius and pz <= pi.coordZ + pi.radius then
+                        count = count + 1
+                      end
                     end
                   end
                 end
