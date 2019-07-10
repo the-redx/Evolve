@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3727")
-SCRIPT_ASSEMBLY = "1.37-b7"
+script_version("1.3728")
+SCRIPT_ASSEMBLY = "1.37-b8"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -279,7 +279,7 @@ function main()
     --------------------=========----------------------
     -- Подгружаем необходимые функции, останавливая основной поток до конца выполнения
     local mstime = os.clock()
-    --[[loadFiles()
+    loadFiles()
     while complete ~= true do wait(0) end
     debug_log(("(debug) Библиотеки | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
@@ -288,7 +288,7 @@ function main()
     debug_log(("(debug) Авто-обновления | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
     loadPermissions("https://docs.google.com/spreadsheets/d/1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y/export?format=tsv&id=1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y&gid=1568566199") -- remove
-    while complete ~= true do wait(0) end]]
+    while complete ~= true do wait(0) end
     complete = false
     --------------------=========----------------------
     -- Загружаем конфиги
