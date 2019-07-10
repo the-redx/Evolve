@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3732")
-SCRIPT_ASSEMBLY = "1.37-rc2"
+script_version("1.3733")
+SCRIPT_ASSEMBLY = "1.37-rc3"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -246,6 +246,8 @@ lectureStatus = 0
 complete = false
 updatesInfo = {
   version = DEBUG_MODE and SCRIPT_ASSEMBLY.." (тестовая)" or thisScript().version,
+  title = "Кажется он жив...",
+  type = "Промежуточное обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
   date = "10.07.2019",
   list = {
     "- Удалены пасхалочки в скрипте;",
@@ -257,6 +259,8 @@ updatesInfo = {
     "- Добавлена команда {ffffff}/match [id]{cccccc}. Отображает местонахождение игрока меткой на карте\nИгрок должен быть в зоне стрима;",
     "- Добавлены новые тэги для биндера, которые взаимодействуют с игроком, выбранным через {ffffff}/match;",
     "- В окне {ffffff}/members 2{cccccc} добавлено контекстное меню. Для вызова меню нажмите {FFFFFF}ПКМ{cccccc} на нике игрока;",
+    "- В Настройках добавлена возможность обновить список админов для команды {ffffff}/adm{cccccc}\nСписок скачивается из сервера, данные на сервере обновляются каждый день.\nДобавляются админы того сервера, на котором вы находитесь + вспомогательные админы;\n",
+    "С данного момента плановые (основные) обновления будут выпускаться раз в 1-2 месяца, промежуточные (мелкие) - раз в 2 недели."
   }
 }
 adminsList = {}
@@ -1073,7 +1077,7 @@ function cmd_members(args)
 end
 
 function cmd_sfaupdates()
-  local str = "{FFFFFF}Версия скрипта: {FF5233}"..updatesInfo.version.."\n{FFFFFF}Дата выхода: {FF5233}"..updatesInfo.date.."{FFFFFF}\n\n"
+  local str = "{FFFFFF}Обновление: {FF5233}"..updatesInfo.title.."\n{FFFFFF}Тип: {FF5233}"..updatesInfo.type.."\n{FFFFFF}Версия скрипта: {FF5233}"..updatesInfo.version.."\n{FFFFFF}Дата выхода: {FF5233}"..updatesInfo.date.."{FFFFFF}\n\n"
   for i = 1, #updatesInfo.list do
     str = str.."{cccccc}"..updatesInfo.list[i].."\n"
   end
@@ -1251,62 +1255,15 @@ end
 
 -- Загружаем админов из файла
 function loadAdmins()
-  local admlist = [[Jeysen_Prado=10
-Maxim_Kudryavtsev=10
-Ioan_Grozny=10
-Brain_Hernandez=10
-Tellarion_Foldring=10
-Sergo_Cross=10
-Dwayne_Eagle=9
-Ziggi_Shmiggi=7
-Tobey_Marshall=7
-Salvatore_Giordano=7
-Maks_Wirense=6
-Leonid_Litvinenko=6
-Butcher_Wezers=5
-Angel_Espejo=5
-Native_Pechenkov=5
-Laurence_Lawson=5
-Christian_Norton=5
-Thomas_Lawson=5
-Snoop_Noop=5
-Alvaro_Welloso=5
-Diego_Hudson=5
-Maximilliano_Asher=5
-Diego_Serrano=5
-Adolfo_Juarez=5
-Le_Ji=5
-Tofik_Dipsize=4
-Jay_Rise=4
-Sam_Teller=3
-Mihail_Klimov=3
-Sam_Teller=3
-Daniel_Molotkov=3
-Hike_Galante=3
-Vladislav_Melentyev=3
-Chester_James=2
-Vladimir_DeMont=2
-Ernesto_Gilmore=2
-Fernando_Haizenberg=2
-Guiseppe_Roell=2
-Link_Maestro=1
-Denial_Blackwood=1
-Brain_Mclaren=1
-Vincent_Vinograd=1]]
   local file = io.open("moonloader/SFAHelper/admins.txt", "a+")
   local count = 0
+  adminsList = {}
   for line in file:lines() do
     local n, l = line:match("(.+)=(.+)")
     if n ~= nil and tonumber(l) ~= nil then
       adminsList[#adminsList + 1] = { nick = n, level = tonumber(l) }
       count = count + 1
     end
-  end
-  if count == 0 then
-    file:write(admlist)
-    file:close()
-    loadAdmins()
-    return
   end
   file:close()
   debug_log("(info) Загружено "..count.." админов", true)
@@ -2250,6 +2207,36 @@ function imgui.OnDrawFrame()
         saveData(pInfo, "moonloader/SFAHelper/config.json")
       end
       imgui.SameLine(); imgui.Text(u8 'Отображение чата в консоле SAMPFUNCS') 
+      if imgui.Button(u8'Обновить список админов') then
+        atext('Запрос отправлен. Ожидание ответа от сервера...')
+        local ip, port = sampGetCurrentServerAddress()
+        httpRequest('http://opentest3.000webhostapp.com/api.php?act=getadmins&server='..ip..':'..port, nil, function(response, code, headers, status)
+          if response then
+            print(code, headers, status)
+            local info = decodeJson(response)
+            if info.success == true then
+              local output = ""
+              local count = 0
+              for key, value in ipairs(info.answer) do
+                output = output..string.format("%s=%s\n", value.nick, value.level)
+                print(value.nick, value.level)
+                count = count + 1
+              end
+              local file = io.open("moonloader/SFAHelper/admins.txt", "w+")
+              file:write(output)
+              file:close()
+              atext('Список админов успешно обновлен! Загружено '..count..' админов')
+              loadAdmins()
+            else
+              atext(string.format('Ошибка сервера: ', info.error == nil and "Подробности не были получены" or info.error))
+            end
+          else
+            atext('При обработке запроса произошла ошибка. Попробуйте позже')
+          end
+        end)
+        --function loadAdmins()
+        --local file = io.open("moonloader/SFAHelper/admins.txt", "a+")
+      end
     elseif data.imgui.menu == 18 then
       imgui.PushItemWidth(100)
       if imgui.HotKey('##punaccept', config_keys.punaccept, tLastKeys, 100) then
@@ -2922,7 +2909,6 @@ function imgui.OnDrawFrame()
     -----
     if membersInfo.mode == 0 and #membersInfo.players > 0 then
       imgui.Text(u8:encode(('Онлайн фракции: %d | На работе: %d | Выходной: %d'):format(membersInfo.online, membersInfo.work, membersInfo.nowork)))
-      imgui.LabelText(u8 'Поиск по нику/ID', u8 'Поиск по нику/ID')
       imgui.InputText(u8 'Поиск по нику/ID', membersInfo.imgui)
       imgui.Columns(6)
       imgui.Separator()
