@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3734")
-SCRIPT_ASSEMBLY = "1.37-rc4"
+script_version("1.3735")
+SCRIPT_ASSEMBLY = "1.37-rc5"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -2953,6 +2953,15 @@ function imgui.OnDrawFrame()
       end
       if imgui.Button(u8'Скопировать РП ник', imgui.ImVec2(-0.1, 20)) then
         cmd_cn(selectedContext.." 0")
+      end
+      if imgui.Button(u8'Установить маркер', imgui.ImVec2(-0.1, 20)) then
+        cmd_match(selectedContext)
+      end
+      if imgui.Button(u8'Проверить повышку', imgui.ImVec2(-0.1, 20)) then
+        cmd_checkrank(selectedContext)
+      end
+      if imgui.Button(u8'Проверить ЧС', imgui.ImVec2(-0.1, 20)) then
+        cmd_checkbl(selectedContext)
       end
       if imgui.Button(u8'Закрыть', imgui.ImVec2(-0.1, 20)) then
         imgui.CloseCurrentPopup()
