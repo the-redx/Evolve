@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3733")
-SCRIPT_ASSEMBLY = "1.37-rc3"
+script_version("1.3734")
+SCRIPT_ASSEMBLY = "1.37-rc4"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -391,6 +391,7 @@ function main()
         sampAddChatMessage('Searchlight создан. Для удаления введите: /light', 0xffff00)
       else
         deleteSearchlight(searchlight)
+        searchlight = nil
         sampAddChatMessage('Searchlight удален', 0xffff00)
       end
     end)
@@ -995,7 +996,7 @@ function cmd_loc(args)
     if sampIsPlayerConnected(rnick) then name = sampGetPlayerNickname(rnick)
     else atext('Игрок оффлайн') return end
   end
-  fileLog(id, 'Местоположение', _, args[2], _)
+  fileLog(name, 'Местоположение', _, args[2], _)
   cmd_r(string.gsub(name, "_", " ")..', ваше местоположение? На ответ '..args[2]..' секунд.')
   addcounter(8, 1)
 end
@@ -2645,6 +2646,12 @@ function imgui.OnDrawFrame()
       str = str.."{tfullname} - Вывести РП ник игрока\n"
       str = str.."{tname} - Вывести имя игрока\n"
       str = str.."{tsurname} - Вывести фамилию игрока\n"
+      str = str.."Следующие параметры работают над выбранным игроком через \"/match\":\n"
+      str = str.."{mID} - Вывести ID игрока\n"
+      str = str.."{mnick} - Вывести ник игрока\n"
+      str = str.."{mfullname} - Вывести РП ник игрока\n"
+      str = str.."{mname} - Вывести имя игрока\n"
+      str = str.."{msurname} - Вывести фамилию игрока\n"
       imgui.TextQuestion(u8:encode(str))
 			imgui.Separator()
       imgui.BeginChild("##bindlist", imgui.ImVec2(970, 442))
@@ -2939,7 +2946,13 @@ function imgui.OnDrawFrame()
         imgui.Text(u8 "Игрок: Не выбрано")
       end
       if imgui.Button(u8'Местоположение', imgui.ImVec2(-0.1, 20)) then
-        cmd_loc(selectedContext.." 60")
+        cmd_loc(selectedContext.." 30")
+      end
+      if imgui.Button(u8'Скопировать ник', imgui.ImVec2(-0.1, 20)) then
+        cmd_cn(selectedContext.." 1")
+      end
+      if imgui.Button(u8'Скопировать РП ник', imgui.ImVec2(-0.1, 20)) then
+        cmd_cn(selectedContext.." 0")
       end
       if imgui.Button(u8'Закрыть', imgui.ImVec2(-0.1, 20)) then
         imgui.CloseCurrentPopup()
