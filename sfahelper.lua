@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3735")
-SCRIPT_ASSEMBLY = "1.37-rc5"
+script_version("1.3741")
+SCRIPT_ASSEMBLY = "1.37-r1"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -248,7 +248,7 @@ updatesInfo = {
   version = DEBUG_MODE and SCRIPT_ASSEMBLY.." (тестовая)" or thisScript().version,
   title = "Кажется он жив...",
   type = "Промежуточное обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "10.07.2019",
+  date = "11.07.2019",
   list = {
     "- Удалены пасхалочки в скрипте;",
     "- Обновлена библиотека HTTP/S запросов;",

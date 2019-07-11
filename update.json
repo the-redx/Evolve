@@ -1,9 +1,9 @@
 {
     "sfahelper":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.luac",
-        "version":"1.36",
+        "version":"1.37",
         "testurl":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.lua",
-        "testversion":"1.3735"
+        "testversion":"1.3741"
     },
     "admintools":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/admintools.luac",
