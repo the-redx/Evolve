@@ -2955,13 +2955,13 @@ function imgui.OnDrawFrame()
         cmd_cn(selectedContext.." 0")
       end
       if imgui.Button(u8'Установить маркер', imgui.ImVec2(-0.1, 20)) then
-        cmd_match(selectedContext)
+        cmd_match(""..selectedContext)
       end
       if imgui.Button(u8'Проверить повышку', imgui.ImVec2(-0.1, 20)) then
-        cmd_checkrank(selectedContext)
+        cmd_checkrank(""..selectedContext)
       end
       if imgui.Button(u8'Проверить ЧС', imgui.ImVec2(-0.1, 20)) then
-        cmd_checkbl(selectedContext)
+        cmd_checkbl(""..selectedContext)
       end
       if imgui.Button(u8'Закрыть', imgui.ImVec2(-0.1, 20)) then
         imgui.CloseCurrentPopup()
