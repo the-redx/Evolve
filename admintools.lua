@@ -1,50 +1,73 @@
 script_name('Admin Tools')
-script_version('1.999999997')
+script_version('1.9999999991')
 script_author('Thomas_Lawson, Edward_Franklin')
 script_description('Admin Tools for Evolve RP')
 script_properties('work-in-pause')
 require 'lib.moonloader'
 require 'lib.sampfuncs'
-local lweapons, weapons = pcall(require, 'game.weapons')
-local lsampev, sampev = pcall(require, 'lib.samp.events')
-local encoding = require 'encoding'
-local lkey, key = pcall(require, 'vkeys')
-local Matrix3X3 = require 'matrix3x3'
-local Vector3D = require 'vector3d'
-local ffi = require 'ffi'
-local d3dx9_43 = ffi.load('d3dx9_43.dll')
-local leffil, effil = pcall(require, 'effil')
-local lrequests, requests = pcall(require, 'requests')
-local getBonePosition = ffi.cast("int (__thiscall*)(void*, float*, int, bool)", 0x5E4280)
-local mem = require 'memory'
-local wm = require 'lib.windows.message'
-local screenx, screeny = getScreenResolution()
-encoding.default = 'CP1251'
-local limgui, imgui = pcall(require, 'imgui')
-local limadd, imadd = pcall(require, 'imgui_addons')
-local rkeys = require 'rkeys'
-local mainwindow = imgui.ImBool(false)
-local settingwindows = imgui.ImBool(false)
-local tpwindow = imgui.ImBool(false)
-local recon = imgui.ImBool(false)
-local cmdwindow = imgui.ImBool(false)
-local mpwindow = imgui.ImBool(false)
-local bMainWindow = imgui.ImBool(false)
-local sInputEdit = imgui.ImBuffer(256)
-local bIsEnterEdit = imgui.ImBool(false)
-local leadwindow = imgui.ImBool(false)
-local arul = imgui.ImBool(false)
-local mpend = imgui.ImBool(false)
-local tunwindow = imgui.ImBool(false)
-local mpname = imgui.ImBuffer(256)
-local mpsponsors = imgui.ImBuffer(256)
-local mpwinner = imgui.ImBuffer(256)
-local mcolorb = imgui.ImInt(0)
-local pcolorb = imgui.ImInt(0)
+local lweapons, weapons     = pcall(require, 'game.weapons')
+                              assert(lweapons, 'not found lib game.weapons')
+local lsampev, sampev       = pcall(require, 'lib.samp.events')
+                              assert(lsampev, 'not found lib lib.samp.events')
+local lencoding, encoding   = pcall(require, 'encoding')
+                              assert(lencoding, 'not found lib encoding')
+local lkey, key             = pcall(require, 'vkeys')
+                              assert(lkey, 'not found lib vkeys')
+local lMatrix3X3, Matrix3X3 = pcall(require, 'matrix3x3')
+                              assert(lMatrix3X3, 'not found lib matrix3x3')
+local lVector3D, Vector3D   = pcall(require, 'vector3d')
+                              assert(lVector3D, 'not found lib vector3d')
+local lffi, ffi             = pcall(require, 'ffi')
+                              assert(lffi, 'not found lib ffi')
+local lrequests, requests   = pcall(require, 'requests')
+                              assert(lrequests, 'not found lib requests')
+local lmem, mem             = pcall(require, 'memory')
+                              assert(lmem, 'not found lib memory')
+local lwm, wm               = pcall(require, 'lib.windows.message')
+                              assert(lwm, 'not found lib lib.windows.message')
+local limgui, imgui         = pcall(require, 'imgui')
+                              assert(limgui, 'not found lib imgui')
+local limadd, imadd         = pcall(require, 'imgui_addons')
+                              assert(limadd, 'not found lib imgui_addons')
+local lrkeys, rkeys         = pcall(require, 'rkeys')
+                              assert(lrkeys, 'not found lib rkeys')
+local lcopas, copas         = pcall(require, 'copas')
+local lhttp, http           = pcall(require, 'copas.http')
+local lcrypto, crypto       = pcall(require, 'crypto_lua')
+local d3dx9_43              = ffi.load('d3dx9_43.dll')
+local getBonePosition       = ffi.cast("int (__thiscall*)(void*, float*, int, bool)", 0x5E4280)
+local dlstatus              = require('moonloader').download_status
+local screenx, screeny      = getScreenResolution()
+encoding.default            = 'CP1251'
+local mainwindow            = imgui.ImBool(false)
+local settingwindows        = imgui.ImBool(false)
+local tpwindow              = imgui.ImBool(false)
+local recon                 = imgui.ImBool(false)
+local cmdwindow             = imgui.ImBool(false)
+local mpwindow              = imgui.ImBool(false)
+local bMainWindow           = imgui.ImBool(false)
+local sInputEdit            = imgui.ImBuffer(256)
+local bIsEnterEdit          = imgui.ImBool(false)
+local leadwindow            = imgui.ImBool(false)
+local arul                  = imgui.ImBool(false)
+local mpend                 = imgui.ImBool(false)
+local tunwindow             = imgui.ImBool(false)
+local tpname                = imgui.ImBuffer(256)
+local tpcoords              = imgui.ImInt3(0, 0, 0)
+local newtpname             = imgui.ImBuffer(256)
+local mpname                = imgui.ImBuffer(256)
+local mpsponsors            = imgui.ImBuffer(256)
+local mpwinner              = imgui.ImBuffer(256)
+local mcolorb               = imgui.ImInt(0)
+local pcolorb               = imgui.ImInt(0)
+local bindname              = imgui.ImBuffer(256)
+local bindtext              = imgui.ImBuffer(1024)
+local prcheck = {pr = 0, prt = {}}
 local wrecon = {}
 local punishignor = {}
 local adminslist = {}
 local nop = 0x90
+local countstart = false
 local killlistmode = 0
 local cursorenb = false
 local u8 = encoding.UTF8
@@ -139,6 +162,7 @@ local config_keys = {
     skeletwhkey = {v = {16, 72}},
     airbrkkey = {v = key.VK_RSHIFT}
 }
+local tplist = {}
 local config_colors = {
     admchat = {r = 255, g = 255, b = 0, color = 16776960},
     supchat = {r = 0, g = 255, b = 153, color = 65433},
@@ -159,6 +183,108 @@ local quitReason = {
     'Кик/Бан',
     'Тайм-аут'
 }
+local otletel = {
+    grove = {},
+    ballas = {},
+    rifa = {},
+    vagos = {},
+    aztec = {}
+}
+local recon = {
+    {
+        name = 'Change',
+        onclick = function() atext("change") end
+    },
+    {
+        name = "Check »",
+        onclick = {
+            {
+                name = 'Check-GM',
+                onclick = function() atext("check-gm") end
+            },
+            {
+                name = 'Check-GM2',
+                onclick = function() atext("check-gm2") end
+            },
+            {
+                name = 'Check-GMCar',
+                onclick = function() atext("check-gmcar") end
+            },
+            {
+                name = 'ResetShot',
+                onclick = function() atext("resetshot") end
+            }
+        }
+    },
+    {
+        name = 'Drop »',
+        onclick = {
+            {
+                name = 'Mute',
+                onclick = function() atext("mute") end
+            },
+            {
+                name = "Slap",
+                onclick = function() atext("Slap") end
+            },
+            {
+                name = "Prison",
+                onclick = function() atext("prison") end
+            },
+            {
+                name = 'Freeze',
+                onclick = function() atext("freeze") end
+            },
+            {
+                name = 'UnFreeze',
+                onclick = function() atext("unfreeze") end
+            }
+        }
+    },
+    {
+        name = "Kick »",
+        onclick = {
+            {
+                name = "SKick",
+                onclick = function() atext("skick") end
+            },
+            {
+                name = 'Kick',
+                onclick = function() atext("kick") end
+            }
+        }
+    },
+    {
+        name = "Warn",
+        onclick = function() atext("warn") end
+    },
+    {
+        name = "Ban »",
+        onclick = {
+            {
+                name = 'Ban',
+                onclick = function() atext("ban") end
+            },
+            {
+                name = "SBan",
+                onclick = function() atext("sban") end
+            },
+            {
+                name = 'IBan',
+                onclick = function() atext("iban") end
+            }
+        }
+    },
+    {
+        name = "Refresh",
+        onclick = function() atext("refresh") end
+    },
+    {
+        name = 'Exit',
+        onclick = function() atext("exit") end
+    }
+}
+
 local frakrang = {
     Mayor = {
         rang_5 = 15,
@@ -221,22 +347,22 @@ local frakrang = {
         inv = 4
     }
 }
-tBindList = {
-	[1] = {
-		text = "",
-		v = {},
-		time = 0
-	},
-	[2] = {
-		text = "",
-		v = {},
-		time = 0
-	},
-	[3] = {
-		text = "",
-		v = {},
-		time = 0
-	}
+local tBindList = {
+    [1] = {
+        text = "",
+        v = {},
+        name = 'Бинд1'
+    },
+    [2] = {
+        text = "",
+        v = {},
+        name = 'Бинд2'
+    },
+    [3] = {
+        text = "",
+        v = {},
+        name = 'Бинд3'
+    }
 }
 local punkey = {
     warn = {
@@ -269,7 +395,34 @@ local punkey = {
         id = nil,
         reason = nil,
         admin = nil
+    },
+    pspawn = {
+        id = nil,
+        nick = nil
     }
+}
+local flyInfo = {
+    active = false,
+    fly_active = false,
+    update = os.clock(),
+    ----------
+    speed_none = 3.0,
+    speed_accelerate = 16.0,
+    speed_decelerate = 0.0,
+    ----------
+    currentSpeed = 0.0,
+    rotationSpeed = 0.0,
+    upSpeed = 0.0,
+    ----------
+    strafe_none = 0,
+    strafe_left = 1,
+    strafe_right = 2,
+    strafe_up = 3,
+    ----------
+    keySpeedState = 0,
+    keyStrafeState = 0,
+    lastKeyStrafeState = 0,
+    lastKeySpeedState = 0,
 }
 local tkills = {}
 local BulletSync = {lastId = 0, maxLines = 15}
@@ -429,6 +582,220 @@ local cfg = {
         socrpm = false
     }
 }
+local fraklist = {
+    POLICE = {
+        [1] = 'Кадет',
+        [2] = 'Офицер',
+        [3] = 'Мл.Сержант',
+        [4] = 'Сержант',
+        [5] = 'Прапорщик',
+        [6] = 'Ст.Прапорщик',
+        [7] = 'Мл.Лейтенант',
+        [8] = 'Лейтенант',
+        [9] = 'Ст.Лейтенант',
+        [10] = 'Капитан',
+        [11] = 'Майор',
+        [12] = 'Подполковник',
+        [13] = 'Полковник',
+        [14] = 'Шериф'
+    },
+    FBI = {
+        [1] = 'Стажёр',
+        [2] = 'Дежурный',
+        [3] = 'Мл.Агент',
+        [4] = 'Агент DEA',
+        [5] = 'Агент CID',
+        [6] = 'Глава DEA',
+        [7] = 'Глава CID',
+        [8] = 'Инспектор FBI',
+        [9] = 'Зам.Директора FBI',
+        [10] = 'Директор FBI'
+    },
+    ARMY = {
+        [1] = 'Рядовой',
+        [2] = 'Ефрейтор',
+        [3] = 'Мл.Сержант',
+        [4] = 'Сержант',
+        [5] = 'Ст.Сержант',
+        [6] = 'Старшина',
+        [7] = 'Прапорщик',
+        [8] = 'Мл.Лейтенант',
+        [9] = 'Лейтенант',
+        [10] = 'Ст.Лейтенант',
+        [11] = 'Капитан',
+        [12] = 'Майор',
+        [13] = 'Подполковник',
+        [14] = 'Полковник',
+        [15] = 'Генерал'
+    },
+    LCN = {
+        [1] = 'Новицио',
+        [2] = 'Ассосиато',
+        [3] = 'Сомбаттенте',
+        [4] = 'Солдато',
+        [5] = 'Боец',
+        [6] = 'Сотто-Капо',
+        [7] = 'Капо',
+        [8] = 'Младший Босс',
+        [9] = 'Консильери',
+        [10] = 'Дон'
+    },
+    YAKUZA = {
+        [1] = 'Вакасю',
+        [2] = 'Сятей',
+        [3] = 'Кедай',
+        [4] = 'Фуку-Комбуте',
+        [5] = 'Вагакасира',
+        [6] = 'Со-Хомбуте',
+        [7] = 'Камбу',
+        [8] = 'Сайко-Комон',
+        [9] = 'Оядзи',
+        [10] = 'Кумите'
+    },
+    MAYOR = {
+        [1] = 'Секретарь',
+        [2] = 'Охранник',
+        [3] = 'Адвокат',
+        [4] = 'Начальник охраны',
+        [5] = 'Зам. Мэра',
+        [6] = 'Мэр'
+    },
+    NEWS = {
+        [1] = 'Стажер',
+        [2] = 'Звукооператор',
+        [3] = 'Звукорежиссер',
+        [4] = 'Репортер',
+        [5] = 'Ведущий',
+        [6] = 'Редактор',
+        [7] = 'Гл.Редактор',
+        [8] = 'Тех.Директор',
+        [9] = 'Програмный директор',
+        [10] = 'Ген.Директор'
+    },
+    SFPD = {
+        [1] = 'Кадет',
+        [2] = 'Офицер',
+        [3] = 'Мл.Сержант',
+        [4] = 'Сержант',
+        [5] = 'Прапорщик',
+        [6] = 'Ст.Прапорщик',
+        [7] = 'Мл.Лейтенант',
+        [8] = 'Лейтенант',
+        [9] = 'Ст.Лейтенант',
+        [10] = 'Капитан',
+        [11] = 'Майор',
+        [12] = 'Подполковник',
+        [13] = 'Полковник',
+        [14] = 'Шериф'
+    },
+    INS = {
+        [1] = 'Стажёр',
+        [2] = 'Консультант',
+        [3] = 'Экзаменатор',
+        [4] = 'Мл.Инструктор',
+        [5] = 'Инструктор',
+        [6] = 'Координатор',
+        [7] = 'Мл.Менеджер',
+        [8] = 'Ст.Менеджер',
+        [9] = 'Директор',
+        [10] = 'Управляющий'
+    },
+    BALLAS = {
+        [1] = 'Блайд',
+        [2] = 'Младший Нига',
+        [3] = 'Крэкер',
+        [4] = 'Гун брo',
+        [5] = 'Ап Бро',
+        [6] = 'Гангстер',
+        [7] = 'Федерал Блок',
+        [8] = 'Фолкс',
+        [9] = 'Райч Нига',
+        [10] = 'Биг Вилли'
+    },
+    VAGOS = {
+        [1] = 'Новатто',
+        [2] = 'Ординарио',
+        [3] = 'Локал',
+        [4] = 'Верификадо',
+        [5] = 'Бандито',
+        [6] = 'V.E.G',
+        [7] = 'Ассесино',
+        [8] = 'Лидер V.E.G',
+        [9] = 'Падрино',
+        [10] = 'Падре'
+    },
+    RM = {
+        [1] = 'Шнырь',
+        [2] = 'Фраер',
+        [3] = 'Бык',
+        [4] = 'Барыга',
+        [5] = 'Блатной',
+        [6] = 'Свояк',
+        [7] = 'Браток',
+        [8] = 'Вор',
+        [9] = 'Вор в законе',
+        [10] = 'Авторитер'
+    },
+    GROVE = {
+        [1] = 'Плейа',
+        [2] = 'Хастла',
+        [3] = 'Килла',
+        [4] = 'Йонг',
+        [5] = 'Гангста',
+        [6] = 'О.Г.',
+        [7] = 'Мобста',
+        [8] = 'Де Кинг',
+        [9] = 'Легенд',
+        [10] = 'Мэд Дог'
+    },
+    AZTEC = {
+        [1] = 'Перро',
+        [2] = 'Тирадор',
+        [3] = 'Геттор',
+        [4] = 'Лас Герас',
+        [5] = 'Мирандо',
+        [6] = 'Сабио',
+        [7] = 'Инвасор',
+        [8] = 'Тесореро',
+        [9] = 'Нестро',
+        [10] = 'Падре'
+    },
+    RIFA = {
+        [1] = 'Новато',
+        [2] = 'Ладрон',
+        [3] = 'Амиго',
+        [4] = 'Мачо',
+        [5] = 'Джуниор',
+        [6] = 'Эрмано',
+        [7] = 'Бандидо',
+        [8] = 'Ауторидад',
+        [9] = 'Аджунто',
+        [10] = 'Падре'
+    },
+    MEDIC = {
+        [1] = 'Интерн',
+        [2] = 'Санитар',
+        [3] = 'Мед.Брат',
+        [4] = 'Спасатель',
+        [5] = 'Нарколог',
+        [6] = 'Доктор',
+        [7] = 'Психолог',
+        [8] = 'Хирург',
+        [9] = 'Зам.Глав.Врача',
+        [10] = 'Глав.Врач'
+    },
+    BIKERS = {
+        [1] = 'Support', 
+        [2] = 'Hang around',
+        [3] = 'Prospect',
+        [4] = 'Member',
+        [5] = 'Road captain',
+        [6] = 'Sergeant-at-arms',
+        [7] = 'Treasurer',
+        [8] = 'Вице президент',
+        [9] = 'Президент'
+    }
+}
 local ID = {
     Fist = 0,
     Knuckles = 1,
@@ -544,42 +911,37 @@ local RenderGun = {
     [ID.Suicide] = 74
 }
 
-function asyncHttpRequest(method, url, args, resolve, reject)
-    local request_thread = effil.thread(function (method, url, args)
-        local requests = require 'requests'
-        local result, response = pcall(requests.request, method, url, args)
-        if result then
-            response.json, response.xml = nil, nil
-            return true, response
-        else
-            return false, response
-        end
-    end)(method, url, args)
-    if not resolve then resolve = function() end end
-    if not reject then reject = function() end end
-    lua_thread.create(function()
-        local runner = request_thread
-        while true do
-            local status, err = runner:status()
-            if not err then
-                if status == 'completed' then
-                    local result, response = runner:get()
-                    if result then
-                        resolve(response)
-                    else
-                        reject(response)
-                    end
-                    return
-                elseif status == 'canceled' then
-                    return reject(status)
-                end
-            else
-                return reject(err)
-            end
+function httpRequest(request, body, handler) -- copas.http
+    -- start polling task
+    if not copas.running then
+        copas.running = true
+        lua_thread.create(function()
             wait(0)
-        end
-    end)
+            while not copas.finished() do
+                local ok, err = copas.step(0)
+                if ok == nil then error(err) end
+                wait(0)
+            end
+            copas.running = false
+        end)
+    end
+    -- do request
+    if handler then
+        return copas.addthread(function(r, b, h)
+            copas.setErrorHandler(function(err) h(nil, err) end)
+            h(http.request(r, b))
+        end, request, body, handler)
+    else
+        local results
+        local thread = copas.addthread(function(r, b)
+            copas.setErrorHandler(function(err) results = {nil, err} end)
+            results = table.pack(http.request(r, b))
+        end, request, body)
+        while coroutine.status(thread) ~= 'dead' do wait(0) end
+        return table.unpack(results)
+    end
 end
+
 function d3dxfont_create(name, height, charset)
     charset = charset or 1
     local d3ddev = ffi.cast('void*', getD3DDevicePtr())
@@ -618,10 +980,10 @@ function apply_custom_style()
 
     style.WindowPadding = ImVec2(15, 15)
     style.WindowRounding = 5.0
-    style.FramePadding = ImVec2(5, 5)
+    --style.FramePadding = ImVec2(5, 5)
     style.FrameRounding = 4.0
-    style.ItemSpacing = ImVec2(12, 8)
-    style.ItemInnerSpacing = ImVec2(8, 6)
+    --[[style.ItemSpacing = ImVec2(12, 8)
+    style.ItemInnerSpacing = ImVec2(8, 6)]]
     style.IndentSpacing = 25.0
     style.ScrollbarSize = 15.0
     style.ScrollbarRounding = 9.0
@@ -905,38 +1267,38 @@ function string.rupper(s)
     return output
 end
 function autoupdate(json_url, url)
-    asyncHttpRequest("GET", json_url, _, function (response) 
-        local info = decodeJson(response.text)
-        updatelink = info.admintools.url --testat если не исходник
-        updateversion = info.admintools.version
-        if updateversion > thisScript().version then
-            lua_thread.create(function()
-                local dlstatus = require('moonloader').download_status
-                atext(("Обнаружено обновление. Пытаюсь обновиться с %s на %s"):format(thisScript().version, updateversion))
-                downloadUrlToFile(updatelink, thisScript().path, function(id3, status1, p13, p23) 
-                    if status1 == dlstatus.STATUS_DOWNLOADINGDATA then
-                        print(("Загружено %d из %d."):format(p13, p23))
-                    elseif status1 == dlstatus.STATUS_ENDDOWNLOADDATA then
-                        print("Загрузка обновления завершена.")
-                        atext("Обновление завершено!")
-                        goupdatestatus = true
-                        lua_thread.create(function() wait(500) thisScript():reload() end)
-                    end
-                    if status1 == dlstatus.STATUSEX_ENDDOWNLOAD then
-                        if not goupdatestatus then
-                            atext("Обновление прошло неудачно. Запускаю устаревшую версию.")
+    httpRequest(json_url, nil, function(response, code, headers, status)
+        if response then
+            local info = decodeJson(response)
+            updatelink = info.admintools.url --testat если не исходник
+            updateversion = info.admintools.version
+            if updateversion > thisScript().version then
+                lua_thread.create(function()
+                    local dlstatus = require('moonloader').download_status
+                    atext(("Обнаружено обновление. Пытаюсь обновиться с %s на %s"):format(thisScript().version, updateversion))
+                    downloadUrlToFile(updatelink, thisScript().path, function(id3, status1, p13, p23) 
+                        if status1 == dlstatus.STATUS_DOWNLOADINGDATA then
+                            print(("Загружено %d из %d."):format(p13, p23))
+                        elseif status1 == dlstatus.STATUS_ENDDOWNLOADDATA then
+                            print("Загрузка обновления завершена.")
+                            atext("Обновление завершено!")
+                            goupdatestatus = true
+                            thisScript():reload()
                         end
-                    end
+                        if status1 == dlstatus.STATUSEX_ENDDOWNLOAD then
+                            if not goupdatestatus then
+                                atext("Обновление прошло неудачно. Запускаю устаревшую версию.")
+                            end
+                        end
+                    end)
                 end)
-            end)
+            else
+                print(("v%s: Обновление не требуется"):format(thisScript().version))
+            end
         else
-            print(("v%s: Обновление не требуется"):format(thisScript().version))
-        end        
-    end, 
-    function (err) 
-        print(("v%s: Не могу проверить обновление. Смиритесь или проверьте самостоятельно на %s"):format(thisScript().version, url))
-    end
-    )
+            print(("v%s: Не могу проверить обновление. Смиритесь или проверьте самостоятельно на %s"):format(thisScript().version, url))
+        end
+    end)
 end
 function split(str, delim, plain)
     local lines, pos, plain = {}, 1, not (plain == false)
@@ -970,15 +1332,99 @@ end
 function enableKillList(enabled)
     setStructElement(sampGetKillInfoPtr(), 0x0, 4, enabled and 1 or 0)
 end
-function main()
+function genCode(skey)
+    skey = basexx.from_base32(skey)
+    value = math.floor(os.time() / 30)
+    value = string.char(
+    0, 0, 0, 0,
+    band(value, 0xFF000000) / 0x1000000,
+    band(value, 0xFF0000) / 0x10000,
+    band(value, 0xFF00) / 0x100,
+    band(value, 0xFF))
+    local hash = sha1.hmac_binary(skey, value)
+    local offset = band(hash:sub(-1):byte(1, 1), 0xF)
+    local function bytesToInt(a,b,c,d)
+      return a*0x1000000 + b*0x10000 + c*0x100 + d
+    end
+    hash = bytesToInt(hash:byte(offset + 1, offset + 4))
+    hash = band(hash, 0x7FFFFFFF) % 1000000
+    return ('%06d'):format(hash)
+end
+function libs()
+    if not lcopas or not lhttp or not lcrypto then
+        atext('Начата загрузка недостающих библиотек')
+        atext('По окончанию загрузки скрипт будет перезагружен')
+        if not lcopas or not lhttp then
+            local direct = {'copas'}
+            local files = {'copas.lua', "copas/ftp.lua", 'copas/http.lua', 'copas/limit.lua', 'copas/smtp.lua', 'requests.lua'}
+            for k, v in pairs(direct) do if not doesDirectoryExist("moonloader/lib/"..v) then createDirectory("moonloader/lib/"..v) end end
+            for k, v in pairs(files) do
+                copas_download_status = 'proccess'
+                downloadUrlToFile('https://raw.githubusercontent.com/WhackerH/kirya/master/lib/'..v, 'moonloader/lib/'..v, function(id, status, p1, p2)
+                    if status == dlstatus.STATUS_DOWNLOADINGDATA then
+                        copas_download_status = 'proccess'
+                        print(string.format('Загружено %d килобайт из %d килобайт.', p1, p2))
+                    elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
+                        copas_download_status = 'succ'
+                    elseif status == 64 then
+                        copas_download_status = 'failed'
+                    end
+                end)
+                while copas_download_status == 'proccess' do wait(0) end
+                if copas_download_status == 'failed' then
+                    print('Не удалось загрузить copas')
+                    thisScript():unload()
+                else
+                    print(v..' был загружен')
+                end
+            end
+        end
+        if not lcrypto then
+            crypto_download_status = 'proccess'
+            downloadUrlToFile('https://raw.githubusercontent.com/WhackerH/kirya/master/lib/crypto_lua.dll', 'moonloader/lib/crypto_lua.dll', function(id, status, p1, p2)
+                if status == dlstatus.STATUS_DOWNLOADINGDATA then
+                    crypto_download_status = 'proccess'
+                    print(string.format('Загружено %d килобайт из %d килобайт.', p1, p2))
+                elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
+                    crypto_download_status = 'succ'
+                elseif status == 64 then
+                    crypto_download_status = 'failed'
+                end
+            end)
+            while crypto_download_status == 'proccess' do wait(0) end
+            if crypto_download_status == 'failed' then
+                print('Не удалось загрузить crypto_lua.dll')
+                thisScript():unload()
+            else
+                print('crypto_lua.dll был загружен')
+            end
+        end
+        atext('Все необходимые библиотеки были загружены')
+        reloadScripts()
+    end
+end
+function infRun(bool)
+    if bool then
+        mem.setint8(0xB7CEE4, 1)
+    else
+        mem.setint8(0xB7CEE4, 0)
+    end
+end
+function memstart()
     local samp = getModuleHandle('samp.dll')
+    --постоянный худ
 	mem.fill(samp + 0x9D31A, nop, 12, true)
     mem.fill(samp + 0x9D329, nop, 12, true)
+    --фастконннект
     mem.fill(sampGetBase() + 0x2D3C45, 0, 2, true)
+    --фикс прыжка
     mem.fill(0x00531155, 0x90, 5, true)
-    mem.setint8(0xB7CEE4, 1)
+    --бесконечный бег
+    infRun(true)
+    --отключение F1
     mem.setuint8(samp + 0x67450, 0xC3, true)
-    local ressamp1, samp1 = loadDynamicLibrary('samp.dll')  -- (загружает динамическую библиотеку по названию и возвращает её хендл (адрес). аналог опкода CLEO 0AA2)
+    --Антикрашер
+    local ressamp1, samp1 = loadDynamicLibrary('samp.dll')
     if ressamp1 then
         samp1 = samp1+0x5CF2C
         writeMemory(samp1, 4, 0x90909090, 1)
@@ -989,12 +1435,25 @@ function main()
         samp1 = samp1 + 4
         writeMemory(samp1, 1, 0x90, 1)
     end
-    local ressamp2, samp2 = loadDynamicLibrary('samp.dll')  -- (загружает динамическую библиотеку по названию и возвращает её хендл (адрес). аналог опкода CLEO 0AA2)
+    --ФПС анлок
+    local ressamp2, samp2 = loadDynamicLibrary('samp.dll')
     if ressamp2 then
         samp2 = samp2 + 0x9D9D0
         writeMemory(samp2, 4, 0x5051FF15, 1)
     end
-    local DWMAPI = ffi.load('dwmapi')
+end
+function main()
+    if lcopas and lhttp then
+        httpRequest("https://raw.githubusercontent.com/WhackerH/EvolveRP/master/apr.txt", nil, function(response, code, headers, status)
+            if response then
+                for line in response:gmatch('[^\r\n]+') do
+                    table.insert(prcheck.prt, line)
+                end
+            else
+                prcheck.pr = 3
+            end
+        end)
+    end
     local directors = {'moonloader/Admin Tools', 'moonloader/Admin Tools/hblist', 'moonloader/config', 'moonloader/config/Admin Tools', 'moonloader/Admin Tools/Check Banned', 'moonloader/Admin Tools/Rules'}
     local files = {'moonloader/Admin Tools/chatlog_all.txt', 'moonloader/config/Admin Tools/fa.txt', 'moonloader/Admin Tools/punishjb.txt', 'moonloader/Admin Tools/punishlogs.txt', 'moonloader/Admin Tools/Check Banned/players.txt'}
 	for k, v in pairs(directors) do
@@ -1007,8 +1466,7 @@ function main()
         end
     end
     if not doesFileExist('moonloader/config/Admin Tools/config.json') then
-        local file = io.open('moonloader/config/Admin Tools/config.json', 'w')
-        file:close()
+        io.open('moonloader/config/Admin Tools/config.json', 'w'):close()
         local scx, scy = convertGameScreenCoordsToWindowScreenCoords(552.33337402344, 435)
         local tcx, tcy = convertGameScreenCoordsToWindowScreenCoords(490.33334350586, 435)
         local ascx, ascy = convertGameScreenCoordsToWindowScreenCoords(3, 272)
@@ -1052,70 +1510,76 @@ function main()
         end
     end
     saveData(cfg, 'moonloader/config/Admin Tools/config.json')
-    if cfg.killlist.startenable then killlistmode = 1 end
+    if not doesFileExist("moonloader/config/Admin Tools/tplist.json") then
+        io.open('moonloader/config/Admin Tools/tplist.json', 'w'):close()
+    else
+        local file = io.open('moonloader/config/Admin Tools/tplist.json', 'r')
+        if file then
+            tplist = decodeJson(file:read('*a'))
+        end
+    end
+    saveData(tplist, "moonloader/config/Admin Tools/tplist.json")
+    if not doesFileExist("moonloader/config/Admin Tools/fraklist.json") then
+        io.open('moonloader/config/Admin Tools/fraklist.json', 'w'):close()
+    else
+        local file = io.open('moonloader/config/Admin Tools/fraklist.json', 'r')
+        if file then
+            fraklist = decodeJson(file:read('*a'))
+        end
+    end
+    saveData(fraklist, "moonloader/config/Admin Tools/fraklist.json")
     if not doesFileExist('moonloader/config/Admin Tools/punishignor.txt') then
         local file = io.open('moonloader/config/Admin Tools/punishignor.txt', 'w')
         file:write('1\n!\ndmg')
         file:close()
     end
     for line in io.lines('moonloader/config/Admin Tools/punishignor.txt') do table.insert(punishignor, line) end
-    DWMAPI.DwmEnableComposition(1)
     repeat wait(0) until isSampAvailable()
-    local prt = {}
-    local prcheck = 0
-    asyncHttpRequest("GET", "https://raw.githubusercontent.com/WhackerH/EvolveRP/master/apr.txt", _, function (response)
-        for line in response.text:gmatch('[^\r\n]+') do
-            table.insert(prt, line)
-        end
-        if checkIntable(prt, sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))) then
-            prcheck = 1
-        else
-            prcheck = 2
-        end
-    end, function (err)
-        prcheck = 3
-    end)
-    while prcheck == 0 do wait(0) end
-    prt = nil
-    if prcheck == 1 then
-        atext("Для вызова меню введите команду \"{66FF00}/at{ffffff}\"")
-    elseif prcheck == 2 then
-        atext("Привязка не обнаружена. Для получения привязки отпишите {66FF00}Thomas_Lawson{ffffff} в ВК {66FF00}vk.com/tlwsn")
-        thisScript():unload()
-    elseif prcheck == 3 then
+    libs()
+    if cfg.killlist.startenable then killlistmode = 1 end
+    if prcheck.pr == 3 then
         atext("Не удалось проверить привязку. Проверьте соединение с интернетом")
         thisScript():unload()
+    else
+        while #prcheck.prt == 0 do wait(0) end
+        if checkIntable(prcheck.prt, sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))) then
+            atext("Для вызова меню введите команду \"{66FF00}/at{ffffff}\"")
+            memstart()
+            local DWMAPI = ffi.load('dwmapi')
+            DWMAPI.DwmEnableComposition(1)
+        else
+            atext("Привязка не обнаружена. Для получения привязки отпишите {66FF00}Thomas_Lawson{ffffff} в ВК {66FF00}vk.com/tlwsn")
+            thisScript():unload()
+        end
     end
-    prcheck = nil
     for k, v in pairs({'ghetto.txt', 'mafia.txt', 'bikers.txt'}) do
-        rulesready = false
         if not doesFileExist("moonloader/Admin Tools/Rules/"..v) then
-            asyncHttpRequest("GET", "https://raw.githubusercontent.com/WhackerH/EvolveRP/master/at_rules/"..v, _, function (response)  rultext = response.text end, function (err) io.open("moonloader/Admin Tools/Rules/"..v, 'w'):close() rulesready = true end)
+            httpRequest("https://raw.githubusercontent.com/WhackerH/EvolveRP/master/at_rules/"..v, nil, function(response, code, headers, status)
+                if response then rultext = response
+                else io.open("moonloader/Admin Tools/Rules/"..v, 'w'):close() rulesready = true
+                end
+            end)
             while not rultext do wait(0) end
             local file = io.open("moonloader/Admin Tools/Rules/"..v, 'w')
             file:write(rultext)
             file:close()
             rultext = nil
-            rulesready = true
-        else
-            rulesready = true
         end
-        while not rulesready do wait(0) end
     end
     if #tostring(cfg.other.adminpass) >=6 and cfg.other.apassb then autoal() end
     if cfg.other.autoupdate then autoupdate("https://raw.githubusercontent.com/WhackerH/EvolveRP/master/update.json", "https://evolve-rp.su/viewtopic.php?f=21&t=151439") end
     lua_thread.create(wh)
     registerFastAnswer()
-    asyncHttpRequest("GET", 'https://raw.githubusercontent.com/WhackerH/EvolveRP/master/admins.txt', _,
-    function (response)
-        for line in response.text:gmatch('[^\r\n]+') do
-            table.insert(adminslist, line)
+    httpRequest("https://raw.githubusercontent.com/WhackerH/EvolveRP/master/admins.txt", nil, function(response, code, headers, status) 
+        if response then
+            for line in response:gmatch('[^\r\n]+') do
+                table.insert(adminslist, line)
+            end
+            print("Список админов был успешно загружен")
+            print(("Список админов:\n%s"):format(table.concat(adminslist, '\n')))
+        else
+            print("Не удалось загрузить список админов")
         end
-        print("Список админов был успешно загружен")
-        print(("Список админов:\n%s"):format(table.concat(adminslist, '\n')))
-    end,
-    function (err)
-        print("Не удалось загрузить список админов")
     end)
     sampRegisterChatCommand("gpc", function()
         local cx, cy = getCursorPos()
@@ -1123,6 +1587,9 @@ function main()
         atext(("X: %s | Y: %s"):format(cx, cy))
         setClipboardText(("%s, %s"):format(cx, cy))
     end)
+    sampRegisterChatCommand("oncapt", oncapt)
+    sampRegisterChatCommand("vkv", vkv)
+    sampRegisterChatCommand("ranks", ranks)
     sampRegisterChatCommand("atp", function() tpwindow.v = not tpwindow.v end)
     sampRegisterChatCommand("arules", function() arul.v = not arul.v end)
     sampRegisterChatCommand('mnarko', mnarko)
@@ -1136,7 +1603,6 @@ function main()
     sampRegisterChatCommand('hblist', hblist)
     sampRegisterChatCommand('getlvl', getlvl)
     sampRegisterChatCommand('punish', punish)
-    sampRegisterChatCommand('fid', function() sampShowDialog(3435, '{ffffff}ID Фракций', '{ffffff}ID\t{ffffff}Фракция\n1\tLSPD\n2\tFBI\n3\tSFA\n5\tLCN\n6\tYakuza\n7\tMayor\n9\tSFN\n10\tSFPD\n11\tInstructors\n12\tBallas\n13\tVagos\n14\tRM\n15\tGrove\n16\tLSN\n17\tAztec\n18\tRifa\n19\tLVA\n20\tLVN\n21\tLVPD\n22\tHospital\n24\tMongols\n26\tWarlocks\n29\tPagans', 'x', _, 5) end)
     sampRegisterChatCommand('arecon', arecon)
     sampRegisterChatCommand('guns', function() sampShowDialog(3435, '{ffffff}ID Оружий', '{ffffff}ID\t{ffffff}Название\n1\tКастет\n2\tКлюшка для гольфа\n3\tПолицейская дубинка\n4\tНож\n5\tБита\n6\tЛопата\n7\tКий\n8\tКатана\n9\tБензопила\n10\tДилдо\n11\tДилдо\n12\tВибратор\n13\tВибратор\n14\tЦветы\n15\tТрость\n16\tГраната\n17\tДымовая граната\n18\tКоктейль Молотова\n22\t9mm пистолет\n23\tSDPistol\n24\tDesert Eagle\n25\tShotgun\n26\tОбрез\n27\tCombat Shotgun\n28\tUZI\n29\tMP5\n30\tAK-47\n31\tM4\n32\tTec-9\n33\tCountry Rifle\n34\tSniper Rifle\n35\tRPG\n36\tHS Rocket\n37\tОгнемёт\n38\tМиниган\n39\tSatchel Charge\n40\tДетонатор\n41\tSpraycan\n42\tОгнетушитель\n43\tФотоаппарат\n44\tNight Vis Goggles\n45\tThermal Goggles\n46\tParachute', 'x', _, 5) end)
     sampRegisterChatCommand('tg', function() sampSendChat('/togphone') end)
@@ -1173,11 +1639,9 @@ function main()
     sampRegisterChatCommand('deladm', deladm)
     initializeRender()
     apply_custom_style()
-    --loadadmins()
     admchecker()
     if not doesFileExist("moonloader/config/Admin Tools/keys.json") then
-        local fa = io.open("moonloader/config/Admin Tools/keys.json", "w")
-        fa:close()
+        io.open("moonloader/config/Admin Tools/keys.json", "w"):close()
     else
         local fa = io.open("moonloader/config/Admin Tools/keys.json", 'r')
         if fa then
@@ -1207,23 +1671,27 @@ function main()
     end
     saveData(config_keys, "moonloader/config/Admin Tools/keys.json")
 	if not doesFileExist("moonloader/config/Admin Tools/binder.json") then
-		local fb = io.open("moonloader/config/Admin Tools/binder.json", "w")
-		fb:close()
+		io.open("moonloader/config/Admin Tools/binder.json", "w"):close()
 	else
 		local fb = io.open("moonloader/config/Admin Tools/binder.json", "r")
 		if fb then
 			tBindList = decodeJson(fb:read('*a'))
             if tBindList == nil then
                 tBindList = {
-                    {
+                    [1] = {
                         text = "",
                         v = {},
-                        time = 0
+                        name = 'Бинд1'
                     },
-                    {
+                    [2] = {
                         text = "",
                         v = {},
-                        time = 0
+                        name = 'Бинд2'
+                    },
+                    [3] = {
+                        text = "",
+                        v = {},
+                        name = 'Бинд3'
                     }
                 }
 			end
@@ -1241,8 +1709,7 @@ function main()
         end
     end
     if not doesFileExist("moonloader/config/Admin Tools/colors.json") then
-        local fc = io.open("moonloader/config/Admin Tools/colors.json", 'w')
-        fc:close()
+        io.open("moonloader/config/Admin Tools/colors.json", 'w'):close()
     else
         local fc = io.open("moonloader/config/Admin Tools/colors.json", "r")
         if fc then
@@ -1299,7 +1766,9 @@ function main()
     trmisscolor = imgui.ImFloat3(trmissr, trmissg, trmissb)
 	for k, v in pairs(tBindList) do
         rkeys.registerHotKey(v.v, true, onHotKey)
-        if v.time == nil then v.time = 0 end
+        if v.time ~= nil then v.time = nil end
+        if v.name == nil then v.name = "Бинд"..k end
+        v.text = v.text:gsub("%[enter%]", ""):gsub("{noenter}", "{noe}")
     end
     reportbind = rkeys.registerHotKey(config_keys.reportkey.v, true, reportk)
     warningbind = rkeys.registerHotKey(config_keys.warningkey.v, true, warningk)
@@ -1317,10 +1786,11 @@ function main()
                 if wparam == key.VK_ESCAPE then
                     tEditData.id = -1
                     consumeWindowMessage(true, true)
-                elseif wparam == key.VK_TAB then
-                    bIsEnterEdit.v = not bIsEnterEdit.v
-                    consumeWindowMessage(true, true)
                 end
+            end
+            if wparam == key.VK_ESCAPE then
+                if mainwindow.v then mainwindow.v = false consumeWindowMessage(true, true) end
+                if tpwindow.v then tpwindow.v = false consumeWindowMessage(true, true) end
             end
         end
     end)
@@ -1354,6 +1824,8 @@ function main()
     lua_thread.create(warningsKey)
     lua_thread.create(admchat)
     lua_thread.create(whon)
+    requestAnimation("SWIM")
+    requestAnimation("PARACHUTE")
     while true do wait(0)
         if swork then 
             if killlistmode == 1 or killlistmode == 2 then
@@ -1376,20 +1848,22 @@ function main()
                 table.remove(wrecon, k)
             end
         end
-        if sampGetGamestate() ~= 3 then
+        --[[if sampGetGamestate() ~= 3 then
             lua_thread.create(function()
                 while sampGetGamestate() ~= 3 do wait(0) end
                 zapolncheck()
             end)
-        end
+        end]]
         --if swork and sampGetGamestate() == 2 then nameTagOff() end
         if wasKeyPressed(key.VK_F12) then swork = not swork 
             if not swork then
                 nameTagOn()
                 if killlistmode == 1 then enableKillList(true) end
+                infRun(false)
             else
                 nameTagOff()
                 if killlistmode == 1 then enableKillList(false) end
+                infRun(true)
             end
         end
         if wasKeyPressed(key.VK_F9) then
@@ -1414,7 +1888,7 @@ function main()
                     local fx, fy, fz = calcScreenCoors(BulletSync[i].t.x, BulletSync[i].t.y, BulletSync[i].t.z)]]
                     local sx, sy, sz = transform2d(BulletSync[i].o.x, BulletSync[i].o.y, BulletSync[i].o.z)
                     local fx, fy, fz = transform2d(BulletSync[i].t.x, BulletSync[i].t.y, BulletSync[i].t.z)
-					if sz > 0 and fz > 0 then
+                    if sz > 0 and fz > 0 then
 						renderDrawLine(sx, sy, fx, fy, 1, bulletTypes[BulletSync[i].tType])
                         renderDrawPolygon(fx, fy-1, 3, 3, 4.0, 10, bulletTypes[BulletSync[i].tType])
 					end
@@ -1502,6 +1976,7 @@ function imgui.TeleportButton(text, coordx, coordy, coordz, interior)
         setCharCoordinates(PLAYER_PED, coordx, coordy, coordz)
         setCharInterior(PLAYER_PED, interior)
         setInteriorVisible(interior)
+        sampSendInteriorChange(interior)
     end
 end
 function imgui.CentrText(text)
@@ -1562,7 +2037,7 @@ function imgui.TextColoredRGB(text)
     render_text(text)
 end
 function rkeys.onHotKey(id, keys)
-    if sampIsChatInputActive() or sampIsDialogActive() or isSampfuncsConsoleActive() then
+    if sampIsChatInputActive() or sampIsDialogActive() or isSampfuncsConsoleActive() or isPauseMenuActive() then
         return false
     end
 end
@@ -1572,8 +2047,8 @@ function imgui.OnDrawFrame()
     local ir, ig, ib, ia = rainbow(1, 1)
     if tpwindow.v then
         imgui.ShowCursor = true
-        imgui.SetNextWindowPos(imgui.ImVec2(screenx/2+350, screeny/2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-        imgui.SetNextWindowSize(imgui.ImVec2(300, 300), imgui.Cond.FirstUseEver)
+        imgui.SetNextWindowPos(imgui.ImVec2(screenx/2+400, screeny/2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+        imgui.SetNextWindowSize(imgui.ImVec2(500, 300), imgui.Cond.FirstUseEver)
         imgui.Begin(u8 'Admin Tools | Телепорты', tpwindow)
         if imgui.CollapsingHeader(u8 'Общественные места') then
             imgui.TeleportButton('Автовокзал ЛС', 1154.2769775391, -1756.1109619141, 13.634266853333, 0)
@@ -1744,6 +2219,53 @@ function imgui.OnDrawFrame()
             imgui.TeleportButton("LS Atruim", 1710.433715,-1669.379272,20.225049, 18)
             imgui.TeleportButton("Bike School", 1494.325195,1304.942871,1093.289062, 3)
         end
+        if imgui.CollapsingHeader(u8 'Сохраненные места') then
+            for k, v in ipairs(tplist) do
+                imgui.TeleportButton(v['text']..'##'..k, v['coords'][1], v['coords'][2], v['coords'][3], 0)
+                if imgui.BeginPopupContextItem("##menu"..k) then
+                    if imgui.Button(u8 'Удалить##'..k) then
+                        table.remove(tplist, k)
+                        saveData(tplist, "moonloader/config/Admin Tools/tplist.json")
+                    end
+                    if imgui.Button(u8 'Переименовать##'..k) then imgui.OpenPopup("##rename"..k) end
+                    --imgui.SetNextWindowSize(imgui.ImVec2(300, 100))
+                    if imgui.BeginPopupModal('##rename'..k, _, imgui.WindowFlags.AlwaysAutoResize) then
+                        imgui.InputText(u8 'Введите новое название', newtpname)
+                        if imgui.Button(u8 'Изменить##'..k) then
+                            v['text'] = u8:decode(newtpname.v)
+                            newtpname.v = ''
+                            saveData(tplist, "moonloader/config/Admin Tools/tplist.json")
+                            imgui.CloseCurrentPopup()
+                        end
+                        imgui.SameLine()
+                        if imgui.Button(u8 'Отмена##'..k) then
+                            imgui.CloseCurrentPopup()
+                        end
+                        imgui.EndPopup()
+                    end
+                    imgui.EndPopup()
+                end
+            end
+            imgui.Separator()
+            imgui.PushItemWidth(100)
+            imgui.InputText(u8 'Название телепорта', tpname)
+            imgui.PopItemWidth()
+            imgui.PushItemWidth(150)
+            imgui.InputInt3(u8 'Координаты телепорта', tpcoords, 0)
+            imgui.SameLine()
+            if imgui.Button(u8 'Текущие координаты') then
+                local myx, myy, myz = getCharCoordinates(PLAYER_PED)
+                tpcoords.v[1] = myx
+                tpcoords.v[2] = myy
+                tpcoords.v[3] = myz
+            end
+            imgui.PopItemWidth()
+            if imgui.Button(u8 'Добавить##tp') then 
+                tplist[#tplist + 1] = {text = u8:decode(tpname.v), coords = {tpcoords.v[1], tpcoords.v[2], tpcoords.v[3]}} 
+                tpname.v = ''
+                tpcoords.v[1], tpcoords.v[2], tpcoords.v[3] = 0,0,0
+                saveData(tplist, "moonloader/config/Admin Tools/tplist.json")  end
+        end
         imgui.End()
     end
     if recon.v then
@@ -1783,6 +2305,28 @@ function imgui.OnDrawFrame()
         imgui.TextColored(ImVec4(0, 255, 0, 1), u8"Pro Sport:"); imgui.SameLine(spacing); imgui.Text(('%s'):format(imtextprosport))
         imgui.PopStyleVar()
         imgui.End()
+        --[[imgui.SetNextWindowSize(imgui.ImVec2(100, 300), imgui.Cond.FirstUseEver)
+        imgui.Begin(u8 'Слежка1', _, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize + imgui.WindowFlags.NoMove + imgui.WindowFlags.NoTitleBar)
+        [if imgui.Button("Change", btn_size) then imgui.OpenPopup("##change_recon") end
+        if imgui.BeginPopupModal('##change_recon', _, imgui.WindowFlags.AlwaysAutoResize) then
+            --imgui.InputInt(u8 'Введите ID игрока')
+            if imgui.Button(u8 "Отправить##change") then sampSendChat("/re") imgui.CloseCurrentPopup() end
+            imgui.SameLine()
+            if imgui.Button(u8 "Отмена##change") then imgui.CloseCurrentPopup() end
+            imgui.EndPopup()
+        end
+        if imgui.Button("Check »", btn_size) then imgui.OpenPopup("##check_recon") end
+        imgui.SetNextWindowSize(imgui.ImVec2(125, 140))
+        if imgui.BeginPopup('##check_recon', _, imgui.WindowFlags.AlwaysAutoResize) then
+            if imgui.Button("Check-GM", btn_size) then atext("check-gm") end
+            if imgui.Button("Check-GM2", btn_size) then atext("check-gm2") end
+            if imgui.Button("Check-GMCar", btn_size) then atext("check-gmcar") end
+            if imgui.Button("ResetShot", btn_size) then atext("resetshot") end
+            imgui.EndPopup()
+        end
+        for k, v in pairs(menu) do
+        end
+        imgui.End()]]
         imgui.PopStyleColor()
         if imgui.IsMouseClicked(0) and data.imgui.reconpos then
             data.imgui.reconpos = false
@@ -1822,7 +2366,7 @@ function imgui.OnDrawFrame()
         if imgui.Button(u8 'Настройки', btn_size) then settingwindows.v = not settingwindows.v end
         if imgui.Button(u8 'Телепорты', btn_size) then tpwindow.v = not tpwindow.v end
         if imgui.Button(u8 'Команды скрипта', btn_size) then cmdwindow.v = not cmdwindow.v end
-        if imgui.Button(u8 'Мероприятие', btn_size) then mpwindow.v = not mpwindow.v end
+        if imgui.Button(u8 'Мероприятие', btn_size) then imgui.OpenPopup('##1') mpwindow.v = not mpwindow.v end
         if imgui.Button(u8 'Лидеры', btn_size) then leadwindow.v = not leadwindow.v end
         if imgui.Button(u8 'Биндер', btn_size) then bMainWindow.v = not bMainWindow.v end
         --if imgui.Button(u8 'Тюнинг авто', btn_size) then tunwindow.v = not tunwindow.v end
@@ -1866,8 +2410,8 @@ function imgui.OnDrawFrame()
                 local carh = storeCarCharIsInNoSave(PLAYER_PED)
                 if getDriverOfCar(carh) == PLAYER_PED then
                     imgui.PushItemWidth(100)
-                    if imgui.InputInt(u8 'Цвет 1', mcolorb) then changeCarColour(carh, mcolorb.v, pcolorb.v) end
-                    if imgui.InputInt(u8 'Цвет 2', pcolorb) then changeCarColour(carh, mcolorb.v, pcolorb.v) end
+                    if imgui.InputInt(u8 'Цвет 1', mcolorb) then changeCarColour(carh, mcolorb.v, pcolorb.v) chcar = true end
+                    if imgui.InputInt(u8 'Цвет 2', pcolorb) then changeCarColour(carh, mcolorb.v, pcolorb.v) chcar = true end
                     imgui.PopItemWidth()
                 else
                     imgui.TextWrapped(u8 'Вы должны находиться за рулем автомобиля')
@@ -1961,7 +2505,7 @@ function imgui.OnDrawFrame()
                 imgui.TextWrapped(u8 'Использование: /checkrangs [id фракции]')
             end
             if imgui.CollapsingHeader('/gs', btn_size) then
-                imgui.TextWrapped(u8 'Описание: Сокращение команды /getstats')
+                imgui.TextWrapped(u8 'Описание: Сокращение команды /getstats.\nВ реконе можно ид не указывать, сразу проверит статистику игрока, за которым слежка')
                 imgui.TextWrapped(u8 'Использование: /gs [id]')
             end
             if imgui.CollapsingHeader('/ags', btn_size) then
@@ -1969,15 +2513,15 @@ function imgui.OnDrawFrame()
                 imgui.TextWrapped(u8 'Использование: /ags [id/nick]')
             end
             if imgui.CollapsingHeader('/sbiv', btn_size) then
-                imgui.TextWrapped(u8 ('Описание: Посадить игрока на %s минут в деморган по причине "Сбив анимации"'):format(cfg.timers.sbivtimer))
+                imgui.TextWrapped(u8 ('Описание: Посадить игрока на %s минут в деморган по причине "Сбив анимации".\nЕсли у вас 1 лвл админки пишет в /a с просьбой посадить'):format(cfg.timers.sbivtimer))
                 imgui.TextWrapped(u8 'Использование: /sbiv [id]')
             end
             if imgui.CollapsingHeader('/csbiv', btn_size) then
-                imgui.TextWrapped(u8 ('Описание: Посадить игрока на %s минут в деморган по причине "Сбив анимации"'):format(cfg.timers.csbivtimer))
+                imgui.TextWrapped(u8 ('Описание: Посадить игрока на %s минут в деморган по причине "Сбив анимации".\nЕсли у вас 1 лвл админки пишет в /a с просьбой посадить'):format(cfg.timers.csbivtimer))
                 imgui.TextWrapped(u8 'Использование: /csbiv [id]')
             end
             if imgui.CollapsingHeader('/cbug', btn_size) then
-                imgui.TextWrapped(u8 ('Описание: Посадить игрока на %s минут в деморган по причине "+с вне гетто"'):format(cfg.timers.cbugtimer))
+                imgui.TextWrapped(u8 ('Описание: Посадить игрока на %s минут в деморган по причине "+с вне гетто".\nЕсли у вас 1 лвл админки пишет в /a с просьбой посадить'):format(cfg.timers.cbugtimer))
                 imgui.TextWrapped(u8 'Использование: /cbug [id]')
             end
             if imgui.CollapsingHeader('/mnarko', btn_size) then
@@ -2087,6 +2631,14 @@ function imgui.OnDrawFrame()
             if imgui.CollapsingHeader('/atp', btn_size) then
                 imgui.TextWrapped(u8 'Описание: Открыть меню телепорта')
                 imgui.TextWrapped(u8 'Использование: /atp')
+            end
+            if imgui.CollapsingHeader('/ranks', btn_size) then
+                imgui.TextWrapped(u8 'Описание: Узнать ранги во фракции')
+                imgui.TextWrapped(u8 'Использование: /ranks [фракция]')
+            end
+            if imgui.CollapsingHeader('/oncapt', btn_size) then
+                imgui.TextWrapped(u8 'Описание: Начать / остановить запись отлетевших в гетто')
+                imgui.TextWrapped(u8 'Использование: /oncapt')
             end
             imgui.End()
         end
@@ -2476,70 +3028,72 @@ function imgui.OnDrawFrame()
 			imgui.DisableInput = false
 			local iScreenWidth, iScreenHeight = getScreenResolution()
 			imgui.SetNextWindowPos(imgui.ImVec2(iScreenWidth / 2, iScreenHeight / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-			imgui.SetNextWindowSize(imgui.ImVec2(1000, 560), imgui.Cond.FirstUseEver)
+			imgui.SetNextWindowSize(imgui.ImVec2(1000, 530), imgui.Cond.FirstUseEver)
 			imgui.Begin(u8("Admin Tools | Биндер##main"), bMainWindow, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize)
-			imgui.Text(u8'Для корректной работы биндера рекомендуется перезагрузить скрипт после изменения настроек биндера.')
-			imgui.Separator()
-			imgui.BeginChild("##bindlist", imgui.ImVec2(970, 442))
-			for k, v in ipairs(tBindList) do
-				if imadd.HotKey("##HK" .. k, v, tLastKeys, 100) then
-					if not rkeys.isHotKeyDefined(v.v) then
-						if rkeys.isHotKeyDefined(tLastKeys.v) then
-							rkeys.unRegisterHotKey(tLastKeys.v)
-						end
-						rkeys.registerHotKey(v.v, true, onHotKey)
+			imgui.BeginChild("##bindlist", imgui.ImVec2(995, 442))
+            for k, v in ipairs(tBindList) do
+                if imadd.HotKey("##HK" .. k, v, tLastKeys, 100) then
+                    if not rkeys.isHotKeyDefined(v.v) then
+                        if rkeys.isHotKeyDefined(tLastKeys.v) then
+                            rkeys.unRegisterHotKey(tLastKeys.v)
+                        end
+                        rkeys.registerHotKey(v.v, true, onHotKey)
                     end
                     saveData(tBindList, "moonloader/config/Admin Tools/binder.json")
-				end
-				imgui.SameLine()
-				if tEditData.id ~= k then
-					local sText = v.text:gsub("%[enter%]$", "")
-					imgui.BeginChild("##cliclzone" .. k, imgui.ImVec2(500, 30))
-					imgui.AlignTextToFramePadding()
-					if sText:len() > 0 then
-						imgui.Text(u8(sText))
-					else
-						imgui.TextDisabled(u8("Пустое сообщение ..."))
-					end
-					imgui.EndChild()
-					if imgui.IsItemClicked() then
-						sInputEdit.v = sText:len() > 0 and u8(sText) or ""
-						bIsEnterEdit.v = string.match(v.text, "(.)%[enter%]$") ~= nil
-						tEditData.id = k
-						tEditData.inputActve = true
-					end
-				else
-					local btimeb = imgui.ImInt(v.time)
-					imgui.PushAllowKeyboardFocus(false)
-					imgui.PushItemWidth(500)
-					local save = imgui.InputText("##Edit" .. k, sInputEdit, imgui.InputTextFlags.EnterReturnsTrue)
-					imgui.PopItemWidth()
-					imgui.PopAllowKeyboardFocus()
-					imgui.SameLine()
-					imgui.Checkbox(u8("Ввод") .. "##editCH" .. k, bIsEnterEdit)
-					imgui.SameLine()
-					imgui.PushItemWidth(50)
-					if imgui.InputInt(u8'Задержка', btimeb, 0) then v.time = btimeb.v end
-					imgui.PopItemWidth()
-					if save then
-						tBindList[tEditData.id].text = u8:decode(sInputEdit.v) .. (bIsEnterEdit.v and "[enter]" or "")
-						tEditData.id = -1
-						saveData(tBindList, "moonloader/config/Admin Tools/binder.json")
-					end
-					if tEditData.inputActve then
-						tEditData.inputActve = false
-						imgui.SetKeyboardFocusHere(-1)
-					end
-				end
-			end
-			imgui.EndChild()
-			imgui.Separator()
-			if imgui.Button(u8"Добавить клавишу") then
-				tBindList[#tBindList + 1] = {text = "", v = {}, time = 0}
-			end
-			imgui.SameLine()
-			if imgui.Button(u8'Сохранить биндер') then saveData(tBindList, "moonloader/config/Admin Tools/binder.json") end
-			imgui.End()
+                end
+                imgui.SameLine()
+                imgui.CentrText(u8(v.name))
+                imgui.SameLine(850)
+                imgui.SetCursorPosX(imgui.GetWindowWidth() - 150 - (imgui.GetStyle().ItemSpacing.x)*2)
+                if imgui.Button(u8 'Редактировать бинд##'..k) then imgui.OpenPopup(u8 "Редактирование биндера##editbind"..k) 
+                    bindname.v = u8(v.name) 
+                    bindtext.v = u8(v.text)
+                end
+                if imgui.BeginPopupModal(u8 'Редактирование биндера##editbind'..k, _, imgui.WindowFlags.NoResize) then
+                    imgui.Text(u8 "Введите название биндера:")
+                    imgui.InputText("##Введите название биндера", bindname)
+                    imgui.Text(u8 "Введите текст биндера:")
+                    imgui.InputTextMultiline("##Введите текст биндера", bindtext, imgui.ImVec2(500, 200))
+                    imgui.Separator()
+                    if imgui.Button(u8 'Ключи', imgui.ImVec2(90, 25)) then imgui.OpenPopup('##bindkey') end
+                    if imgui.BeginPopup('##bindkey') then
+                        imgui.Text(u8 'Используйте ключи биндера для более удобного использования биндера')
+                        imgui.Separator()
+                        imgui.Text(u8 '{f6} - Отправить сообщение в чат через эмуляцию чата (использовать в самом начале)')
+                        imgui.Text(u8 '{noe} - Оставить сообщение в полле ввода а не отправлять его в чат (использовать в самом начале)')
+                        imgui.Text(u8 '{wait:sek} - Задержка между строками, где sek - кол-во миллисекунд. Пример: {wait:2000} - задержка 2 секунды. (использовать отдельно на новой строчке)')
+                        imgui.Text(u8 '{screen} - Сделать скриншот экрана (использовать отдельно на новой строчке)')
+                        imgui.EndPopup()
+                    end
+                    imgui.SameLine()
+                    imgui.SetCursorPosX((imgui.GetWindowWidth() - 90 - imgui.GetStyle().ItemSpacing.x))
+                    if imgui.Button(u8 "Удалить бинд##"..k, imgui.ImVec2(90, 25)) then
+                        table.remove(tBindList, k)
+                        saveData(tBindList, "moonloader/config/Admin Tools/binder.json")
+                        imgui.CloseCurrentPopup()
+                    end
+                    imgui.SameLine()
+                    imgui.SetCursorPosX((imgui.GetWindowWidth() - 180 + imgui.GetStyle().ItemSpacing.x) / 2)
+                    if imgui.Button(u8 "Сохранить##"..k, imgui.ImVec2(90, 25)) then
+                        v.name = u8:decode(bindname.v)
+                        v.text = u8:decode(bindtext.v)
+                        bindname.v = ''
+                        bindtext.v = ''
+                        saveData(tBindList, "moonloader/config/Admin Tools/binder.json")
+                        imgui.CloseCurrentPopup()
+                    end
+                    imgui.SameLine()
+                    if imgui.Button(u8 "Закрыть##"..k, imgui.ImVec2(90, 25)) then imgui.CloseCurrentPopup() end
+                    imgui.EndPopup()
+                end
+            end
+            imgui.EndChild()
+            imgui.Separator()
+            if imgui.Button(u8"Добавить клавишу") then
+                tBindList[#tBindList + 1] = {text = "", v = {}, time = 0, name = "Бинд"..#tBindList + 1}
+                saveData(tBindList, "moonloader/config/Admin Tools/binder.json")
+            end
+		imgui.End()
 		end
     end
 end
@@ -2548,15 +3102,28 @@ function onHotKey(id, keys)
         local sKeys = tostring(table.concat(keys, " "))
         for k, v in pairs(tBindList) do
             if sKeys == tostring(table.concat(v.v, " ")) then
-                if tostring(v.text):len() > 0 then
-                    local bIsEnter = string.match(v.text, "(.)%[enter%]$") ~= nil
-                    if bIsEnter then
-                        sampSendChat(v.text:gsub("%[enter%]$", ""))
-                    else
-                        sampSetChatInputText(v.text)
-                        sampSetChatInputEnabled(true)
+                local tostr = tostring(v.text)
+                if tostr:len() > 0 then
+                    for line in tostr:gmatch('[^\r\n]+') do
+                        if line:match("^{wait%:%d+}$") then
+                            wait(line:match("^%{wait%:(%d+)}$"))
+                        elseif line:match("^{screen}$") then
+                            screen()
+                        else
+                            local bIsEnter = string.match(line, "^{noe}(.+)") ~= nil
+                            local bIsF6 = string.match(line, "^{f6}(.+)") ~= nil
+                            if not bIsEnter then
+                                if bIsF6 then
+                                    sampProcessChatInput(line:gsub("{f6}", ""))
+                                else
+                                    sampSendChat(line)
+                                end
+                            else
+                                sampSetChatInputText(line:gsub("{noe}", ""))
+                                sampSetChatInputEnabled(true)
+                            end
+                        end
                     end
-                    wait(v.time)
                 end
             end
         end
@@ -2570,6 +3137,16 @@ function getFrak(frak)
         if frak:match(".+ MC") then frak = frak:match("(.+) MC") end
         return frak
     end
+end
+function isHex(str)
+    local str = tostring(str):upper()
+    if #str ~= 6 then return false end
+    for i = 1, #str do
+        if str:byte(i) < 48 or str:byte(i) > 70 or (str:byte(i) < 65 and str:byte(i) > 57) then
+            return false
+        end
+    end
+    return true
 end
 function getRank(frak, rang)
     local trangs = {}
@@ -3045,7 +3622,7 @@ function onScriptTerminate(scr, quit)
     if scr == script.this then
         if killlistmode == 1 then enableKillList(true) end
         nameTag = true
-        if not quit then nameTagOn() end
+        if not quit then nameTagOn() infRun(false) end
         showCursor(false)
         removePointMarker()
         if fonts_loaded then
@@ -3078,9 +3655,16 @@ function sampev.onSpectatePlayer(id, type)
 end
 
 function sampev.onTogglePlayerSpectating(state)
+    if state then
+        dx, dy, dz = getCharCoordinates(PLAYER_PED)
+    end
     if not state then
-        reid = -1
-        traceid = -1
+        lua_thread.create(function()
+            while not sampIsLocalPlayerSpawned() do wait(0) end
+            requestCollision(dx, dy); loadScene(dx, dy, dz)
+            reid = -1
+            traceid = -1
+        end)
     end
 end
 function sampev.onUnoccupiedSync(id, data)
@@ -3107,6 +3691,7 @@ function sampev.onServerMessage(color, text)
     local mynick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
     if text:match('^ Вы авторизировались как модератор %d+ уровня$') then cfg.other.admlvl = tonumber(text:match('^ Вы авторизировались как модератор (%d+) уровня$')) saveData(cfg, 'moonloader/config/Admin Tools/config.json') end
     punishlog(text)
+    otletfunc(text, color)
     if cfg.other.admlvl > 1 and color == -10270806 then
         if punkey.re.id or punkey.warn.id or punkey.ban.id or punkey.prison.id then
             if text:find(sampGetPlayerNickname(punkey.warn.id)) or text:find(sampGetPlayerNickname(punkey.ban.id)) or text:find(sampGetPlayerNickname(punkey.prison.id)) then
@@ -3143,11 +3728,41 @@ function sampev.onServerMessage(color, text)
                             id = nil,
                             reason = nil,
                             admin = nil
+                        },
+                        pspawn = {
+                            id = nil,
+                            nick = nil
                         }
                     }
                 end
             end
         end
+    end
+    if text:match("^ Администратор %S+ добавил %d+ материалов на склад фракции .+. Текущее состояние склада: %d+$") and color == -65366 then
+        local nick, mati, banda = text:match("^ Администратор (%S+) добавил (%d+) материалов на склад фракции (.+). Текущее состояние склада: %d+$")
+        if nick == sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))) then
+            if banda == 'Grove' or banda == 'Rifa' or banda == 'Ballas' or banda == 'Vagos' or banda == 'Aztec' then
+                if not doesFileExist("moonloader/Admin Tools/setmatlog.txt") then
+                    local time = localTime()
+                    local file = io.open("moonloader/Admin Tools/setmatlog.txt", "w")
+                    file:write(("\n[size=85][list][*] [color=#00BFFF]Игровой ник[/color]: %s\n"):format(nick))
+                    file:write(("[*] [color=#00BFFF]Наименование банды[/color]: %s\n"):format(banda))
+                    file:write(("[*] [color=#00BFFF]Количество выданных материалов[/color]: %s\n"):format(mati))
+                    file:write(("[*] [color=#00BFFF]Дата и время[/color]: %s / %s[/list][/size]\n"):format(("%s:%s"):format(time.wHour, time.wMinute), os.date('%d.%m.%Y')))
+                    file:close()
+                else
+                    local time = localTime()
+                    local file = io.open("moonloader/Admin Tools/setmatlog.txt", "a")
+                    file:write(("\n[size=85][list][*] [color=#00BFFF]Игровой ник[/color]: %s\n"):format(nick))
+                    file:write(("[*] [color=#00BFFF]Наименование банды[/color]: %s\n"):format(banda))
+                    file:write(("[*] [color=#00BFFF]Количество выданных материалов[/color]: %s\n"):format(mati))
+                    file:write(("[*] [color=#00BFFF]Дата и время[/color]: %s / %s[/list][/size]\n"):format(("%s:%s"):format(time.wHour, time.wMinute), os.date('%d.%m.%Y')))
+                    file:close()
+                end
+            end
+        end
+        --[[atext(("Ник: %s | Банда: %s | Кол-во материалов: %s"):format(nick, banda, mati))
+        atext(color)]]
     end
     if bancheck and text:find("Игрок не найден") then 
         atext(("Игрок %s не заблокирован"):format(bnick)) 
@@ -3284,7 +3899,7 @@ function sampev.onServerMessage(color, text)
     end
     if checkfraks then
         if text:match('^ ID: %d+ |.+') then
-            local cid, cnick, crang = text:match('^ ID%: (%d+) | %d+%:%d+ %d+%.%d+%.%d+ | (.+)%: .+%[(%d+)%]')
+            local cid, cday, cmonth, cyear, cnick, crang = text:match('^ ID%: (%d+) | %d+%:%d+ (%d+)%.(%d+)%.(%d+) | (.+)%: .+%[(%d+)%]')
             local lvl = sampGetPlayerScore(cid)
             if lvl ~= 0 then
                 local crang = tonumber(crang)
@@ -3367,6 +3982,13 @@ function sampev.onServerMessage(color, text)
                     if crang == 9 then
                         if lvl < frakrang.Mafia.rang_9 then
                             table.insert(checkf, string.format('Nick: %s [%s] | LVL: %s | Rang: %s', cnick, cid, lvl, crang))
+                        end
+                    end
+                    if crang == 7 or crang == 8 or crang == 9 then
+                        local dayInvite = os.time({ day = cday, month = cmonth, year = cyear })
+                        local today = os.time({day = os.date('%d'), month = os.date('%m'), year = os.date('%Y')})
+                        if today - dayInvite < 4 then
+                            table.insert(checkf, string.format("Nick: %s [%s] | LVL: %s | Rang: %s — находится во фракции менее 4-ех дней. Дата принятия: %s.%s.%s", cnick, cid, lvl, crang, cday,cmonth,cyear))
                         end
                     end
                 elseif check_frak == 11 then
@@ -3669,19 +4291,17 @@ function sampev.onPlayerQuit(id, reason)
     end
 end
 function sampev.onPlayerDeathNotification(killerId, killedId, reason)
-	--[[local kill = ffi.cast('struct stKillInfo*', sampGetKillInfoPtr())
-    local _, myid = sampGetPlayerIdByCharHandle(playerPed)
-	local n_killer = ( sampIsPlayerConnected(killerId) or killerId == myid ) and sampGetPlayerNickname(killerId) or nil
-	local n_killed = ( sampIsPlayerConnected(killedId) or killedId == myid ) and sampGetPlayerNickname(killedId) or nil
-	lua_thread.create(function()
-		wait(0)
-		if n_killer then kill.killEntry[4].szKiller = ffi.new('char[25]', ( n_killer .. '[' .. killerId .. ']' ):sub(1, 24) ) end
-		if n_killed then kill.killEntry[4].szVictim = ffi.new('char[25]', ( n_killed .. '[' .. killedId .. ']' ):sub(1, 24) ) end
-    end)]]
-    local killercolor = ("%06X"):format(bit.band(sampGetPlayerColor(killerId), 0xFFFFFF))
-    local killedcolor = ("%06X"):format(bit.band(sampGetPlayerColor(killedId), 0xFFFFFF))
-    table.insert(tkills, ('{'..("%06X"):format(bit.band(sampGetPlayerColor(killerId), 0xFFFFFF))..'}%s[%s]\t{'..("%06X"):format(bit.band(sampGetPlayerColor(killedId), 0xFFFFFF))..'}%s[%s]\t{ffffff}%s'):format(sampGetPlayerNickname(killerId),killerId, sampGetPlayerNickname(killedId),killedId, sampGetDeathReason(reason)))
-    table.insert(tkilllist, {killer = ('{%s}%s [%s]'):format(killercolor, sampGetPlayerNickname(killerId), killerId), killed = ('{%s} %s [%s]'):format(killedcolor, sampGetPlayerNickname(killedId), killedId), reason = reason})
+    if killerId ~= nil and reason ~= nil and killedId ~= nil then
+        local _, myid = sampGetPlayerIdByCharHandle(PLAYER_PED)
+        if (sampIsPlayerConnected(killerId) or killerId == myid) and (sampIsPlayerConnected(killedId) or killedId == myid) then
+            local killercolor   = ("%06X"):format(bit.band(sampGetPlayerColor(killerId), 0xFFFFFF))
+            local killedcolor   = ("%06X"):format(bit.band(sampGetPlayerColor(killedId), 0xFFFFFF))
+            local killerNick    = sampGetPlayerNickname(killerId)
+            local killedNick    = sampGetPlayerNickname(killedId)
+            table.insert(tkills, ("{%s}%s [%s]\t{%s}%s [%s]\t%s"):format(killercolor, killerNick, killerId, killedcolor, killedNick, killedId, sampGetDeathReason(reason)))
+            table.insert(tkilllist, {killer = ('{%s}%s [%s]'):format(killercolor, killerNick, killerId), killed = ('{%s} %s [%s]'):format(killedcolor, killedNick, killedId), reason = reason})
+        end
+    end
     if #tkilllist > 5 then table.remove(tkilllist, 1) end
 end
 function sampev.onTogglePlayerControllable(bool)
@@ -3706,6 +4326,7 @@ function sampev.onBulletSync(playerid, data)
 end
 function sampev.onPlayerJoin(id, clist, isNPC, nick)
     text_notify_connect(('{00ff00}Подключился: {ffffff}%s [%s]'):format(nick, id))
+    local _, myid = sampGetPlayerIdByCharHandle(PLAYER_PED)
 	for i, v in ipairs(wrecon) do
 		if v["nick"] == nick then
 			if (os.time() - v["time"]) < 5 and (os.time() - v["time"]) > 0 then
@@ -3773,6 +4394,7 @@ function renders()
             local checkerheight = renderGetFontDrawHeight(checkfont)
             local hudheight = renderGetFontDrawHeight(hudfont)
             local killheight = renderGetFontDrawHeight(killfont)
+            screenx, screeny = getScreenResolution()
             if killlistmode == 1 then
                 local killsy = cfg.killlist.posy
                 for k, v in ipairs(tkilllist) do
@@ -3814,7 +4436,7 @@ function renders()
                     end
                 end
             end
-            renderFontDrawText(hudfont, ('%s %s %s [%s %s] [FPS: %s]'):format(os.date("[%H:%M:%S]"), funcsStatus.Inv and '{00FF00}[Inv]{ffffff}' or '[Inv]', funcsStatus.AirBrk and '{00FF00}[AirBrk]{ffffff}' or '[AirBrk]', hpos, hposint, hfps), 0, screeny-hudheight, -1)
+            renderFontDrawText(hudfont, ('%s %s %s %s [%s %s] [FPS: %s]'):format(os.date("[%H:%M:%S]"), funcsStatus.Inv and '{00FF00}[Inv]{ffffff}' or '[Inv]', funcsStatus.AirBrk and '{00FF00}[AirBrk]{ffffff}' or '[AirBrk]', flyInfo.active and '{00FF00}[Fly]{ffffff}' or '[Fly]', hpos, hposint, hfps), 0, screeny-hudheight, -1)
             if cfg.admchecker.enable then
                 renderFontDrawText(checkfont, "{00ff00}Админы онлайн ["..#admins_online.."]:", cfg.admchecker.posx, admrenderPosY-#admins_online*checkerheight, -1)
                 for k, v in ipairs(admins_online) do
@@ -3845,23 +4467,6 @@ function renders()
             end
         end
     end
-end
-function loadadmins()
-    if doesFileExist("moonloader/config/Admin Tools/adminlist.txt") then
-        for admin in io.lines("moonloader/config/Admin Tools/adminlist.txt") do
-			table.insert(admins, admin:match("(%S+)"))
-        end
-    else
-        io.open("moonloader/config/Admin Tools/adminlist.txt", "w"):close()
-    end
-    if doesFileExist("moonloader/config/Admin Tools/playerlist.txt") then
-        for admin in io.lines("moonloader/config/Admin Tools/playerlist.txt") do
-			table.insert(players, admin:match("(%S+)"))
-        end
-    else
-        io.open("moonloader/config/Admin Tools/playerlist.txt", "w"):close()
-    end
-
 end
 function sampGetPlayerIdByNickname(nick)
     local _, myid = sampGetPlayerIdByCharHandle(playerPed)
@@ -3955,6 +4560,17 @@ function check_keys_fast()
             local veh = nil
             if isInVeh then veh = storeCarCharIsInNoSave(playerPed) end
             if not isSampfuncsConsoleActive() and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() then
+                if wasKeyPressed(190) then
+                    if flyInfo.active == true then
+                        clearCharTasks(playerPed)
+                        flyInfo.active = false
+                    else
+                        flyInfo.active = true
+                    end
+                end
+                if flyInfo.active then
+                    fly()
+                end
                 if isKeyJustPressed(key.VK_F3) then
                     setCharHealth(PLAYER_PED, 0)
                 end
@@ -4292,6 +4908,9 @@ function gun(pam)
         end
     end)
 end
+function sampev.onSendClientJoin(version, mod, nick)
+    zapolncheck()
+end
 function sampev.onShowDialog(id, style, title, button1, button2, text)
     if id == 0 then
         if bancheck then
@@ -4476,15 +5095,15 @@ function gs(pam)
     local _, myid = sampGetPlayerIdByCharHandle(PLAYER_PED)
     if id ~= nil then
         if sampIsPlayerConnected(id) or id == myid then
-            sampSendChat('/getstats '..id)
+            sampSendChat(("/getstats %s"):format(id))
         else
-            atext('Игрок оффлайн')
+            atext("Игрок оффлайн")
         end
     else
-        if reid ~= nil then
-            sampSendChat('/getstats '..reid)
+        if reid ~= -1 then
+            sampSendChat(("/getstats %s"):format(reid))
         else
-            atext('Введите: /gs [id]')
+            atext("Введите /gs [id]")
         end
     end
 end
@@ -4721,28 +5340,27 @@ function cip2(pam)
 	if #ips2 == 2 then
 		local jsonips = encodeJson(ips2)
 		atext('Идет проверка IP адресов. Ожидайте..')
-		asyncHttpRequest("POST", "http://ip-api.com/batch?fields=25305&lang=ru", { data = jsonips },
-		function(response)
-			local rdata = decodeJson(u8:decode(response.text))
-			if rdata[1]["status"] == "success" and rdata[2]["status"] == "success" then
-				local distances2 = distance_cord(rdata[1]["lat"], rdata[1]["lon"], rdata[2]["lat"], rdata[2]["lon"])
-				if tonumber(pam) == nil then
-					sampAddChatMessage((' Страна: {66FF00}%s{ffffff} | Город: {66FF00}%s{ffffff} | ISP: {66FF00}%s [R-IP: %s]'):format(rdata[1]["country"], rdata[1]["city"], rdata[1]["isp"], rdata[1]["query"]), -1)
-					sampAddChatMessage((' Страна: {66FF00}%s{ffffff} | Город:{66FF00} %s{ffffff} | ISP: {66FF00}%s [IP: %s]'):format(rdata[2]["country"], rdata[2]["city"], rdata[2]["isp"], rdata[2]["query"]), -1)
-					sampAddChatMessage((' Расстояние: {66FF00}%s {ffffff}км. | Ник: {66FF00}%s'):format(math.floor(distances2), rnick), -1)
-				else
-					sampSendChat(('/a Страна: %s | Город: %s | ISP: %s [R-IP: %s]'):format(rdata[1]["country"], rdata[1]["city"], rdata[1]["isp"], rdata[1]["query"]), -1)
-					wait(cfg.other.delay)
-					sampSendChat(('/a Страна: %s | Город: %s | ISP: %s [IP: %s]'):format(rdata[2]["country"], rdata[2]["city"], rdata[2]["isp"], rdata[2]["query"]), -1)
-					wait(cfg.other.delay)
-					sampSendChat(('/a Расстояние: %s км. | Ник: %s'):format(math.floor(distances2), rnick), -1)
-				end
-			end
-		end,
-		function(err)
-			atext('Произошла ошибка проверки IP адресов')
-		end
-		)
+        httpRequest("http://ip-api.com/batch?fields=25305&lang=ru", { data = jsonips }, function(response, code, headers, status)
+            if response then
+                local rdata = decodeJson(u8:decode(response))
+                if rdata[1]["status"] == "success" and rdata[2]["status"] == "success" then
+                    local distances2 = distance_cord(rdata[1]["lat"], rdata[1]["lon"], rdata[2]["lat"], rdata[2]["lon"])
+                    if tonumber(pam) == nil then
+                        sampAddChatMessage((' Страна: {66FF00}%s{ffffff} | Город: {66FF00}%s{ffffff} | ISP: {66FF00}%s [R-IP: %s]'):format(rdata[1]["country"], rdata[1]["city"], rdata[1]["isp"], rdata[1]["query"]), -1)
+                        sampAddChatMessage((' Страна: {66FF00}%s{ffffff} | Город:{66FF00} %s{ffffff} | ISP: {66FF00}%s [IP: %s]'):format(rdata[2]["country"], rdata[2]["city"], rdata[2]["isp"], rdata[2]["query"]), -1)
+                        sampAddChatMessage((' Расстояние: {66FF00}%s {ffffff}км. | Ник: {66FF00}%s'):format(math.floor(distances2), rnick), -1)
+                    else
+                        sampSendChat(('/a Страна: %s | Город: %s | ISP: %s [R-IP: %s]'):format(rdata[1]["country"], rdata[1]["city"], rdata[1]["isp"], rdata[1]["query"]), -1)
+                        wait(cfg.other.delay)
+                        sampSendChat(('/a Страна: %s | Город: %s | ISP: %s [IP: %s]'):format(rdata[2]["country"], rdata[2]["city"], rdata[2]["isp"], rdata[2]["query"]), -1)
+                        wait(cfg.other.delay)
+                        sampSendChat(('/a Расстояние: %s км. | Ник: %s'):format(math.floor(distances2), rnick), -1)
+                    end
+                end
+            else
+                atext('Произошла ошибка проверки IP адресов')
+            end
+		end)
 	else
 		atext('Не найдено IP адресов для сравнения')
     end
@@ -4752,32 +5370,30 @@ function cip(pam)
     local rdata = {}
     if #ips == 2 then
         atext('Идет проверка IP адресов. Ожидайте..')
-        local site = "http://f0294620.xsph.ru/?ip1="..ips[1].."&ip2="..ips[2]
-        asyncHttpRequest("GET", site, _,
-        function (response)
-            local rdata = decodeJson(response.text)
-            if rdata.ipone.success and rdata.iptwo.success then
-                local distances2 = distance_cord(rdata.ipone.latitude, rdata.ipone.longitude,rdata.iptwo.latitude, rdata.iptwo.longitude)
-                if tonumber(pam) == nil then
-                    sampAddChatMessage((' Страна: {66FF00}%s{ffffff} | Город: {66FF00}%s{ffffff} | ISP: {66FF00}%s [R-IP: %s]'):format(u8:decode(rdata.ipone.country), u8:decode(rdata.ipone.city), u8:decode(rdata.ipone.isp), u8:decode(rdata.ipone.ip)), -1)
-                    sampAddChatMessage((' Страна: {66FF00}%s{ffffff} | Город:{66FF00} %s{ffffff} | ISP: {66FF00}%s [IP: %s]'):format(u8:decode(rdata.iptwo.country), u8:decode(rdata.iptwo.city), u8:decode(rdata.iptwo.isp), u8:decode(rdata.iptwo.ip)), -1)
-                    sampAddChatMessage((' Расстояние: {66FF00}%s {ffffff}км. | Ник: {66FF00}%s %s'):format(math.floor(distances2), rnick, sampGetPlayerIdByNickname(rnick) and '['..sampGetPlayerIdByNickname(rnick)..']' or ''), -1)
+        local site = "http://a0314415.xsph.ru/?ip1="..ips[1].."&ip2="..ips[2]
+        httpRequest(site, _, function(response, code, headers, status)
+            if response then
+                local rdata = decodeJson(response)
+                if rdata.ipone.success and rdata.iptwo.success then
+                    local distances2 = distance_cord(rdata.ipone.latitude, rdata.ipone.longitude,rdata.iptwo.latitude, rdata.iptwo.longitude)
+                    if tonumber(pam) == nil then
+                        sampAddChatMessage((' Страна: {66FF00}%s{ffffff} | Город: {66FF00}%s{ffffff} | ISP: {66FF00}%s [R-IP: %s]'):format(u8:decode(rdata.ipone.country), u8:decode(rdata.ipone.city), u8:decode(rdata.ipone.isp), u8:decode(rdata.ipone.ip)), -1)
+                        sampAddChatMessage((' Страна: {66FF00}%s{ffffff} | Город:{66FF00} %s{ffffff} | ISP: {66FF00}%s [IP: %s]'):format(u8:decode(rdata.iptwo.country), u8:decode(rdata.iptwo.city), u8:decode(rdata.iptwo.isp), u8:decode(rdata.iptwo.ip)), -1)
+                        sampAddChatMessage((' Расстояние: {66FF00}%s {ffffff}км. | Ник: {66FF00}%s %s'):format(math.floor(distances2), rnick, sampGetPlayerIdByNickname(rnick) and '['..sampGetPlayerIdByNickname(rnick)..']' or ''), -1)
+                    else
+                        sampSendChat(('/a Страна: %s | Город: %s | ISP: %s [R-IP: %s]'):format(u8:decode(rdata.ipone.country), u8:decode(rdata.ipone.city), u8:decode(rdata.ipone.isp), u8:decode(rdata.ipone.ip)))
+                        wait(cfg.other.delay)
+                        sampSendChat(('/a Страна: %s | Город: %s | ISP: %s [IP: %s]'):format(u8:decode(rdata.iptwo.country), u8:decode(rdata.iptwo.city), u8:decode(rdata.iptwo.isp), u8:decode(rdata.iptwo.ip)))
+                        wait(cfg.other.delay)
+                        sampSendChat(('/a Расстояние: %s км. | Ник: %s %s'):format(math.floor(distances2), rnick, sampGetPlayerIdByNickname(rnick) and '['..sampGetPlayerIdByNickname(rnick)..']' or ''))
+                    end
                 else
-                    sampSendChat(('/a Страна: %s | Город: %s | ISP: %s [R-IP: %s]'):format(u8:decode(rdata.ipone.country), u8:decode(rdata.ipone.city), u8:decode(rdata.ipone.isp), u8:decode(rdata.ipone.ip)))
-                    wait(cfg.other.delay)
-                    sampSendChat(('/a Страна: %s | Город: %s | ISP: %s [IP: %s]'):format(u8:decode(rdata.iptwo.country), u8:decode(rdata.iptwo.city), u8:decode(rdata.iptwo.isp), u8:decode(rdata.iptwo.ip)))
-                    wait(cfg.other.delay)
-                    sampSendChat(('/a Расстояние: %s км. | Ник: %s %s'):format(math.floor(distances2), rnick, sampGetPlayerIdByNickname(rnick) and '['..sampGetPlayerIdByNickname(rnick)..']' or ''))
+                    atext('Произошла ошибка проверки IP адресов')
                 end
             else
                 atext('Произошла ошибка проверки IP адресов')
             end
-        end,
-        function (err)
-            atext('Произошла ошибка проверки IP адресов')
-            print(err)
-        end
-        )
+        end)
     else
         atext('Не найдено IP адресов для сравнения')
     end
@@ -5014,7 +5630,7 @@ function punish()
             atext('Выдача наказаний по жалобам начата')
             for line in io.lines(os.getenv('TEMP')..'\\Punishment.txt') do
                 local type, nick, hour, reason = line:match("(.+) Ник: (.+) Количество %S+: (%d*) Причина: (.+)")
-                if nick:match(".+%s") then nick = nick:match("(.+)%s") end
+                if nick:match(".+%s$") then nick = nick:match("(.+)%s$") end
                 local nick = nick:gsub(" ", '_')
                 if sampGetPlayerIdByNickname(nick) ~= nil then
                     if type == "[W]" then pwarn(("%s %s %s"):format(sampGetPlayerIdByNickname(nick), hour, reason))
@@ -5063,7 +5679,7 @@ function punishlog(text)
 end
 
 function getlvl(pam)
-        lua_thread.create(function()
+    lua_thread.create(function()
         local t = {}
         local cid = tonumber(pam)
         if cid ~= nil then
@@ -5158,8 +5774,10 @@ end
 function addplayer(pam)
     if pam:match("^%s*(%d+)%s*(%S*)%s*(.*)") then
         local id, color, text = pam:match("(%d+)%s*(%S*)%s*(.*)")
-        if #color > 0 and #color < 6 then text = color ..' '..text end
-        if #color < 6 then color = 'FFFFFF' end
+        if not isHex(color) then 
+            text = color..' '..text
+            color = 'FFFFFF'
+        end
         if sampIsPlayerConnected(id) then
             local nick = sampGetPlayerNickname(id)
             local result, key = checkInTableChecker(players, nick)
@@ -5198,8 +5816,10 @@ function addplayer(pam)
     elseif pam:match("^%s*(%S+)%s*(%S*)%s*(.*)") then
         local nick, color, text = pam:match("(%S+)%s*(%S*)%s*(.*)")
         local id = sampGetPlayerIdByNickname(nick)
-        if #color > 0 and #color < 6 then text = color ..' '..text end
-        if #color < 6 then color = 'FFFFFF' end
+        if not isHex(color) then 
+            text = color..' '..text
+            color = 'FFFFFF'
+        end
         if id ~= nil then
             local result, key = checkInTableChecker(players, nick)
             if result then
@@ -5243,8 +5863,10 @@ end
 function addadm(pam)
     if pam:match("^%s*(%d+)%s*(%S*)%s*(.*)") then
         local id, color, text = pam:match("(%d+)%s*(%S*)%s*(.*)")
-        if #color > 0 and #color < 6 then text = color ..' '..text end
-        if #color < 6 then color = 'FFFFFF' end
+        if not isHex(color) then 
+            text = color..' '..text
+            color = 'FFFFFF'
+        end
         if sampIsPlayerConnected(id) then
             local nick = sampGetPlayerNickname(id)
             local result, key = checkInTableChecker(admins, nick)
@@ -5289,8 +5911,10 @@ function addadm(pam)
         end
     elseif pam:match("^%s*(%S+)%s*(%S*)%s*(.*)") then
         local nick, color, text = pam:match("(%S+)%s*(%S*)%s*(.*)")
-        if #color > 0 and #color < 6 then text = color ..' '..text end
-        if #color < 6 then color = 'FFFFFF' end
+        if not isHex(color) then 
+            text = color..' '..text
+            color = 'FFFFFF'
+        end
         local id = sampGetPlayerIdByNickname(nick)
         if id ~= nil then
             local result, key = checkInTableChecker(admins, nick)
@@ -5422,8 +6046,10 @@ end
 function addtemp(pam)
     if pam:match("^%s*(%d+)%s*(%S*)%s*(.*)") then
         local id, color, text = pam:match("(%d+)%s*(%S*)%s*(.*)")
-        if #color > 0 and #color < 6 then text = color ..' '..text end
-        if #color < 6 then color = 'FFFFFF' end
+        if not isHex(color) then 
+            text = color..' '..text
+            color = 'FFFFFF'
+        end
         if sampIsPlayerConnected(id) then
             local nick = sampGetPlayerNickname(id)
             local result, key = checkInTableChecker(temp_checker, nick)
@@ -5469,8 +6095,10 @@ function addtemp(pam)
     elseif pam:match("^%s*(%S+)%s*(%S*)%s*(.*)") then
         local nick, color, text = pam:match("(%S+)%s*(%S*)%s*(.*)")
         local id = sampGetPlayerIdByNickname(nick)
-        if #color > 0 and #color < 6 then text = color ..' '..text end
-        if #color < 6 then color = 'FFFFFF' end
+        if not isHex(color) then 
+            text = color..' '..text
+            color = 'FFFFFF'
+        end
         if id ~= nil then
             local result, key = checkInTableChecker(temp_checker, nick)
             if result then
@@ -5611,6 +6239,14 @@ function admchat()
                         end
                     end
                 end
+                if text:match('^pspawn %d+') or text:match('^/pspawn %d+') then
+                    if sampIsPlayerConnected(tonumber(text:match('pspawn (%d+)'))) then
+                        punkey.pspawn.id = text:match('pspawn (%d+)')
+                        punkey.pspawn.admin = nick
+                        atext(("Администратор %s [%s] хочет заспавнить игрока %s [%s]"):format(nick, id, sampGetPlayerNickname(punkey.pspawn.id), punkey.pspawn.id))
+                        atext(("Нажмите {66FF00}%s{FFFFFF} для подтверждения или {66FF00}%s{ffffff} для отмены"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + "), table.concat(rkeys.getKeysName(config_keys.pundeny.v), " + ")))
+                    end
+                end
                 if cfg.other.admlvl >= 4 then
                     if text:match('^auninvite %d+ .+') or text:match('^/auninvite %d+ .+') then
                         if sampIsPlayerConnected(tonumber(text:match('auninvite (%d+) .+'))) then
@@ -5636,6 +6272,10 @@ function admchat()
     end
 end
 function punaccept()
+    if punkey.pspawn.id then
+        sampSendChat(("/pspawn %s"):format(punkey.pspawn.id))
+        punkey.pspawn.id, punkey.pspawn.nick = nil, nil
+    end
     if punkey.re.id then
         sampSendChat(('/re %s'):format(punkey.re.id))
         punkey.re.id, punkey.re.nick = nil, nil
@@ -5699,6 +6339,10 @@ function pundeny()
                 id = nil,
                 reason = nil,
                 admin = nil
+            },
+            pspawn = {
+                id = nil,
+                nick = nil
             }
         }
         atext('Выдача наказаний отменена')
@@ -5868,6 +6512,7 @@ function aunv(pam)
     if id and reason then
         if sampIsPlayerConnected(tonumber(id)) or tonumber(id) == select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)) then
             sampSendChat(("/auninvite %s %s"):format(id, reason))
+            print('уволил')
         else
             atext("Игрок оффлайн")
         end
@@ -5980,3 +6625,292 @@ function mcbug(pam)
         atext("Введите: /mcbug [id]")
     end
 end
+
+function ranks(pam)
+    lua_thread.create(function()
+        local t = {}
+        for k, v in pairs(fraklist) do
+            table.insert(t, k)
+        end
+        if #pam ~= 0 then
+            if checkIntable(t, string.rupper(pam)) then
+                for k,v in pairs(fraklist[string.rupper(pam)]) do
+                    atext(("[%s] %s"):format(k, v))
+                end
+            else
+                sampShowDialog(33121, '{66FF00}Список фракций:', "{ffffff}"..table.concat(t, '\n'), 'x', _, 2)
+                while sampIsDialogActive(33121) do wait(0) end
+                local result, button, list, input = sampHasDialogRespond(33121)
+                if result and button ==  1 then
+                    local text = sampGetListboxItemText(list)
+                    for k,v in pairs(fraklist[text]) do
+                        atext(("[%s] %s"):format(k, v))
+                    end
+                end
+            end
+        else
+            atext("Введите: /ranks [фракция]")
+        end
+    end)
+end
+
+function vkv(pam)
+    local id = tonumber(pam)
+    local _, myid = sampGetPlayerIdByCharHandle(PLAYER_PED)
+    if id ~= nil then
+        if sampIsPlayerConnected(id) or id == myid then
+            if cfg.other.admlvl < 2 then
+                sampSendChat(("/a /prison %s 30 Война вне квадрата"):format(id--[[, cfg.timers.sbivtimer]]))
+            else
+                sampSendChat(("/prison %s 30 Война вне квадрата"):format(id--[[, cfg.timers.sbivtimer]]))
+            end
+        else
+            atext('Игрок оффлайн')
+        end
+    else
+        atext("Введите: /vkv [id]")
+    end
+end
+function oncapt()
+    lua_thread.create(function()
+        text = ("{ffffff}Банда\tКол-во отлетевших\nGrove\t%s\nBallas\t%s\nRifa\t%s\nVagos\t%s\nAztec\t%s\n \nЗапустить счетчик\nОстановить счетчик\nСбросить счетчик"):format(#otletel.grove, #otletel.ballas, #otletel.rifa, #otletel.vagos, #otletel.aztec)
+        sampShowDialog(2134, ("Отлетевшие | Состояние: %s"):format(countstart and 'Включен' or 'Выключен'), text, '»', 'x', 5)
+        while sampIsDialogActive(2134) do wait(0) end
+        local result, button, list, input = sampHasDialogRespond(2134)
+        if result and button ==  1 then
+            if list == 0 then
+                otext = ''
+                for k, v in pairs(otletel.grove) do otext = otext..v.."\n" end
+                sampShowDialog(2135,"Отлетевшие: Grove",otext,'x',_,2)
+            elseif list == 1 then
+                otext = ''
+                for k, v in pairs(otletel.ballas) do otext = otext..v.."\n" end
+                sampShowDialog(2135,"Отлетевшие: Ballas",otext,'x',_,2)
+            elseif list == 2 then
+                otext = ''
+                for k, v in pairs(otletel.rifa) do otext = otext..v.."\n" end
+                sampShowDialog(2135,"Отлетевшие: Rifa",otext,'x',_,2)
+            elseif list == 3 then
+                otext = ''
+                for k, v in pairs(otletel.vagos) do otext = otext..v.."\n" end
+                sampShowDialog(2135,"Отлетевшие: Vagos",otext,'x',_,2)
+            elseif list == 4 then
+                otext = ''
+                for k, v in pairs(otletel.aztec) do otext = otext..v.."\n" end
+                sampShowDialog(2135,"Отлетевшие: Aztec",otext,'x',_,2)
+            elseif list == 6 then
+                countstart = true
+                atext("Запись отлетевших включена.")
+            elseif list == 7 then
+                countstart = false
+                atext("Запись отлетевших отключена.")
+            elseif list == 8 then
+                atext("Список отлетевших обнулен.")
+                otletel = {
+                    grove = {},
+                    ballas = {},
+                    rifa = {},
+                    vagos = {},
+                    aztec = {}
+                }
+            end
+        end
+    end)
+end
+function otletfunc(text, color)
+    if countstart then
+        if color == -10270806 then
+            if string.rlower(text):find("grove") then
+                table.insert(otletel.grove, text)
+            elseif string.rlower(text):find("ballas") then
+                table.insert(otletel.ballas, text)
+            elseif string.rlower(text):find("rifa") then
+                table.insert(otletel.rifa, text)
+            elseif string.rlower(text):find("aztec") then
+                table.insert(otletel.aztec, text)
+            elseif string.rlower(text):find("vagos") then
+                table.insert(otletel.vagos, text)
+            end
+        end
+    end
+end
+
+function fly()
+    local posX, posY, posZ = getCharCoordinates(playerPed)
+    local angle = getCharHeading(playerPed)
+    local cx, cy, cz = getActiveCameraCoordinates()
+    local groundZ = getGroundZFor3dCoord(posX, posY, posZ)
+    local speed = getCharSpeed(playerPed)
+    local vecX, vecY, vecZ = getCharVelocity(playerPed)
+    local boostX, boostY, boostZ = 0.0, 0.0, 0.0
+    local rotation, upstream = 0.0, 0.0
+  
+    ----- Ограничение на Fly
+    if reconstate then return end
+    if funcsStatus.AirBrk then return end
+    if isCharInAnyCar(PLAYER_PED) then return end
+    --[[if not sampIsLocalPlayerSpawned() then return end
+    if reid ~= -1 then return end
+    if getActiveInterior() ~= 0 then return end]]
+
+  
+    ----- Стоим на земле
+    if groundZ + 1.2 > posZ and groundZ - 1.2 < posZ then
+        if flyInfo.fly_active == true then
+            flyInfo.fly_active = false
+            clearCharTasks(playerPed)
+        end
+        return
+    end
+  
+    ----- Узнаем новое состояние
+    if isKeyDown(key.VK_W) then
+        flyInfo.keySpeedState = flyInfo.speed_accelerate
+    elseif isKeyDown(key.VK_S) then
+        flyInfo.keySpeedState = flyInfo.speed_decelerate
+    else
+        flyInfo.keySpeedState = flyInfo.speed_none
+    end
+    if isKeyDown(key.VK_A) then
+        flyInfo.keyStrafeState = flyInfo.strafe_left
+        rotation = 6.0
+    elseif isKeyDown(key.VK_D) then
+        flyInfo.keyStrafeState = flyInfo.strafe_right
+        rotation = 6.0
+    elseif isKeyDown(key.VK_SPACE) then
+        flyInfo.keyStrafeState = flyInfo.strafe_up
+        upstream = 50.0
+    else
+        flyInfo.keyStrafeState = flyInfo.strafe_none
+    end
+  
+    ----- Начальная анимация
+    if flyInfo.fly_active == false then
+        flyInfo.fly_active = true
+        flyInfo.lastKeyStrafeState = flyInfo.strafe_none
+        if posZ - cz > 0 then
+            boostZ = flyInfo.speed_none + 10.0
+        else
+            boostZ = (flyInfo.speed_none + 10.0) * -1
+        end
+        taskPlayAnimNonInterruptable(playerPed, "Swim_Tread", "SWIM", 4.0, 1, 0, 0, 0, -1)
+    end
+  
+    ----- Изменяем анимацию в зависимости от скорости
+    if flyInfo.keyStrafeState ~= flyInfo.lastKeyStrafeState or flyInfo.keySpeedState ~= flyInfo.lastKeySpeedState then
+        flyInfo.lastKeyStrafeState = flyInfo.keyStrafeState
+        flyInfo.lastKeySpeedState = flyInfo.keySpeedState
+        if flyInfo.keySpeedState == flyInfo.speed_none then
+            taskPlayAnimNonInterruptable(playerPed, "Swim_Breast", "SWIM", 4.0, 1, 0, 0, 0, -1)
+        elseif flyInfo.keySpeedState == flyInfo.speed_accelerate then
+            taskPlayAnimNonInterruptable(playerPed, "SWIM_crawl", "SWIM", 4.0, 1, 0, 0, 0, -1)
+        elseif flyInfo.keySpeedState == flyInfo.speed_decelerate then
+            if speed > 15.0 then
+                taskPlayAnimNonInterruptable(playerPed, "FALL_skyDive", "PARACHUTE", 4.0, 1, 0, 0, 0, -1)
+            else
+                taskPlayAnimNonInterruptable(playerPed, "Swim_Tread", "SWIM", 4.0, 1, 0, 0, 0, -1)
+            end
+        end
+    end
+  
+    ------ Ускорение / Замедление
+    local time = tonumber(string.format("%.2f", os.clock()))
+    if flyInfo.update < time - 0.01 then
+        local chSpeed = flyInfo.keySpeedState - flyInfo.currentSpeed
+        local chRotation = rotation - flyInfo.rotationSpeed
+        local chUp = upstream - flyInfo.upSpeed
+        flyInfo.rotationSpeed = flyInfo.rotationSpeed + (chRotation / 50)
+        flyInfo.upSpeed = flyInfo.upSpeed + (chUp / 50)
+        flyInfo.currentSpeed = flyInfo.currentSpeed + (chSpeed / 50)
+        flyInfo.update = time
+    end
+  
+    local coordsX = (posX - cx) * (boostX + flyInfo.currentSpeed)
+    local coordsY = (posY - cy) * (boostY + flyInfo.currentSpeed)
+    local coordsZ = ((posZ - cz) * (boostZ + flyInfo.currentSpeed)) + 0.3
+  
+    ----- Вычисляем скорость персонажа и кватернион вращения персонажа
+    local qx, qy, qz, qw = getCharQuaternion(playerPed)
+    if flyInfo.keyStrafeState == flyInfo.strafe_left then
+        local ang = angle + 90
+        if ang >= 360.0 then ang = ang - 360.0 end
+        local atX = math.sin(math.rad(-ang))
+        local atY = math.cos(math.rad(-ang))
+        if (coordsX > 0 and atX > 0) or (coordsX < 0 and atX < 0) then
+            coordsX = coordsX + (atX * flyInfo.rotationSpeed)
+        elseif (coordsX > 0 and atX < 0) or (coordsX < 0 and atX > 0) then
+            coordsX = (coordsX - (atX * flyInfo.rotationSpeed)) * -1
+        end 
+        if (coordsY > 0 and atY > 0) or (coordsY < 0 and atY < 0) then
+            coordsY = coordsY + (atY * flyInfo.rotationSpeed)
+        elseif (coordsY > 0 and atY < 0) or (coordsY < 0 and atY > 0) then
+            coordsY = (coordsY - (atY * flyInfo.rotationSpeed)) * -1
+        end
+    elseif flyInfo.keyStrafeState == flyInfo.strafe_right then
+        local ang = angle - 90
+        if ang >= 360.0 then ang = ang - 360.0 end
+        local atX = math.sin(math.rad(-ang))
+        local atY = math.cos(math.rad(-ang))
+        if (coordsX > 0 and atX > 0) or (coordsX < 0 and atX < 0) then
+            coordsX = coordsX + (atX * flyInfo.rotationSpeed)
+        elseif (coordsX > 0 and atX < 0) or (coordsX < 0 and atX > 0) then
+            coordsX = (coordsX - (atX * flyInfo.rotationSpeed)) * -1
+        end 
+        if (coordsY > 0 and atY > 0) or (coordsY < 0 and atY < 0) then
+            coordsY = coordsY + (atY * flyInfo.rotationSpeed)
+        elseif (coordsY > 0 and atY < 0) or (coordsY < 0 and atY > 0) then
+                coordsY = (coordsY - (atY * flyInfo.rotationSpeed)) * -1
+        end  
+    end
+    if flyInfo.keyStrafeState == flyInfo.strafe_up then
+        coordsZ = flyInfo.upSpeed
+    end
+    if flyInfo.keySpeedState ~= flyInfo.speed_decelerate then
+        if coordsZ > 1.0 then coordsZ = coordsZ * 1.5
+        else coordsZ = coordsZ / 2 end
+    end
+    --setCharQuaternion(playerPed, qqx, qqy, qqz, qqw)
+  
+    ----- Устанавливаем скорость персонажа
+    local zAngle = getHeadingFromVector2d(posX - cx, posY - cy)
+    setCharHeading(playerPed, zAngle)
+    setCharVelocity(playerPed, coordsX, coordsY, coordsZ)
+end
+  
+function getCoordinatesInFrontOfChar(angle)
+    local atX, atY, _ = getCharCoordinates(playerPed)
+    atX = atX + math.sin(math.rad(-angle))
+    atY = atY + math.cos(math.rad(-angle))
+    return atX, atY
+end
+
+function checkGangZones() 
+    ffi.cdef [[ 
+        struct stGangzone 
+        { 
+        float fPosition[4]; 
+        uint32_t dwColor; 
+        uint32_t dwAltColor; 
+        }; 
+        
+        struct stGangzonePool 
+        { 
+        struct stGangzone *pGangzone[1024]; 
+        int iIsListed[1024]; 
+        }; 
+    ]] 
+    local gz_pool = ffi.cast('struct stGangzonePool*', sampGetGangzonePoolPtr()) 
+    if gz_pool.iIsListed[123] ~= 0 and gz_pool.pGangzone[123] ~= nil then 
+    local gz_pos = gz_pool.pGangzone[123].fPosition 
+    local gz_color = gz_pool.pGangzone[123].dwColor 
+    local gz_alt_color = gz_pool.pGangzone[123].dwAltColor 
+    print(gz_pos[0], gz_pos[1], gz_pos[2], gz_pos[3], gz_color, gz_alt_color) 
+    end 
+end
+
+--[[function sampev.onGangZoneDestroy(id)
+    atext(id)
+end
+
+    149 - карьер
+]]
