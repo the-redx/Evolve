@@ -1,14 +1,18 @@
 script_name("Activity") 
 script_authors({ 'Edward_Franklin', 'Thomas_Lawson' })
-script_version("1.45") -- Final version
-script_version_number(14535)
+script_version("1.5") -- Final version
+script_version_number(14536)
 --------------------------------------------------------------------
 require "lib.moonloader"
-local inicfg = require 'inicfg'
-local sampevents = require "lib.samp.events"
-local encoding = require 'encoding'
-encoding.default = 'CP1251'
-local imgui = require 'imgui'
+local inicfg              = require 'inicfg'
+local sampevents          = require "lib.samp.events"
+local encoding            = require 'encoding'
+encoding.default          = 'CP1251'
+local imgui               = require 'imgui'
+local lrequests, requests = pcall(require, 'requests')
+local lcopas, copas       = pcall(require, 'copas')
+local lhttp, http         = pcall(require, 'copas.http')
+local lcrypto, crypto     = pcall(require, 'crypto_lua')
 local u8 = encoding.UTF8
 --------------------------------------------------------------------
 local mainwindow = imgui.ImBool(false)
@@ -23,7 +27,8 @@ local pInfo = inicfg.load({
     dayPM = 0,
     weekPM = 0,
     thisWeek = 0,
-    weekOnline = 0
+    weekOnline = 0,
+    admLvl = 0
   },
   weeks = {0,0,0,0,0,0,0},
   punish = {
@@ -56,7 +61,7 @@ function main()
     apply_custom_style()
     if not isSampfuncsLoaded() or not isSampLoaded() then return end
     while not isSampAvailable() do wait(100) end
-    autoupdate("https://raw.githubusercontent.com/the-redx/EvolveRP/master/update.json", '[Activity Helper]', "https://evolve-rp.su/viewtopic.php?f=21&t=151439")
+    autoupdate("https://raw.githubusercontent.com/WhackerH/EvolveRP/master/update.json", '[Activity Helper]', "https://evolve-rp.su/viewtopic.php?f=21&t=151439")
     sampRegisterChatCommand('activitydebug', function()
       DEBUG_MODE = not DEBUG_MODE
       atext(("Debug mode %s"):format(DEBUG_MODE and "включен" or "отключен"))
@@ -107,17 +112,19 @@ function main()
     end
     if sampGetGamestate() == 3 then
       sampSendChat("/a")
+      sendStat(false)
       debug_log("Gamestate == 3, check alogin")
     end
     debug_log("Main end: dayWeek = "..pInfo.info.weekOnline.." | dayOnline = "..pInfo.info.dayOnline)
     --------------------=========----------------------
     while not sampIsLocalPlayerSpawned() do wait(0) end
-    local _, myid = sampGetPlayerIdByCharHandle(playerPed)
+    local _, myid = sampGetPlayerIdByCharHandle(PLAYER_PED)
     sInfo.authTime = os.date("%d.%m.%y %H:%M:%S")
     sInfo.updateAFK = os.time()
     playerid = myid
     nick = sampGetPlayerNickname(myid)
     calculateOnline()
+    sendOnline()
     while true do wait(0)
       if sampGetGamestate() ~= 3 and sInfo.isALogin == true then
         sInfo.isALogin = false
@@ -125,6 +132,14 @@ function main()
       end
       imgui.Process = mainwindow.v
     end
+end
+
+function sendOnline()
+  lua_thread.create(function()
+    while true do wait(900000)
+      sendStat(false)
+    end
+  end)
 end
 
 function calculateOnline()
@@ -141,6 +156,117 @@ function calculateOnline()
       sInfo.updateAFK = os.time()
     end  
   end)
+end
+
+function sendStat(bool)
+  lua_thread.create(function()
+    while not sInfo.isALogin do wait(0) end
+    local zaprosTable = {
+      {
+        jsonrpc = '2.0',
+        id = os.time(),
+        method = 'set.Online',
+        params = {
+          nick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))),
+          hash = string.lower(crypto.md5(os.time()..'activity-@-helper'..sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))))),
+          level = pInfo.info.admLvl,
+          dayOnline = pInfo.info.dayOnline,
+          dayPM = pInfo.info.dayPM,
+          dayAFK = pInfo.info.dayAFK,
+          weekOnline = pInfo.info.weekOnline,
+          weekPM = pInfo.info.weekPM
+        }
+      },
+      {
+        jsonrpc = '2.0',
+        id = os.time(),
+        method = 'set.Punish',
+        params = {
+          nick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))),
+          hash = string.lower(crypto.md5(os.time()..'activity-@-helper'..sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))))),
+          ban = pInfo.punish.ban,
+          warn = pInfo.punish.warn,
+          kick = pInfo.punish.kick,
+          prison = pInfo.punish.prison,
+          mute = pInfo.punish.mute,
+          banip = pInfo.punish.banip,
+          rmute = pInfo.punish.rmute,
+          jail = pInfo.punish.jail
+        }
+      },
+      {
+        jsonrpc = '2.0',
+        id = os.time(),
+        method = 'set.Weeks',
+        params = {
+          nick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))),
+          hash = string.lower(crypto.md5(os.time()..'activity-@-helper'..sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))))),
+          [1] = pInfo.weeks[1],
+          [2] = pInfo.weeks[2],
+          [3] = pInfo.weeks[3],
+          [4] = pInfo.weeks[4],
+          [5] = pInfo.weeks[5],
+          [6] = pInfo.weeks[6],
+          [7] = pInfo.weeks[7]
+        }
+      }
+    }
+    if bool then zaprosTable[1].params.alogin = true end
+    --url = ("https://redx-dev.web.app/api.html?dayAFK=%s&dayOnline=%s&dayPM=%s&level=%s&nick=%s&weekOnline=%s&weekPM=%s"):format(pInfo.info.dayAFK, pInfo.info.dayOnline, pInfo.info.dayPM, pInfo.info.admLvl, sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))), pInfo.info.weekOnline,pInfo.info.weekPM)
+    httpRequest("https://redx-dev.web.app/api?data="..encodeJson(zaprosTable), nil, function(response) end)
+    --downloadUrlToFile(url, os.getenv('TEMP') .. '\\activity')
+    --print("https://redx-dev.web.app/api?data="..encodeJson(zaprosTable))
+  end)
+end
+
+function httpRequest(request, body, handler) -- copas.http
+  -- start polling task
+  if not copas.running then
+      copas.running = true
+      lua_thread.create(function()
+          wait(0)
+          while not copas.finished() do
+              local ok, err = copas.step(0)
+              if ok == nil then error(err) end
+              wait(0)
+          end
+          copas.running = false
+      end)
+  end
+  -- do request
+  if handler then
+      return copas.addthread(function(r, b, h)
+          copas.setErrorHandler(function(err) h(nil, err) end)
+          h(http.request(r, b))
+      end, request, body, handler)
+  else
+      local results
+      local thread = copas.addthread(function(r, b)
+          copas.setErrorHandler(function(err) results = {nil, err} end)
+          results = table.pack(http.request(r, b))
+      end, request, body)
+      while coroutine.status(thread) ~= 'dead' do wait(0) end
+      return table.unpack(results)
+  end
+end
+
+function char_to_hex(str)
+  return string.format("%%%02X", string.byte(str))
+end
+
+function url_encode(str)
+  local str = string.gsub(str, "\\", "\\")
+  local str = string.gsub(str, "([^%w])", char_to_hex)
+  return str
+end
+
+function http_build_query(query)
+  local buff=""
+  for k, v in pairs(query) do
+    buff = buff.. string.format("%s=%s&", k, url_encode(v))
+  end
+  local buff = string.reverse(string.gsub(string.reverse(buff), "&", "", 1))
+  return buff
 end
 
 function autoupdate(json_url, prefix, url)
@@ -177,7 +303,6 @@ function autoupdate(json_url, prefix, url)
                     elseif status1 == dlstatus.STATUS_ENDDOWNLOADDATA then
                       print('Загрузка обновления завершена.')
                       atext('Обновление завершено!')
-                      atext('Что нового: Теперь при экстренном выходе из игры онлайн не сбивается.')
                       goupdatestatus = true
                       lua_thread.create(function() wait(500) thisScript():reload() end)
                     end
@@ -212,58 +337,6 @@ function saveconfig()
   if pInfo.info.dayOnline > 0 and pInfo.info.weekOnline > 0 then
     inicfg.save(pInfo, "activity-checker");
   end
-end
-
-function imgui.TextColoredRGB(text)
-  local style = imgui.GetStyle()
-  local colors = style.Colors
-  local ImVec4 = imgui.ImVec4
-
-  local explode_argb = function(argb)
-      local a = bit.band(bit.rshift(argb, 24), 0xFF)
-      local r = bit.band(bit.rshift(argb, 16), 0xFF)
-      local g = bit.band(bit.rshift(argb, 8), 0xFF)
-      local b = bit.band(argb, 0xFF)
-      return a, r, g, b
-  end
-
-  local getcolor = function(color)
-      if color:sub(1, 6):upper() == 'SSSSSS' then
-          local r, g, b = colors[1].x, colors[1].y, colors[1].z
-          local a = tonumber(color:sub(7, 8), 16) or colors[1].w * 255
-          return ImVec4(r, g, b, a / 255)
-      end
-      local color = type(color) == 'string' and tonumber(color, 16) or color
-      if type(color) ~= 'number' then return end
-      local r, g, b, a = explode_argb(color)
-      return imgui.ImColor(r, g, b, a):GetVec4()
-  end
-
-  local render_text = function(text_)
-      for w in text_:gmatch('[^\r\n]+') do
-          local text, colors_, m = {}, {}, 1
-          w = w:gsub('{(......)}', '{%1FF}')
-          while w:find('{........}') do
-              local n, k = w:find('{........}')
-              local color = getcolor(w:sub(n + 1, k - 1))
-              if color then
-                  text[#text], text[#text + 1] = w:sub(m, n - 1), w:sub(k + 1, #w)
-                  colors_[#colors_ + 1] = color
-                  m = n
-              end
-              w = w:sub(1, n - 1) .. w:sub(k + 1, #w)
-          end
-          if text[0] then
-              for i = 0, #text do
-                  imgui.TextColored(colors_[i] or colors[1], u8(text[i]))
-                  imgui.SameLine(nil, 0)
-              end
-              imgui.NewLine()
-          else imgui.Text(u8(w)) end
-      end
-  end
-
-  render_text(text)
 end
 
 function apply_custom_style()
@@ -331,25 +404,24 @@ function imgui.OnDrawFrame()
   if mainwindow.v then
     imgui.ShowCursor = true
     local btn_size = imgui.ImVec2(-0.1, 0)
-    local ImVec4 = imgui.ImVec4
     local spacing = 165.0
     imgui.SetNextWindowSize(imgui.ImVec2(325, 300), imgui.Cond.FirstUseEver)
     imgui.SetNextWindowPos(imgui.ImVec2(screenx/2, screeny/2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
     imgui.Begin('Activity Helper', mainwindow, imgui.WindowFlags.NoResize)
     ---------
-    imgui.Text(u8"Ник:"); imgui.SameLine(spacing); imgui.Text(('%s[%d]'):format(nick, playerid))
-    imgui.Text(u8"Авторизация в ALogin:"); imgui.SameLine(spacing); imgui.TextColoredRGB(string.format('%s', sInfo.isALogin == true and "{00bf80}Авторизирован" or "{ec3737}Отсутствует"))
-    if sInfo.isALogin == true and sInfo.lvlAdmin > 0 then
-      imgui.Text(u8"Уровень модератора:"); imgui.SameLine(spacing); imgui.Text(('%s'):format(sInfo.lvlAdmin))
+    imgui.Text(u8"Ник:"); imgui.SameLine(spacing); imgui.Text(('%s [%s]'):format(nick, playerid))
+    imgui.Text(u8"Авторизация в ALogin:"); imgui.SameLine(spacing); imgui.TextColored(getAloginColor(), ("%s"):format(u8(sInfo.isALogin and  "Авторизирован" or "Отсутствует")))
+    if sInfo.isALogin == true and pInfo.info.admLvl > 0 then
+      imgui.Text(u8"Уровень модератора:"); imgui.SameLine(spacing); imgui.Text(('%s'):format(pInfo.info.admLvl))
     end
     imgui.Text(u8"Время авторизации:"); imgui.SameLine(spacing); imgui.Text(('%s'):format(sInfo.authTime))
     imgui.Separator()
     imgui.Text(u8"Отыграно за сегодня:"); imgui.SameLine(spacing); imgui.Text(('%s'):format(secToTime(pInfo.info.dayOnline)))
     imgui.Text(u8"AFK за сегодня:"); imgui.SameLine(spacing); imgui.Text(('%s'):format(secToTime(pInfo.info.dayAFK)))
-    imgui.Text(u8"Ответов за сегодня:"); imgui.SameLine(spacing); imgui.Text(('%d'):format(pInfo.info.dayPM))
+    imgui.Text(u8"Ответов за сегодня:"); imgui.SameLine(spacing); imgui.Text(('%s'):format(pInfo.info.dayPM))
     imgui.Separator()
     imgui.Text(u8"Отыграно за неделю:"); imgui.SameLine(spacing); imgui.Text(('%s'):format(secToTime(pInfo.info.weekOnline)))
-    imgui.Text(u8"Ответов за неделю:"); imgui.SameLine(spacing); imgui.Text(('%d'):format(pInfo.info.weekPM))
+    imgui.Text(u8"Ответов за неделю:"); imgui.SameLine(spacing); imgui.Text(('%s'):format(pInfo.info.weekPM))
     imgui.Separator()
     if imgui.Button(u8 'Статистика по дням', btn_size) then weekonline.v = not weekonline.v end
     if imgui.Button(u8 'Статистика наказаний', btn_size) then punishments.v = not punishments.v end
@@ -371,16 +443,7 @@ function imgui.OnDrawFrame()
       local daynumber = dateToWeekNumber(os.date("%d.%m.%y"))
       if daynumber == 0 then daynumber = 7 end
       for key, value in ipairs(pInfo.weeks) do
-        local colour = ""
-        if daynumber > 0 then
-          if daynumber < key then colour = "ec3737"
-          elseif daynumber == key then colour = "FFFFFF"
-          else colour = "00BF80" end
-        else
-          if daynumber == 0 and key == 7 then colour = "FFFFFF"
-          else colour = "00BF80" end
-        end
-        imgui.Text(dayName[key]); imgui.SameLine(spacing); imgui.TextColoredRGB(('{%s}%s'):format(colour,daynumber == key and secToTime(pInfo.info.dayOnline) or secToTime(value)))
+        imgui.Text(dayName[key]); imgui.SameLine(spacing); imgui.TextColored(getDayColor(key, daynumber), ('%s'):format(daynumber == key and secToTime(pInfo.info.dayOnline) or secToTime(value)))
       end
       imgui.End()
     end
@@ -427,9 +490,11 @@ function sampevents.onServerMessage(color, text)
   	pInfo.punish.jail = pInfo.punish.jail + 1
   end
   if text:match("Вы авторизировались как модератор .+ уровня") then
-    sInfo.lvlAdmin = tonumber(text:match("Вы авторизировались как модератор (.+) уровня"))
+    pInfo.info.admLvl = tonumber(text:match("Вы авторизировались как модератор (.+) уровня"))
     sInfo.isALogin = true
     sInfo.sessionStart = os.time()
+    sendStat(true)
+    saveconfig()
   end
   if text:match("Ответ от "..nick) then
     pInfo.info.dayPM = pInfo.info.dayPM + 1
@@ -467,7 +532,9 @@ function sampevents.onServerMessage(color, text)
     atext("Внимание! На домашнем счёту осталось слишком мало денег. Успейте пополнить счёт")
   end]]
   if text:match("Время online за текущий день") then
-    sampAddChatMessage(string.format(" Время online за неделю - %s (Без учета АФК) | Ответов: %d", secToTime(pInfo.info.weekOnline), pInfo.info.weekPM), 0xCCCCCC)
+    --sampAddChatMessage(("%06X"):format(bit.rshift(color, 8)), -1)
+    sampAddChatMessage(string.format(" Время online за неделю - %s (Без учета АФК) | Ответов: %d", secToTime(pInfo.info.weekOnline), pInfo.info.weekPM), 0xBFC0C2)
+    --sendStat()
   end
 end
 
@@ -521,4 +588,22 @@ function debug_log(text)
 	file:write(('[%s || %s] %s\n'):format(os.date('%H:%M:%S'), os.date('%d.%m.%Y'), text))
 	file:close()
 	file = nil
+end
+function getAloginColor()
+  if sInfo.isALogin then
+    return imgui.ImVec4(0, 191/255, 128/255, 1)
+  else
+    return imgui.ImVec4(236/255, 55/255, 55/255, 1)
+  end
+end
+
+function getDayColor(key, daynumber)
+  if daynumber > 0 then
+    if daynumber < key then return imgui.ImVec4(236/255, 55/255, 55/255, 1)
+    elseif daynumber == key then return imgui.ImVec4(1, 1, 1, 1)
+    else return imgui.ImVec4(0, 191/255, 128/255, 1) end
+  else
+    if daynumber == 0 and key == 7 then return imgui.ImVec4(1, 1, 1, 1)
+    else return imgui.ImVec4(0, 191/255, 128/255, 1) end
+  end
 end
