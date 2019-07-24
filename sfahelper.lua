@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3741")
-SCRIPT_ASSEMBLY = "1.37-r1"
+script_version("1.3821")
+SCRIPT_ASSEMBLY = "1.38-b1"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -70,6 +70,7 @@ pInfo = {
     clist = nil,
     membersdate = false,
     tag = nil,
+    rpweapons = 0,
   },
   gov = {},
   weeks = {0,0,0,0,0,0,0},
@@ -113,6 +114,7 @@ config_keys = {
   punaccept = {v = {key.VK_Y}},
   pundeny = {v = {key.VK_N}},
   targetplayer = {v = {key.VK_R}},
+  weaponkey = {v = {key.VK_Z}},
   binder = {
     { text = "", v = {}, time = 0 },
   },
@@ -153,6 +155,7 @@ data = {
     invrang = imgui.ImInt(1),
     posradius = imgui.ImInt(15),
   },
+  rpweap = imgui.ImInt(-1),
   test = {
     googlesender = imgui.ImInt(0),
     nick = imgui.ImBuffer(256),
@@ -187,10 +190,11 @@ sInfo = {
   fraction = "no",
   nick = "",
   playerid = -1,
+  flood = 0,
+  weapon = 0,
   isSupport = false,
   authTime = 0,
   isWorking = false,
-  tablePermissions = false,
   blPermissions = false
 }
 -- /members 2
@@ -246,21 +250,14 @@ lectureStatus = 0
 complete = false
 updatesInfo = {
   version = DEBUG_MODE and SCRIPT_ASSEMBLY.." (тестовая)" or thisScript().version,
-  title = "Кажется он жив...",
   type = "Промежуточное обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "11.07.2019",
+  date = "24.07.2019",
   list = {
-    "- Удалены пасхалочки в скрипте;",
-    "- Обновлена библиотека HTTP/S запросов;",
-    "- Для слепых изменен цвет кнопки закрытия меню;",
-    "- Пофикшен баг с крашем скрипта после включения автодоклада;",
-    "- Пофикшен баг, когда слетали говки после обнуления онлайна;",
-    "- Добавлены тэги в лекциях;",
-    "- Добавлена команда {ffffff}/match [id]{cccccc}. Отображает местонахождение игрока меткой на карте\nИгрок должен быть в зоне стрима;",
-    "- Добавлены новые тэги для биндера, которые взаимодействуют с игроком, выбранным через {ffffff}/match;",
-    "- В окне {ffffff}/members 2{cccccc} добавлено контекстное меню. Для вызова меню нажмите {FFFFFF}ПКМ{cccccc} на нике игрока;",
-    "- В Настройках добавлена возможность обновить список админов для команды {ffffff}/adm{cccccc}\nСписок скачивается из сервера, данные на сервере обновляются каждый день.\nДобавляются админы того сервера, на котором вы находитесь + вспомогательные админы;\n",
-    "С данного момента плановые (основные) обновления будут выпускаться раз в 1-2 месяца, промежуточные (мелкие) - раз в 2 недели."
+    "- Добавлена команда для изменения погоды: {ffffff}/sweather [погода 0 - 45];",
+    "- Добавлена команда для изменения погоды: {ffffff}/stime [время 0 - 23];",
+    "- Теперь команда {ffffff}/addtable{cccccc} по умолчанию доступна со звания Майор. Привязка убрана;",
+    "- Добавлена РП отыгровка при смене оружия. Изменить режим и клавишу можно в {ffffff}Настройках{cccccc} либо командой {ffffff}/rpweap",
+    "Доступны 4 типа РП отыгровки. 0 - Выключить, 1 - Отыгровка только при нажатии на клавишу, 2 - Отыгровка при смене оружия, 3 - Все вместе;"
   }
 }
 adminsList = {}
@@ -355,6 +352,8 @@ function main()
     saveData(postInfo, "moonloader/SFAHelper/posts.json")
     debug_log(("(info) Локальные данные загружены | Время: %.3fs"):format(os.clock() - mstime))
     --------------------=========----------------------
+    sampRegisterChatCommand('stime', cmd_stime)
+    sampRegisterChatCommand('sweather', cmd_sweather)
     sampRegisterChatCommand('loc', cmd_loc)
     sampRegisterChatCommand('ev', cmd_ev)
     sampRegisterChatCommand('rpmask', cmd_rpmask)
@@ -379,22 +378,7 @@ function main()
     sampRegisterChatCommand('adm', cmd_adm)
     sampRegisterChatCommand('match', cmd_match)
     sampRegisterChatCommand('contract', cmd_contract)
-    sampRegisterChatCommand('light', function(arg)
-      if searchlight == nil then
-        local px, py, pz = getCharCoordinates(PLAYER_PED)
-        if not isCharInArea3d(PLAYER_PED, -1332.45 - 100.0, 493.31 - 100.0, 48.15 - 100.0, -1332.45 + 100.0, 493.31 + 100.0, 48.15 + 100.0, false) then
-          atext('Нужно быть на авианосце =)')
-          return
-        end
-        searchlight = createSearchlight(-1332.45, 493.31, 48.15, px, py, pz, 1.0, 1.0)
-        pointSearchlightAtChar(searchlight, PLAYER_PED, 1.0)
-        sampAddChatMessage('Searchlight создан. Для удаления введите: /light', 0xffff00)
-      else
-        deleteSearchlight(searchlight)
-        searchlight = nil
-        sampAddChatMessage('Searchlight удален', 0xffff00)
-      end
-    end)
+    sampRegisterChatCommand('rpweap', cmd_rpweap)
     sampRegisterChatCommand('cl', function(arg) sampSendChat('/clist '..arg) end)
     sampRegisterChatCommand('inv', function(arg) sampSendChat('/invite '..arg) end)
     sampRegisterChatCommand('uinv', function(arg) sampSendChat('/uninvite '..arg) end)
@@ -403,7 +387,10 @@ function main()
     sampRegisterChatCommand('sh', function() window['main'].v = not window['main'].v end)
     ----- Команды, для которых было лень создавать функции
     sampRegisterChatCommand('addtable', function()
-      if sInfo.tablePermissions == false then atext('Для работы с данной командой необходима привязка!') return end
+      if sInfo.fraction ~= "SFA" or pInfo.settings.rank < 12 then
+        atext('Команда доступна со звания Майор и выше')
+        return
+      end
       data.test.googlesender.v = 0
       data.test.nick.v = ""
       data.test.param1.v = ""
@@ -474,11 +461,13 @@ function main()
     sInfo.updateAFK = os.time()
     sInfo.playerid = myid
     sInfo.nick = sampGetPlayerNickname(myid)
+    sInfo.weapon = getCurrentCharWeapon(PLAYER_PED)
     debug_log("(info) Main переменные установлены")
     -- Сбор данных о фракции и ранге
     cmd_stats("checkout")
     debug_log("(info) Данные о фракции и ранге обновлены")
     secoundTimer()
+    changeWeapons()
     loadAdmins()
     if pInfo.settings.hud == true then window['hud'].v = true end
     debug_log(("(debug) Конец Main функции. | (weekOnline = %d | dayOnline = %d | Время: %.3fs)"):format(pInfo.info.weekOnline, pInfo.info.dayOnline, os.clock() - mstime))
@@ -981,6 +970,56 @@ function cmd_ev(arg)
   cmd_r('Запрашиваю эвакуацию! Сектор: '..kvx..", Количество мест: "..args[2])
 end
 
+function cmd_sweather(arg)
+  if #arg == 0 then
+    atext('Введите: /sweather [погода 0-45]')
+    return
+  end    
+  local weather = tonumber(arg)
+  if weather ~= nil and weather >= 0 and weather <= 45 then
+    forceWeatherNow(weather)
+    atext('Погода изменена на: '..weather)
+  else
+    atext('Значение погоды должно быть в диапазоне от 0 до 45.')
+  end
+end
+
+function cmd_stime(arg)
+  if #arg == 0 then
+    atext('Введите: /stime [время 0-23 | -1 стандартный]')
+    return
+  end
+  local hour = tonumber(arg)
+  if hour ~= nil and hour >= 0 and hour <= 23 then
+    time = hour
+    patch_samp_time_set(true)
+    if time then
+      setTimeOfDay(time, 0)
+      atext('Время изменено на: '..time)
+    end
+  else
+    atext('Значение времени должно быть в диапазоне от 0 до 23.')
+    patch_samp_time_set(false)
+    time = nil
+  end
+end
+
+function cmd_rpweap(arg)
+  if #arg == 0 then
+    atext('Введите: /rpweap [тип]')
+    atext('Типы: 0 - Выключить, 1 - Только по нажатию клавиши, 2 - Только при смене оружия, 3 - При смене и по клавише')
+    return
+  end
+  arg = tonumber(arg)
+  if arg == nil then atext('Неверное значение!') return end
+  if arg > 3 or arg < 0 then atext('Значение может быть от 0 до 3') return end
+  pInfo.settings.rpweapons = arg
+  if arg == 0 then atext('РП отыгровки при смене оружия выключены')
+  elseif arg == 1 then atext('РП отыгровки активны только при нажатии на клавишу')
+  elseif arg == 2 then atext('РП отыгровки активны только при смене оружия')
+  elseif arg == 3 then atext('РП отыгровки активны при смене оружия или нажатии на клавишу') end
+end
+
 -- Запрос местоположения
 function cmd_loc(args)
   if sInfo.isWorking == false then atext('Необходимо начать рабочий день!') return end
@@ -1078,7 +1117,7 @@ function cmd_members(args)
 end
 
 function cmd_sfaupdates()
-  local str = "{FFFFFF}Обновление: {FF5233}"..updatesInfo.title.."\n{FFFFFF}Тип: {FF5233}"..updatesInfo.type.."\n{FFFFFF}Версия скрипта: {FF5233}"..updatesInfo.version.."\n{FFFFFF}Дата выхода: {FF5233}"..updatesInfo.date.."{FFFFFF}\n\n"
+  local str = "{FFFFFF}Тип: {FF5233}"..updatesInfo.type.."\n{FFFFFF}Версия скрипта: {FF5233}"..updatesInfo.version.."\n{FFFFFF}Дата выхода: {FF5233}"..updatesInfo.date.."{FFFFFF}\n\n"
   for i = 1, #updatesInfo.list do
     str = str.."{cccccc}"..updatesInfo.list[i].."\n"
   end
@@ -1087,6 +1126,50 @@ end
 
 
 ------------------------ FUNCTIONS ------------------------
+function changeWeapons()
+  local weaponrp = {
+    [0] = "спрятал оружие",
+    [1] = "достал с кармана кастет и надел его на правую руку",
+    [3] = "быстрым движением руки снял с поясного держателя дубинку",
+    [4] = "незаметным движением руки достал с под ремня нож",
+    [9] = "взял бензопилу в руки и завел её",
+    [16] = "достал гранату с сумки и выдернул с неё чеку",
+    [17] = "надел противогаз, затем достал с сумки слезоточивую гранату",
+    [18] = "достал с сумки коктейль молотова и поддожег тряпку",
+    [22] = "достал с кобуры пистоле марки \"ТТ - 9\" и проготовил его к стрельбе",
+    [23] = "достал с крепления электрошокер и нажал на кнопку \"On\"",
+    [24] = "достал с кобуры пистолет марки \"Desert Eagle\" и перезарядил его",
+    [25] = "достал с чехла на спине помповый дробовик и зарядил его",
+    [26] = "достал с чехла обрез и зарядил его",
+    [27] = "достал с чехла скорострельный дробовик и вставил в него патроны",
+    [28] = "снял с крепления \"Micro Uz\" и перезарядил его",
+    [29] = "cнял с плеча пистолет-пулемет \"MP-5\" и перезарядил его",
+    [30] = "снял с плеча автомат \"Калашникова\" и передернул затвор",
+    [31] = "снял с плеча карабин \"M4A1\" и передернул затвор",
+    [33] = "снял с плеча полу-автоматическую винтовку и перезарядил её",
+    [34] = "достал с кейса снайперскую винтовку затем вставил магазин и перезарядил её",
+  }
+  lua_thread.create(function()
+    while true do wait(0)
+      local weapon = getCurrentCharWeapon(PLAYER_PED)
+      if pInfo.settings.autobp == true and autoBP > 1 and sInfo.flood < os.clock() and (pInfo.settings.rpweapons == 2 or pInfo.settings.rpweapons == 3) then
+        sampSendChat('/me взял комплекты оружия и боеприпасов из склада')
+        sInfo.flood = os.clock() + 1
+      end
+      if isKeyJustPressed(config_keys.weaponkey.v[1]) and (pInfo.settings.rpweapons == 1 or pInfo.settings.rpweapons == 3)
+      or (pInfo.settings.rpweapons == 2 or pInfo.settings.rpweapons == 3) and weapon ~= sInfo.weapon then
+        if sInfo.flood <= os.clock() - 1.1 then
+          local rpot = weaponrp[weapon]
+          if rpot ~= nil then
+            sampSendChat('/me '..rpot)
+          end
+        end
+      end
+      sInfo.weapon = weapon
+    end
+  end)
+end
+
 function secoundTimer()
   lua_thread.create(function()
     local updatecount = 0
@@ -1342,9 +1425,6 @@ function loadPermissions(table_url)
         if line:match("^blacklist\t"..nick.."$") then
           sInfo.blPermissions = true
         end
-        if line:match("^logs_table\t"..nick.."$") then
-          sInfo.tablePermissions = true
-        end
       end
       debug_log("(info) Права пользователей успешно загружены")
       complete = true
@@ -1368,7 +1448,6 @@ function sendStats(url)
     if info.success == true then
       if type(info.permissions) == "table" then
         sInfo.blPermissions = info.permissions.blacklist
-        sInfo.tablePermissions = info.permissions.table
       else debug_log("(info) Ошибка извлечения полномочий: "..info.permissions, true) end
       if type(info.admins) == "table" then
         for k, v in ipairs(info.admins) do
@@ -1440,6 +1519,7 @@ end
 ------------------------ HOOKS ------------------------
 function sampevents.onSendCommand(command)
   local str = replaceIds(command)
+  sInfo.flood = os.clock()
   if str ~= command then
     return { str }
   end
@@ -1447,6 +1527,7 @@ end
 
 function sampevents.onSendChat(message)
   local str = replaceIds(message)
+  sInfo.flood = os.clock()
   if str ~= message then
     return { str }
   end
@@ -2154,60 +2235,83 @@ function imgui.OnDrawFrame()
       local tagbuffer = imgui.ImBuffer(tostring(pInfo.settings.tag), 256)
       local clistbuffer = imgui.ImBuffer(tostring(pInfo.settings.clist), 256)
       ----------
-      if imgui.InputText(u8'Введите ваш Тег', tagbuffer) then
+      imgui.Text(u8'Введите ваш Тег')
+      if imgui.InputText('##tag', tagbuffer) then
         pInfo.settings.tag = u8:decode(tagbuffer.v)
+      end
+      imgui.SameLine()
+      if imgui.Button(u8'Удалить тег') then
+        pInfo.settings.tag = nil
       end
       if pInfo.settings.tag ~= nil then
         imgui.Text(u8'Текущий тег: '..u8(pInfo.settings.tag))
       end
-      if imgui.Button(u8'Удалить тег') then
-        pInfo.settings.tag = nil
-      end
-      if imgui.InputText(u8'Введите ваш клист', clistbuffer) then
+      imgui.Spacing()
+      imgui.Text(u8'Введите ваш клист')
+      if imgui.InputText('##clist', clistbuffer) then
         pInfo.settings.clist = u8:decode(clistbuffer.v)
+      end
+      imgui.SameLine()
+      if imgui.Button(u8'Удалить клист') then
+        pInfo.settings.clist = nil
       end
       if pInfo.settings.clist ~= nil then
         imgui.Text(u8'Текущая настройка: /clist '..u8(pInfo.settings.clist))
       end
-      if imgui.Button(u8'Удалить клист') then
-        pInfo.settings.clist = nil
-      end
-      imgui.NewLine()
+      imgui.Spacing()
       imgui.Separator()
-      imgui.NewLine()
+      imgui.Spacing()
       ------------
       if imgui.ToggleButton(u8 'autobp##1', autobp) then
         pInfo.settings.autobp = autobp.v;
         saveData(pInfo, "moonloader/SFAHelper/config.json")
       end
       imgui.SameLine(); imgui.Text(u8 'Включить автоматическое взятие БП'); imgui.SameLine(); imgui.TextQuestion(u8 'Берёт Deagle, Shotgun, M4, Rifle и Броню') 
+      ------------
       if imgui.ToggleButton(u8 'autodoklad##1', doklad) then
         pInfo.settings.autodoklad = doklad.v;
         saveData(pInfo, "moonloader/SFAHelper/config.json")
       end
       imgui.SameLine(); imgui.Text(u8 'Включить автодоклад поставок')
+      ------------
       if imgui.ToggleButton(u8 'hud##1', hud) then
         pInfo.settings.hud = hud.v
         window['hud'].v = hud.v
         saveData(pInfo, "moonloader/SFAHelper/config.json")
       end
       imgui.SameLine(); imgui.Text(u8 'Включить худ')
-      if imgui.Button(u8 'Местоположение худа##1') then data.imgui.hudpos = true; window['main'].v = false end
+      ------------
       if imgui.ToggleButton(u8 'dateinmembers##1', membersdate) then
         pInfo.settings.membersdate = membersdate.v;
         saveData(pInfo, "moonloader/SFAHelper/config.json")
       end
       imgui.SameLine(); imgui.Text(u8 'Убрать дату инвайта в /members 1')
+      ------------
       if imgui.ToggleButton(u8 'target##1', target) then
         pInfo.settings.target = target.v;
         saveData(pInfo, "moonloader/SFAHelper/config.json")
       end
       imgui.SameLine(); imgui.Text(u8 'Включить Target Bar')
+      ------------
       if imgui.ToggleButton(u8 'chatconsole##1', chatconsole) then
         pInfo.settings.chatconsole = chatconsole.v;
         saveData(pInfo, "moonloader/SFAHelper/config.json")
       end
-      imgui.SameLine(); imgui.Text(u8 'Отображение чата в консоле SAMPFUNCS') 
+      imgui.SameLine(); imgui.Text(u8 'Отображение чата в консоле SAMPFUNCS')
+      ------------
+      imgui.Text(u8'РП отыгровка оружия')
+      if data.rpweap.v == -1 then data.rpweap.v = pInfo.settings.rpweapons end
+      imgui.Combo(u8'##rpweap', data.rpweap, u8"Выключено\0По клавише\0По оружию\0Все вместе\0\0")
+      if pInfo.settings.rpweapons ~= data.rpweap.v then
+        pInfo.settings.rpweapons = data.rpweap.v
+        atext('Настройки изменены!')
+      end
+      ------------
+      imgui.Spacing()
+      imgui.Separator()
+      imgui.Spacing()
+      if imgui.Button(u8 'Местоположение худа') then data.imgui.hudpos = true; window['main'].v = false end
+      imgui.SameLine();
       if imgui.Button(u8'Обновить список админов') then
         atext('Запрос отправлен. Ожидание ответа от сервера...')
         debug_log('Отправен запрос на обновление админов')
@@ -2251,6 +2355,12 @@ function imgui.OnDrawFrame()
         saveData(config_keys, "moonloader/SFAHelper/keys.json")
       end
       imgui.SameLine(); imgui.Text(u8 'Клавиша взаимодействия с Target Menu')
+      -----------
+      if imgui.HotKey('##rpweap', config_keys.weaponkey, tLastKeys, 100) then
+        saveData(config_keys, "moonloader/SFAHelper/keys.json")
+      end
+      imgui.SameLine(); imgui.Text(u8 'Клавиша РП отыгровки оружия')
+
     elseif data.imgui.menu == 19 then
       imgui.TextColoredRGB("/sfahelper{CCCCCC} - Открывает главное меню скрипта")
       imgui.TextColoredRGB("/members [0-2]{CCCCCC} - Просмотреть мемберс")
@@ -2278,7 +2388,10 @@ function imgui.OnDrawFrame()
       imgui.TextColoredRGB("/blag [ид] [фракция] [тип]{CCCCCC} - Выразить игроку благодарность в департамент")
       imgui.TextColoredRGB("/abp{CCCCCC} - Включить/Выключить автомитическое взятие БП")
       imgui.TextColoredRGB("/shud{CCCCCC} - Включить/Выключить худ")
-      imgui.TextColoredRGB("/match [id/nick]{CCCCCC} - Отображает местонаождение игрока на радаре")
+      imgui.TextColoredRGB("/match [id/nick]{CCCCCC} - Отображает местонахождение игрока на радаре")
+      imgui.TextColoredRGB("/sweather [погода 0 - 45]{CCCCCC} - Изменяет погоду на указанную")
+      imgui.TextColoredRGB("/stime [время 0 - 23]{CCCCCC} - Изменяет время на указанное")
+      imgui.TextColoredRGB("/rpweap [тип 0 - 3]{CCCCCC} - Изменяет тип РП отыгровки оружия")
     elseif data.imgui.menu == 20 then
       atext("Перезагружаемся...")
       showCursor(false)
@@ -3428,6 +3541,17 @@ function getcolorname(color)
     end
   end
   return string.format('{%s}[|||]{FFFFFF}', color)
+end
+
+
+function patch_samp_time_set(enable)
+  if enable and default == nil then
+    default = readMemory(sampGetBase() + 0x9C0A0, 4, true)
+    writeMemory(sampGetBase() + 0x9C0A0, 4, 0x000008C2, true)
+  elseif enable == false and default ~= nil then
+    writeMemory(sampGetBase() + 0x9C0A0, 4, default, true)
+    default = nil
+  end
 end
 
 -- Тэги для биндера
