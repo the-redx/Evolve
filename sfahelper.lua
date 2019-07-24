@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3821")
-SCRIPT_ASSEMBLY = "1.38-b1"
+script_version("1.3822")
+SCRIPT_ASSEMBLY = "1.38-b2"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -42,6 +42,7 @@ window = {
   ['members'] = imgui.ImBool(false),
   ['addtable'] = imgui.ImBool(false),
   ['hud'] = imgui.ImBool(false),
+  ['punishlog'] = imgui.ImBool(false),
 }
 screenx, screeny = getScreenResolution()
 -- Главная таблица с настройками
@@ -154,8 +155,8 @@ data = {
     grang = imgui.ImInt(0),
     invrang = imgui.ImInt(1),
     posradius = imgui.ImInt(15),
+    rpweap = imgui.ImInt(-1),
   },
-  rpweap = imgui.ImInt(-1),
   test = {
     googlesender = imgui.ImInt(0),
     nick = imgui.ImBuffer(256),
@@ -165,6 +166,7 @@ data = {
   },
   filename = "",
   departament = {},
+  punishlog = {},
   players = {},
   members = {}
 }
@@ -257,7 +259,8 @@ updatesInfo = {
     "- Добавлена команда для изменения погоды: {ffffff}/stime [время 0 - 23];",
     "- Теперь команда {ffffff}/addtable{cccccc} по умолчанию доступна со звания Майор. Привязка убрана;",
     "- Добавлена РП отыгровка при смене оружия. Изменить режим и клавишу можно в {ffffff}Настройках{cccccc} либо командой {ffffff}/rpweap",
-    "Доступны 4 типа РП отыгровки. 0 - Выключить, 1 - Отыгровка только при нажатии на клавишу, 2 - Отыгровка при смене оружия, 3 - Все вместе;"
+    "Доступны 4 типа РП отыгровки. 0 - Выключить, 1 - Отыгровка только при нажатии на клавишу, 2 - Отыгровка при смене оружия, 3 - Все вместе;",
+    "- Добавлена команда {ffffff}/punishlog{cccccc}. Позволяет просмотреть наказания игрока. Берет данные из рации за все время;"
   }
 }
 adminsList = {}
@@ -379,6 +382,7 @@ function main()
     sampRegisterChatCommand('match', cmd_match)
     sampRegisterChatCommand('contract', cmd_contract)
     sampRegisterChatCommand('rpweap', cmd_rpweap)
+    sampRegisterChatCommand('punishlog', cmd_punishlog)
     sampRegisterChatCommand('cl', function(arg) sampSendChat('/clist '..arg) end)
     sampRegisterChatCommand('inv', function(arg) sampSendChat('/invite '..arg) end)
     sampRegisterChatCommand('uinv', function(arg) sampSendChat('/uninvite '..arg) end)
@@ -479,9 +483,9 @@ function main()
         debug_log("(debug) Lost connection. isWorking = false")
       end
       -- Определяем самостоятельные окна, и окна для которых нужка мышка
-      if window['target'].v or window['main'].v or window['hud'].v or window['addtable'].v or window['shpora'].v or window['members'].v then imgui.Process = true
+      if window['target'].v or window['main'].v or window['hud'].v or window['addtable'].v or window['shpora'].v or window['members'].v or window['punishlog'].v then imgui.Process = true
       else imgui.Process = false end
-      if window['main'].v or window['addtable'].v or window['shpora'].v or window['members'].v then imgui.ShowCursor = true
+      if window['main'].v or window['addtable'].v or window['shpora'].v or window['members'].v or window['punishlog'].v then imgui.ShowCursor = true
       else imgui.ShowCursor = false end
       -----------
       -- Перемещение худа
@@ -1004,6 +1008,46 @@ function cmd_stime(arg)
   end
 end
 
+function cmd_punishlog(nick)
+  if #nick == 0 then
+    atext('Введите: /punishlog [id / nick]')
+    return
+  end
+  local pid = tonumber(nick)
+  if pid ~= nil and sampIsPlayerConnected(pid) then nick = sampGetPlayerNickname(pid) end
+  nick = rusUpper(nick)
+  if doesFileExist('moonloader/SFAHelper/punishlog.json') then
+    lua_thread.create(function()
+      local fa = io.open("moonloader/SFAHelper/punishlog.json", 'r')
+      if fa then
+        local punlog = decodeJson(fa:read('*a'))
+        if punlog ~= nil then
+          data.punishlog = {}
+          local count = 0
+          for i = 1, #punlog do
+            local text = rusUpper(punlog[i].text)
+            if text:match(nick) or text:match(nick:gsub("_", " ")) or text:match(nick:gsub(".+_", "")) then
+              table.insert(data.punishlog, punlog[i])
+              count = count + 1
+            end
+          end
+          if count > 0 then
+            window['punishlog'].v = true
+            atext('Всего: '..count..' вхождений')
+            return
+          end
+        end
+        fa:close()
+      end
+    end)     
+  else
+    local fa = io.open("moonloader/SFAHelper/punishlog.json", "w")
+    fa:write("[]")
+    fa:close()
+  end
+  atext('Ничего не найдено!')
+end
+
 function cmd_rpweap(arg)
   if #arg == 0 then
     atext('Введите: /rpweap [тип]')
@@ -1152,16 +1196,17 @@ function changeWeapons()
   lua_thread.create(function()
     while true do wait(0)
       local weapon = getCurrentCharWeapon(PLAYER_PED)
-      if pInfo.settings.autobp == true and autoBP > 1 and sInfo.flood < os.clock() and (pInfo.settings.rpweapons == 2 or pInfo.settings.rpweapons == 3) then
-        sampSendChat('/me взял комплекты оружия и боеприпасов из склада')
-        sInfo.flood = os.clock() + 1
+      if pInfo.settings.autobp == true and autoBP > 1 and sInfo.flood < os.clock() - 1 and (pInfo.settings.rpweapons == 2 or pInfo.settings.rpweapons == 3) then
+        sInfo.flood = os.clock() + 3
       end
-      if isKeyJustPressed(config_keys.weaponkey.v[1]) and (pInfo.settings.rpweapons == 1 or pInfo.settings.rpweapons == 3)
-      or (pInfo.settings.rpweapons == 2 or pInfo.settings.rpweapons == 3) and weapon ~= sInfo.weapon then
-        if sInfo.flood <= os.clock() - 1.1 then
-          local rpot = weaponrp[weapon]
-          if rpot ~= nil then
-            sampSendChat('/me '..rpot)
+      if not sampIsChatInputActive() and not sampIsDialogActive() and not isSampfuncsConsoleActive() then
+        if isKeyJustPressed(config_keys.weaponkey.v[1]) and (pInfo.settings.rpweapons == 1 or pInfo.settings.rpweapons == 3)
+        or (pInfo.settings.rpweapons == 2 or pInfo.settings.rpweapons == 3) and weapon ~= sInfo.weapon then
+          if sInfo.flood <= os.clock() - 1.1 then
+            local rpot = weaponrp[weapon]
+            if rpot ~= nil then
+              sampSendChat('/me '..rpot)
+            end
           end
         end
       end
@@ -1439,6 +1484,31 @@ function loadPermissions(table_url)
   end)
 end
 
+function pushradioLog(text)
+  local result = {}
+  if text:match("^ .- %w+_%w+: .+") then
+    local rank, name, surname, radio = text:match("^ (.-) (%w+)_(%w+): (.+)")
+    radio = radio:gsub('%[.-%]', '')
+    radio = radio:gsub(':', '')
+    result.rank = rank
+    result.from = name.."_"..surname
+    result.text = radio
+  else return end
+  result.time = os.date('%d.%m.%Y')..' '..os.date('%H:%M:%S')
+  ------- Сохранение --------
+  local file = io.open('moonloader/SFAHelper/punishlog.json', 'r')
+  local pushLog = decodeJson(file:read('*a'))
+  if pushLog ~= nil and file ~= nil then
+    table.insert(pushLog, result)
+    file:close()
+    file = io.open('moonloader/SFAHelper/punishlog.json', 'w')
+    if file ~= nil then
+      file:write(encodeJson(pushLog))
+      file:close()
+    else debug_log('(error) Failed to open punishlog.json with "w" flag') end
+  else debug_log('(error) Failed to open punishlog.json with "r" flag') end
+end
+
 -- Отправляем статистику на хосте (отключено)
 function sendStats(url)
   local requests = require 'requests'
@@ -1596,6 +1666,8 @@ function sampevents.onShowDialog(dialogid, style, title, button1, button2, text)
       if autoBP == #guns + 1 then
         autoBP = 1
         sampCloseCurrentDialogWithButton(0)
+        wait(250)
+        sampSendChat('/me взял комплекты оружия и боеприпасов из склада')
         return
       end
       sampSendDialogResponse(5225, 1, guns[autoBP], "")
@@ -1919,7 +1991,13 @@ function sampevents.onServerMessage(color, text)
     if sInfo.isWorking == false and (sInfo.fraction == "SFA" or sInfo.fraction == "LVA") then
       sInfo.isWorking = true
       debug_log("(info) Проверка прошла успешно, рабочий день начат.", true)
-    end    
+    end
+    lua_thread.create(function()
+      local tt = rusLower(text)
+      if tt:match("наряд") or tt:match('местоположение') or tt:match('понижен') or tt:match('уволен') or tt:match('комиссован') or tt:match('занесён') or tt:match('выговор') or tt:match('предупреждение') then
+        pushradioLog(text)
+      end
+    end)
   end
   -- Рацияя департамента
   if color == -8224086 then
@@ -1955,7 +2033,7 @@ function imgui.OnDrawFrame()
     spacing = 185.0
     ----------------------
     imgui.SetNextWindowSize(imgui.ImVec2(600, 300), imgui.Cond.FirstUseEver)
-    imgui.SetNextWindowPos(imgui.ImVec2(screenx/2, screeny/2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+    imgui.SetNextWindowPos(imgui.ImVec2(screenx / 2, screeny / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
     imgui.Begin(u8'SFA-Helper | Главное меню', window['main'], imgui.WindowFlags.MenuBar + imgui.WindowFlags.NoResize + imgui.WindowFlags.AlwaysAutoResize)
     ----------------------
     -- Формируем меню
@@ -2300,10 +2378,10 @@ function imgui.OnDrawFrame()
       imgui.SameLine(); imgui.Text(u8 'Отображение чата в консоле SAMPFUNCS')
       ------------
       imgui.Text(u8'РП отыгровка оружия')
-      if data.rpweap.v == -1 then data.rpweap.v = pInfo.settings.rpweapons end
-      imgui.Combo(u8'##rpweap', data.rpweap, u8"Выключено\0По клавише\0По оружию\0Все вместе\0\0")
-      if pInfo.settings.rpweapons ~= data.rpweap.v then
-        pInfo.settings.rpweapons = data.rpweap.v
+      if data.imgui.rpweap.v == -1 then data.imgui.rpweap.v = pInfo.settings.rpweapons end
+      imgui.Combo(u8'##rpweap', data.imgui.rpweap, u8"Выключено\0По клавише\0По оружию\0Все вместе\0\0")
+      if pInfo.settings.rpweapons ~= data.imgui.rpweap.v then
+        pInfo.settings.rpweapons = data.imgui.rpweap.v
         atext('Настройки изменены!')
       end
       ------------
@@ -2392,6 +2470,7 @@ function imgui.OnDrawFrame()
       imgui.TextColoredRGB("/sweather [погода 0 - 45]{CCCCCC} - Изменяет погоду на указанную")
       imgui.TextColoredRGB("/stime [время 0 - 23]{CCCCCC} - Изменяет время на указанное")
       imgui.TextColoredRGB("/rpweap [тип 0 - 3]{CCCCCC} - Изменяет тип РП отыгровки оружия")
+      imgui.TextColoredRGB("/punishlog [id /nick]{CCCCCC} - Просмотр наказаний игрока")
     elseif data.imgui.menu == 20 then
       atext("Перезагружаемся...")
       showCursor(false)
@@ -3208,6 +3287,17 @@ function imgui.OnDrawFrame()
     end
     imgui.End()
   end
+  if window['punishlog'].v then
+    imgui.SetNextWindowSize(imgui.ImVec2(750, 400), imgui.Cond.FirstUseEver)
+    imgui.SetNextWindowPos(imgui.ImVec2(screenx / 2, screeny / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+    imgui.Begin(u8'SFA-Helper | Лог наказаний', window['punishlog'], imgui.WindowFlags.HorizontalScrollbar)
+    for i = #data.punishlog, 1, -1 do
+      imgui.Text(u8:encode(("%s | Выдал: %s (%s)"):format(data.punishlog[i].time, data.punishlog[i].from, data.punishlog[i].rank)))
+      imgui.Text(u8:encode("Текст: "..data.punishlog[i].text))
+      imgui.NewLine()
+    end
+    imgui.End() 
+  end
   if window['hud'].v then
     local myping = sampGetPlayerPing(sInfo.playerid)
     local myweapon = getCurrentCharWeapon(PLAYER_PED)
@@ -3433,11 +3523,11 @@ end
 function saveData(table, path)
   if path == 'moonloader/SFAHelper/config.json' and table.info.weekOnline < 0 then return end
 	if doesFileExist(path) then os.remove(path) end
-    local sfa = io.open(path, "w")
-    if sfa then
-        sfa:write(encodeJson(table))
-        sfa:close()
-    end
+  local sfa = io.open(path, "w")
+  if sfa then
+    sfa:write(encodeJson(table))
+    sfa:close()
+  end
 end
 
 -- Записываем действия (хуевый пример, спиздил у Бимы ;DDD)
