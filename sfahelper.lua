@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3825")
-SCRIPT_ASSEMBLY = "1.38-b5"
+script_version("1.3826")
+SCRIPT_ASSEMBLY = "1.38-b6"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -270,7 +270,8 @@ updatesInfo = {
     "- Добавлена РП отыгровка при смене оружия. Изменить режим и клавишу можно в {ffffff}Настройках{cccccc} либо командой {ffffff}/rpweap",
     "Доступны 4 типа РП отыгровки. 0 - Выключить, 1 - Отыгровка только при нажатии на клавишу, 2 - Отыгровка при смене оружия, 3 - Все вместе;",
     "- Добавлена команда {ffffff}/punishlog{cccccc}. Позволяет просмотреть наказания игрока. Берет данные из рации за все время;",
-    "- Команды {ffffff}/rpmask, /cl, /inv, /gr, /uinv{cccccc} удалены т.к они могут быть заменены командным биндером;"
+    "- Команды {ffffff}/rpmask, /cl, /inv, /gr, /uinv{cccccc} удалены т.к они могут быть заменены командным биндером;",
+    "- Теперь в командном биндере можно забиндить несколько строк на одну команду;"
   }
 }
 adminsList = {}
@@ -3101,9 +3102,21 @@ function imgui.OnDrawFrame()
       if imgui.MenuItem(u8 'Командный биндер') then data.imgui.bind = 2 end
       if imgui.MenuItem(u8 'Сохранить изменения') then
         if data.imgui.bind == 2 then
+          local replacedValues = {}
           for k, v in ipairs(config_keys.cmd_binder) do
             if sampIsChatCommandDefined(v.cmd) then sampUnregisterChatCommand(v.cmd) end
+            local newValues = {}
+            for i = 1, #v.text do
+              if v.text[i] ~= "" then
+                newValues[#newValues + 1] = v.text[i]
+              end
+            end
+            if #newValues > 0 then
+              replacedValues[#replacedValues + 1] = { cmd = v.cmd, wait = v.wait and v.wait or 1100, text = newValues }
+            end
           end
+          sCmdEdit = {}
+          config_keys.cmd_binder = replacedValues
           registerFastCmd()
         end
         atext('Биндер успешно изменен!')
@@ -3220,7 +3233,8 @@ function imgui.OnDrawFrame()
 -------------------------]].."\n"..str
       imgui.Text(u8'Для изменения текста необходимо нажать на поле с текстом. Для сохранения наведитесь на поле и нажмите Enter.')
       imgui.Text(u8'После изменения названия команды необходимо нажать "Сохранить изменения", иначе команда не зарегистрируется в системе.')
-      imgui.Text(u8'Вы можете придумать любую команду на свой вкус и для ваших потребностей с помощью специальных \'вставок\'.')
+      imgui.Text(u8'Вы можете придумать любую команду на свой вкус и для ваших потребностей с помощью специальных "вставок".')
+      imgui.Text(u8'Чтобы удалить команду или строку, просто оставьте её пустой и нажмите "Сохранить изменения". Система сама удалить все лишнее.')
       imgui.Spacing(); imgui.Separator(); imgui.Spacing()
       imgui.Columns(2)
       -------------------
@@ -3256,17 +3270,17 @@ function imgui.OnDrawFrame()
               sCmdEdit[k].text[i] = imgui.ImBuffer(256)
               sCmdEdit[k].text[i].v = u8:encode(v.text[i])
             end
-            imgui.PushItemWidth(imgui.GetWindowSize().x - 400)
+            imgui.PushItemWidth(imgui.GetWindowSize().x - 320)
             if imgui.InputText("##Edit"..k..i, sCmdEdit[k].text[i]) then
               v.text[i] = u8:decode(sCmdEdit[k].text[i].v)
             end
             imgui.PopItemWidth()
-            imgui.SameLine()
+            --[[imgui.SameLine()
             imgui.PushItemWidth(50)
             if imgui.Button(u8"Удалить##deleteCH" .. k .. i) then
               sampAddChatMessage('ідіть у сраку', 0xffff00)
             end
-            imgui.PopItemWidth()
+            imgui.PopItemWidth()]]
           end
         end
         imgui.NewLine()
