@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3826")
-SCRIPT_ASSEMBLY = "1.38-b6"
+script_version("1.3831")
+SCRIPT_ASSEMBLY = "1.38-rc1"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -122,7 +122,7 @@ config_keys = {
     { text = "", v = {}, time = 0 },
   },
   cmd_binder = {
-    { cmd = "pass", wait = 1100, text = { "Здравия желаю! Я {myrankname}, {myfullname}. Предъявите ваши документы." } },
+    --{ cmd = "pass", wait = 1100, text = { "Здравия желаю! Я {myrankname}, {myfullname}. Предъявите ваши документы." } },
     { cmd = "uinv", wait = 1100, text = { "/uninvite {param} {param2}" } },
     { cmd = "gr", wait = 1100, text = { "/giverank {param} {param2}" } },
     { cmd = "inv", wait = 1100, text = { "/invite {param}" } },
@@ -262,7 +262,7 @@ complete = false
 updatesInfo = {
   version = DEBUG_MODE and SCRIPT_ASSEMBLY.." (тестовая)" or thisScript().version,
   type = "Промежуточное обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "24.07.2019",
+  date = "27.07.2019",
   list = {
     "- Добавлена команда для изменения погоды: {ffffff}/sweather [погода 0 - 45];",
     "- Добавлена команда для изменения погоды: {ffffff}/stime [время 0 - 23];",
@@ -3101,14 +3101,25 @@ function imgui.OnDrawFrame()
       if imgui.MenuItem(u8 'Клавишный биндер') then data.imgui.bind = 1 end
       if imgui.MenuItem(u8 'Командный биндер') then data.imgui.bind = 2 end
       if imgui.MenuItem(u8 'Сохранить изменения') then
+        if data.imgui.bind == 1 then
+          local replacedValues = {}
+          for k, v in ipairs(config_keys.binder) do
+            if v.text ~= "" and v.text ~= nil then
+              replacedValues[#replacedValues + 1] = v
+            end
+          end
+          config_keys.binder = replacedValues
+        end
         if data.imgui.bind == 2 then
           local replacedValues = {}
           for k, v in ipairs(config_keys.cmd_binder) do
             if sampIsChatCommandDefined(v.cmd) then sampUnregisterChatCommand(v.cmd) end
             local newValues = {}
-            for i = 1, #v.text do
-              if v.text[i] ~= "" then
-                newValues[#newValues + 1] = v.text[i]
+            if v.cmd ~= "" then
+              for i = 1, #v.text do
+                if v.text[i] ~= "" and v.text ~= nil then
+                  newValues[#newValues + 1] = v.text[i]
+                end
               end
             end
             if #newValues > 0 then
@@ -3158,8 +3169,8 @@ function imgui.OnDrawFrame()
       imgui.Text(u8'Для изменения текста необходимо нажать на поле с текстом. Для сохранения наведитесь на поле и нажмите Enter.')
       imgui.Text(u8'После изменения названия команды необходимо нажать "Сохранить изменения", иначе команда не зарегистрируется в системе.')
       imgui.Text(u8'Чтобы назначить два действия на одни и те же клавиши, необходимо просто их внести в разные строчки, с указанием задержки.')
-      imgui.Text(u8'Порядок вывода строк равен их порядку в этом списке.')
-      imgui.Text(u8'Вы можете придумать любую команду на свой вкус и для ваших потребностей с помощью специальных \'вставок\'.')
+      imgui.Text(u8'Вы можете придумать любую команду на свой вкус и для ваших потребностей с помощью специальных "вставок".')
+      imgui.Text(u8'Чтобы удалить строку, просто оставьте её пустой и нажмите "Сохранить изменения". Система сама удалить все лишнее.')
       imgui.Spacing(); imgui.Separator(); imgui.Spacing()
       imgui.Columns(2)
       -------------------
