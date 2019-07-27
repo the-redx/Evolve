@@ -1,7 +1,7 @@
 script_name("SFA-Helper") 
 script_authors({ 'Edward_Franklin' })
-script_version("1.3822")
-SCRIPT_ASSEMBLY = "1.38-b2"
+script_version("1.3825")
+SCRIPT_ASSEMBLY = "1.38-b5"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -43,6 +43,7 @@ window = {
   ['addtable'] = imgui.ImBool(false),
   ['hud'] = imgui.ImBool(false),
   ['punishlog'] = imgui.ImBool(false),
+  ['binder'] = imgui.ImBool(false)
 }
 screenx, screeny = getScreenResolution()
 -- Главная таблица с настройками
@@ -72,6 +73,7 @@ pInfo = {
     membersdate = false,
     tag = nil,
     rpweapons = 0,
+    update37 = false
   },
   gov = {},
   weeks = {0,0,0,0,0,0,0},
@@ -120,9 +122,15 @@ config_keys = {
     { text = "", v = {}, time = 0 },
   },
   cmd_binder = {
-    { cmd = "pass", text = "Здравия желаю! Я {myrankname}, {myfullname}. Предъявите ваши документы." }
+    { cmd = "pass", wait = 1100, text = { "Здравия желаю! Я {myrankname}, {myfullname}. Предъявите ваши документы." } },
+    { cmd = "uinv", wait = 1100, text = { "/uninvite {param} {param2}" } },
+    { cmd = "gr", wait = 1100, text = { "/giverank {param} {param2}" } },
+    { cmd = "inv", wait = 1100, text = { "/invite {param}" } },
+    { cmd = "cl", wait = 1100, text = { "/clist {param}" } },
+    { cmd = "rpmask", wait = 1100, text = { "/me достал маску из кармана и надел на лицо", "/clist 32", "/do На лице маска, на форме нет опознавательных знаков. Личность не опознать" } }
   }
 }
+
 -- Для /checkbl, /checkrank
 tempFiles = {
   blacklist = {},
@@ -141,6 +149,7 @@ data = {
     lecturetext = {},
     selectshpora = {},
     setgovtextarea = {},
+    bind = 1,
     selectlecture = {string = ""},
     lecturetime = imgui.ImInt(3),
     mw = imgui.ImBool(false),
@@ -260,7 +269,8 @@ updatesInfo = {
     "- Теперь команда {ffffff}/addtable{cccccc} по умолчанию доступна со звания Майор. Привязка убрана;",
     "- Добавлена РП отыгровка при смене оружия. Изменить режим и клавишу можно в {ffffff}Настройках{cccccc} либо командой {ffffff}/rpweap",
     "Доступны 4 типа РП отыгровки. 0 - Выключить, 1 - Отыгровка только при нажатии на клавишу, 2 - Отыгровка при смене оружия, 3 - Все вместе;",
-    "- Добавлена команда {ffffff}/punishlog{cccccc}. Позволяет просмотреть наказания игрока. Берет данные из рации за все время;"
+    "- Добавлена команда {ffffff}/punishlog{cccccc}. Позволяет просмотреть наказания игрока. Берет данные из рации за все время;",
+    "- Команды {ffffff}/rpmask, /cl, /inv, /gr, /uinv{cccccc} удалены т.к они могут быть заменены командным биндером;"
   }
 }
 adminsList = {}
@@ -325,10 +335,29 @@ function main()
       if fa then
         local config_k = decodeJson(fa:read('*a'))
         if config_k ~= nil then
+          if not pInfo.settings.update37 then
+            if config_k.cmd_binder ~= nil then
+              local replaced = false
+              for i = 1, #config_k.cmd_binder do
+                if type(config_k.cmd_binder[i].text) == "string" then
+                  local text = config_k.cmd_binder[i].text
+                  config_k.cmd_binder[i].text = { text }
+                  config_k.cmd_binder[i].wait = 1100
+                  replaced = true
+                end
+              end
+              if replaced then
+                for i = 1, #config_keys.cmd_binder do
+                  table.insert(config_k.cmd_binder, config_keys.cmd_binder[i])
+                end
+              end
+            end
+            pInfo.settings.update37 = true
+          end
           -- Дополняет дефолтную таблицу данными из конфига. Если чего то нет в конфиге, будут оставлены дефолтные значения.
           debug_log("(debug) Starting additionArray. From = 'moonloader/SFAHelper/keys.json', TO = config_keys")
           config_keys = additionArray(config_k, config_keys)
-        end 
+        end
         fa:close()
       end      
     else
@@ -359,7 +388,6 @@ function main()
     sampRegisterChatCommand('sweather', cmd_sweather)
     sampRegisterChatCommand('loc', cmd_loc)
     sampRegisterChatCommand('ev', cmd_ev)
-    sampRegisterChatCommand('rpmask', cmd_rpmask)
     sampRegisterChatCommand('sfaupdates', cmd_sfaupdates)
     sampRegisterChatCommand('shupd', cmd_sfaupdates)
     sampRegisterChatCommand('blag', cmd_blag)
@@ -383,10 +411,6 @@ function main()
     sampRegisterChatCommand('contract', cmd_contract)
     sampRegisterChatCommand('rpweap', cmd_rpweap)
     sampRegisterChatCommand('punishlog', cmd_punishlog)
-    sampRegisterChatCommand('cl', function(arg) sampSendChat('/clist '..arg) end)
-    sampRegisterChatCommand('inv', function(arg) sampSendChat('/invite '..arg) end)
-    sampRegisterChatCommand('uinv', function(arg) sampSendChat('/uninvite '..arg) end)
-    sampRegisterChatCommand('gr', function(arg) sampSendChat('/giverank '..arg) end)
     sampRegisterChatCommand('sfahelper', function() window['main'].v = not window['main'].v end)
     sampRegisterChatCommand('sh', function() window['main'].v = not window['main'].v end)
     ----- Команды, для которых было лень создавать функции
@@ -483,9 +507,9 @@ function main()
         debug_log("(debug) Lost connection. isWorking = false")
       end
       -- Определяем самостоятельные окна, и окна для которых нужка мышка
-      if window['target'].v or window['main'].v or window['hud'].v or window['addtable'].v or window['shpora'].v or window['members'].v or window['punishlog'].v then imgui.Process = true
+      if window['target'].v or window['main'].v or window['hud'].v or window['addtable'].v or window['shpora'].v or window['members'].v or window['punishlog'].v or window['binder'].v then imgui.Process = true
       else imgui.Process = false end
-      if window['main'].v or window['addtable'].v or window['shpora'].v or window['members'].v or window['punishlog'].v then imgui.ShowCursor = true
+      if window['main'].v or window['addtable'].v or window['shpora'].v or window['members'].v or window['punishlog'].v or window['binder'].v then imgui.ShowCursor = true
       else imgui.ShowCursor = false end
       -----------
       -- Перемещение худа
@@ -809,17 +833,6 @@ function cmd_watch(args)
   else atext('Неизвестный параметр') end
 end
 
-function cmd_rpmask()
-  lua_thread.create(function()
-    sampSendChat('/me достал маску из кармана и надел на лицо')
-    wait(1250)
-    sampSendChat('/clist 32')
-    wait(1250)
-    sampSendChat('/do На лице маска, на форме нет опознавательных знаков. Личность не опознать')
-    return
-  end)
-end
-
 -- Проверка повышки из гугл таблиц
 function cmd_checkrank(arg)
   if sInfo.fraction ~= "SFA" then atext('Команда доступна только игрокам из SFA') end
@@ -1014,7 +1027,7 @@ function cmd_punishlog(nick)
     return
   end
   local pid = tonumber(nick)
-  if pid ~= nil and sampIsPlayerConnected(pid) then nick = sampGetPlayerNickname(pid) end
+  if pid ~= nil and (sampIsPlayerConnected(pid) or sInfo.playerid == pid) then nick = sampGetPlayerNickname(pid) end
   nick = rusUpper(nick)
   if doesFileExist('moonloader/SFAHelper/punishlog.json') then
     lua_thread.create(function()
@@ -1035,17 +1048,19 @@ function cmd_punishlog(nick)
             window['punishlog'].v = true
             atext('Всего: '..count..' вхождений')
             return
+          else
+            atext('Ничего не найдено!')
           end
         end
         fa:close()
-      end
+      else atext('Произошла ошибка') end
     end)     
   else
+    atext('Ничего не найдено!')
     local fa = io.open("moonloader/SFAHelper/punishlog.json", "w")
     fa:write("[]")
     fa:close()
   end
-  atext('Ничего не найдено!')
 end
 
 function cmd_rpweap(arg)
@@ -1497,6 +1512,13 @@ function pushradioLog(text)
   result.time = os.date('%d.%m.%Y')..' '..os.date('%H:%M:%S')
   ------- Сохранение --------
   local file = io.open('moonloader/SFAHelper/punishlog.json', 'r')
+  if file == nil then
+    local fa = io.open("moonloader/SFAHelper/punishlog.json", "w")
+    fa:write("[]")
+    fa:close()
+    pushradioLog(text)
+    return
+  end
   local pushLog = decodeJson(file:read('*a'))
   if pushLog ~= nil and file ~= nil then
     table.insert(pushLog, result)
@@ -1505,6 +1527,7 @@ function pushradioLog(text)
     if file ~= nil then
       file:write(encodeJson(pushLog))
       file:close()
+      return
     else debug_log('(error) Failed to open punishlog.json with "w" flag') end
   else debug_log('(error) Failed to open punishlog.json with "r" flag') end
 end
@@ -1666,8 +1689,10 @@ function sampevents.onShowDialog(dialogid, style, title, button1, button2, text)
       if autoBP == #guns + 1 then
         autoBP = 1
         sampCloseCurrentDialogWithButton(0)
-        wait(250)
-        sampSendChat('/me взял комплекты оружия и боеприпасов из склада')
+        if pInfo.settings.rpweapons > 0 then
+          wait(250)
+          sampSendChat('/me взял комплекты оружия и боеприпасов из склада')
+        end
         return
       end
       sampSendDialogResponse(5225, 1, guns[autoBP], "")
@@ -2079,7 +2104,7 @@ function imgui.OnDrawFrame()
       if imgui.BeginMenu(u8 'Настройки') then
         if imgui.MenuItem(u8 'Основные настройки') then data.imgui.menu = 17 end
         if imgui.MenuItem(u8 'Настройки клавиш') then data.imgui.menu = 18 end
-        if imgui.MenuItem(u8 'Биндер') then data.imgui.menu = 28 end
+        if imgui.MenuItem(u8 'Биндер') then window['binder'].v = true end
         if imgui.MenuItem(u8 'Команды') then data.imgui.menu = 19 end
         if imgui.MenuItem(u8 'Перезагрузить скрипт') then data.imgui.menu = 20 end
         if imgui.MenuItem(u8 'Поддержать разработчиков') then
@@ -2447,11 +2472,6 @@ function imgui.OnDrawFrame()
       imgui.TextColoredRGB("/ev [0-1] [кол-во мест]{CCCCCC} - Запросить эвакуацию. 0 - текущий квадрат, 1- по метке")
       imgui.TextColoredRGB("/loc [id/nick] [секунды]{CCCCCC} - Запросить местоположение бойца")
       imgui.TextColoredRGB("/watch [add/remove/list] [id игрока]{CCCCCC} - Панель слежки за цветом ника игрока")
-      imgui.TextColoredRGB("/rpmask{CCCCCC} - РП отыгровка маски")
-      imgui.TextColoredRGB("/cl{CCCCCC} - Сокращение команды /clist")
-      imgui.TextColoredRGB("/inv{CCCCCC} - Сокращение команды /invite")
-      imgui.TextColoredRGB("/gr{CCCCCC} - Сокращение команды /giverank")
-      imgui.TextColoredRGB("/uinv{CCCCCC} - Сокращение команды /uninvite")
       imgui.TextColoredRGB("/checkrank [id/nick]{CCCCCC} - Проверка последнего повышения игрока. Доступно с 12+ ранга")
       imgui.TextColoredRGB("/checkbl [id/nick]{CCCCCC} - Проверка игрока на ЧС. Доступно DIS, NETC а также 12+ рангам")
       imgui.TextColoredRGB("/cchat{CCCCCC} - Очищает чат")
@@ -2805,225 +2825,6 @@ function imgui.OnDrawFrame()
         data.imgui.setgov.v = ""
         data.imgui.menu = 25
       end        
-    elseif data.imgui.menu == 28 then
-      imgui.LockPlayer = true
-			imgui.DisableInput = false
-      imgui.PushItemWidth(500)
-      imgui.Text(u8'Для изменения текста необходимо нажать на поле с текстом. Для сохранения наведитесь на поле и нажмите Enter.')
-      imgui.Text(u8'После изменения названия команды необходимо нажать "Сохранить биндер", иначе команда не зарегистрируется в системе.')
-      imgui.Text(u8'Чтобы назначить два действия на одни и те же клавиши, необходимо просто их внести в разные строчки, с указанием задержки.')
-      imgui.Text(u8'Порядок вывода строк равен их порядку в этом списке.')
-      imgui.Text(u8'Вы можете придумать любую команду на свой вкус и для ваших потребностей с помощью специальных \'вставок\'.')
-      imgui.Text(u8'При выполнении команды эти вставки будут заменены на необходимый текст. Просмотреть список всех вставок можно в данном вложении:')
-      imgui.SameLine()
-      local str = "Список специальных вставок:\n"
-      str = str.."{mynick} - Вывести ваш ник\n"
-      str = str.."{myfullname} - Вывести ваш РП ник\n"
-      str = str.."{myname} - Вывести ваше имя\n"
-      str = str.."{mysurname} - Вывести вашу фамилию\n"
-      str = str.."{myid} - Вывести ваш ID\n"
-      str = str.."{myhp} - Вывести ваше здоровье\n"
-      str = str.."{myarm} - Вывести вашу броню\n"
-      str = str.."{myrank} - Вывести ваш ранг (числовой)\n"
-      str = str.."{myrankname} - Вывести ваше звание (текст)\n-------------------------\n"
-      str = str.."{kvadrat} - Вывести квадрат, в котором вы находитесь\n"
-      str = str.."{tag} - Вывести ваш тэг\n"
-      str = str.."{frac} - Вывести вашу фракцию\n"
-      str = str.."{city} - Вывести город, в котором вы сейчас находитесь\n"
-      str = str.."{zone} - Вывести локацию, в котором вы сейчас находитесь\n"
-      str = str.."{time} - Вывести текущее время\n-------------------------\n"
-      str = str.."Следующие параметры работают над последним игроком, выделенным через таргет:\n"
-      str = str.."{tID} - Вывести ID игрока\n"
-      str = str.."{tnick} - Вывести ник игрока\n"
-      str = str.."{tfullname} - Вывести РП ник игрока\n"
-      str = str.."{tname} - Вывести имя игрока\n"
-      str = str.."{tsurname} - Вывести фамилию игрока\n"
-      str = str.."Следующие параметры работают над выбранным игроком через \"/match\":\n"
-      str = str.."{mID} - Вывести ID игрока\n"
-      str = str.."{mnick} - Вывести ник игрока\n"
-      str = str.."{mfullname} - Вывести РП ник игрока\n"
-      str = str.."{mname} - Вывести имя игрока\n"
-      str = str.."{msurname} - Вывести фамилию игрока\n"
-      imgui.TextQuestion(u8:encode(str))
-			imgui.Separator()
-      imgui.BeginChild("##bindlist", imgui.ImVec2(970, 442))
-			for k, v in ipairs(config_keys.binder) do
-				if imgui.HotKey("##HK" .. k, v, tLastKeys, 100) then
-					if not rkeys.isHotKeyDefined(v.v) then
-						if rkeys.isHotKeyDefined(tLastKeys.v) then
-							rkeys.unRegisterHotKey(tLastKeys.v)
-						end
-            rkeys.registerHotKey(v.v, true, onHotKey)
-          end
-          saveData(config_keys, "moonloader/SFAHelper/keys.json")
-				end
-				imgui.SameLine()
-				if tEditData.id ~= k then
-					local sText = v.text:gsub("%[enter%]$", "")
-					imgui.BeginChild("##cliclzone" .. k, imgui.ImVec2(500, 30))
-					imgui.AlignTextToFramePadding()
-					if sText:len() > 0 then
-						imgui.Text(u8(sText))
-					else
-						imgui.TextDisabled(u8("Пустое сообщение ..."))
-					end
-					imgui.EndChild()
-					if imgui.IsItemClicked() then
-						sInputEdit.v = sText:len() > 0 and u8(sText) or ""
-						bIsEnterEdit.v = string.match(v.text, "(.)%[enter%]$") ~= nil
-						tEditData.id = k
-						tEditData.inputActve = true
-					end
-				else
-					local btimeb = imgui.ImInt(v.time)
-					imgui.PushAllowKeyboardFocus(false)
-					imgui.PushItemWidth(450)
-					local save = imgui.InputText("##Edit" .. k, sInputEdit, imgui.InputTextFlags.EnterReturnsTrue)
-					imgui.PopItemWidth()
-					imgui.PopAllowKeyboardFocus()
-					imgui.SameLine()
-					imgui.Checkbox(u8("Ввод") .. "##editCH" .. k, bIsEnterEdit)
-					imgui.SameLine()
-					imgui.PushItemWidth(50)
-					if imgui.InputInt(u8'Задержка', btimeb, 0) then v.time = btimeb.v end
-					imgui.PopItemWidth()
-					if save then
-						config_keys.binder[tEditData.id].text = u8:decode(sInputEdit.v) .. (bIsEnterEdit.v and "[enter]" or "")
-            tEditData.id = -1
-						saveData(config_keys, "moonloader/SFAHelper/keys.json")
-					end
-					if tEditData.inputActve then
-						tEditData.inputActve = false
-						imgui.SetKeyboardFocusHere(-1)
-					end
-				end
-			end
-			imgui.EndChild()
-			imgui.Separator()
-			if imgui.Button(u8"Добавить строчку") then
-				config_keys.binder[#config_keys.binder + 1] = {text = "", v = {}, time = 0}
-			end
-			imgui.SameLine()
-      if imgui.Button(u8'Сохранить биндер') then
-        atext('Биндер успешно сохранен!')
-        saveData(config_keys, "moonloader/SFAHelper/keys.json")
-      end
-      imgui.SameLine()
-      if imgui.Button(u8'Перейти к командному биндеру') then
-        tEditData = { id = -1, inputActive = false }
-        data.imgui.menu = 29
-      end
-    elseif data.imgui.menu == 29 then
-      imgui.LockPlayer = true
-      imgui.DisableInput = false
-      imgui.Text(u8'Для изменения текста необходимо нажать на поле с текстом. Для сохранения наведитесь на поле и нажмите Enter.')
-      imgui.Text(u8'После изменения названия команды необходимо нажать "Сохранить биндер", иначе команда не зарегистрируется в системе.')
-      imgui.Text(u8'Вы можете придумать любую команду на свой вкус и для ваших потребностей с помощью специальных \'вставок\'.')
-      imgui.Text(u8'При выполнении команды эти вставки будут заменены на необходимый текст. Просмотреть список всех вставок можно в данном вложении:')
-      imgui.SameLine()
-      local str = "Список специальных вставок:\n{param} - Первый аргумент, который идёт после команды\n"
-      str = str.."{pNickByID} - Отобразить ник по ID в параметре\n"
-      str = str.."{pFullNameByID} - Отобразить РП ник по ID в параметре\n"
-      str = str.."{pNameByID} - Отобразить Имя по ID в параметре\n"
-      str = str.."{pSurnameByID} - Отобразить Фамилию по ID в параметре\n"
-      str = str.."{param2} - Второй аргумент\n"
-      str = str.."{param3} - Третий аргумент\n-------------------------\n"
-      str = str.."{mynick} - Вывести ваш ник\n"
-      str = str.."{myfullname} - Вывести ваш РП ник\n"
-      str = str.."{myname} - Вывести ваше имя\n"
-      str = str.."{mysurname} - Вывести вашу фамилию\n"
-      str = str.."{myid} - Вывести ваш ID\n"
-      str = str.."{myhp} - Вывести ваше здоровье\n"
-      str = str.."{myarm} - Вывести вашу броню\n"
-      str = str.."{myrank} - Вывести ваш ранг (числовой)\n"
-      str = str.."{myrankname} - Вывести ваше звание (текст)\n-------------------------\n"
-      str = str.."{kvadrat} - Вывести квадрат, в котором вы находитесь\n"
-      str = str.."{tag} - Вывести ваш тэг\n"
-      str = str.."{frac} - Вывести вашу фракцию\n"
-      str = str.."{city} - Вывести город, в котором вы сейчас находитесь\n"
-      str = str.."{zone} - Вывести локацию, в котором вы сейчас находитесь\n"
-      str = str.."{time} - Вывести текущее время\n-------------------------\n"
-      str = str.."Следующие параметры работают над последним игроком, выделенным через таргет:\n"
-      str = str.."{tID} - Вывести ID игрока\n"
-      str = str.."{tnick} - Вывести ник игрока\n"
-      str = str.."{tfullname} - Вывести РП ник игрока\n"
-      str = str.."{tname} - Вывести имя игрока\n"
-      str = str.."{tsurname} - Вывести фамилию игрока\n"
-      str = str.."Следующие параметры работают над выбранным игроком через \"/match\":\n"
-      str = str.."{mID} - Вывести ID игрока\n"
-      str = str.."{mnick} - Вывести ник игрока\n"
-      str = str.."{mfullname} - Вывести РП ник игрока\n"
-      str = str.."{mname} - Вывести имя игрока\n"
-      str = str.."{msurname} - Вывести фамилию игрока\n"
-      imgui.TextQuestion(u8:encode(str))
-      imgui.Separator()
-			imgui.BeginChild("##cmdlist", imgui.ImVec2(970, 442))
-      for k, v in ipairs(config_keys.cmd_binder) do
-        imgui.PushItemWidth(100)
-        if sCmdEdit[k] == nil then
-          sCmdEdit[k] = imgui.ImBuffer(256)
-          sCmdEdit[k].v = v.cmd
-        end
-        if imgui.InputText("##CMD" .. k, sCmdEdit[k]) then
-          sCmdEdit[k].v = sCmdEdit[k].v:gsub("/", "")
-          if sampIsChatCommandDefined(v.cmd) then sampUnregisterChatCommand(v.cmd) end
-          v.cmd = sCmdEdit[k].v
-        end
-        imgui.PopItemWidth()
-        imgui.SameLine()
-        imgui.PushItemWidth(650)
-				if tEditData.id ~= k then
-					local sText = v.text
-					imgui.BeginChild("##cliclzone" .. k, imgui.ImVec2(500, 30))
-					imgui.AlignTextToFramePadding()
-					if sText:len() > 0 then
-						imgui.Text(u8(sText))
-					else
-						imgui.TextDisabled(u8("Пустое сообщение ..."))
-					end
-					imgui.EndChild()
-					if imgui.IsItemClicked() then
-						sInputEdit.v = sText:len() > 0 and u8(sText) or ""
-						tEditData.id = k
-						tEditData.inputActve = true
-					end
-				else
-					imgui.PushAllowKeyboardFocus(false)
-					imgui.PushItemWidth(450)
-					local save = imgui.InputText("##Edit" .. k, sInputEdit, imgui.InputTextFlags.EnterReturnsTrue)
-					imgui.PopItemWidth()
-					imgui.PopAllowKeyboardFocus()
-					if save then
-						config_keys.cmd_binder[tEditData.id].text = u8:decode(sInputEdit.v)
-            tEditData.id = -1
-						saveData(config_keys, "moonloader/SFAHelper/keys.json")
-					end
-					if tEditData.inputActve then
-						tEditData.inputActve = false
-						imgui.SetKeyboardFocusHere(-1)
-					end
-        end
-        imgui.PopItemWidth()
-			end
-      imgui.EndChild()
-			imgui.Separator()
-			if imgui.Button(u8"Добавить строчку") then
-				config_keys.cmd_binder[#config_keys.cmd_binder + 1] = { cmd = "", text = "" }
-			end
-			imgui.SameLine()
-      if imgui.Button(u8'Сохранить биндер') then
-        for k, v in ipairs(config_keys.cmd_binder) do
-          if sampIsChatCommandDefined(v.cmd) then sampUnregisterChatCommand(v.cmd) end
-        end
-        registerFastCmd()
-        atext('Биндер успешно сохранен!')
-        saveData(config_keys, "moonloader/SFAHelper/keys.json")
-      end
-      imgui.SameLine()
-      if imgui.Button(u8'Перейти к клавишному биндеру') then
-        data.imgui.menu = 28
-        tEditData = { id = -1, inputActive = false }
-      end
     end
     imgui.End()
   end
@@ -3287,6 +3088,199 @@ function imgui.OnDrawFrame()
     end
     imgui.End()
   end
+  if window['binder'].v then
+    imgui.LockPlayer = true
+    imgui.DisableInput = false
+    imgui.SetNextWindowSize(imgui.ImVec2(screenx / 1.5, 625), imgui.Cond.FirstUseEver)
+    imgui.SetNextWindowPos(imgui.ImVec2(screenx / 2, screeny / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+    imgui.Begin(u8'SFA-Helper | Биндер', window['binder'], imgui.WindowFlags.MenuBar + imgui.WindowFlags.HorizontalScrollbar)
+    imgui.PushItemWidth(500)
+    ----------------------
+    if imgui.BeginMenuBar(u8 'binder') then
+      if imgui.MenuItem(u8 'Клавишный биндер') then data.imgui.bind = 1 end
+      if imgui.MenuItem(u8 'Командный биндер') then data.imgui.bind = 2 end
+      if imgui.MenuItem(u8 'Сохранить изменения') then
+        if data.imgui.bind == 2 then
+          for k, v in ipairs(config_keys.cmd_binder) do
+            if sampIsChatCommandDefined(v.cmd) then sampUnregisterChatCommand(v.cmd) end
+          end
+          registerFastCmd()
+        end
+        atext('Биндер успешно изменен!')
+        saveData(config_keys, "moonloader/SFAHelper/keys.json")
+      end
+      imgui.EndMenuBar()
+    end
+    ----------------------
+    local str = ""
+    str = str.."{mynick} - Ваш ник\n"
+    str = str.."{myfullname} - Ваш РП ник\n"
+    str = str.."{myname} - Ваше имя\n"
+    str = str.."{mysurname} - Ваша фамилия\n"
+    str = str.."{myid} - Ваш ID\n"
+    str = str.."{myhp} - Ваше здоровье\n"
+    str = str.."{myarm} - Ваша броня\n"
+    str = str.."{myrank} - Ваш ранг (числовой)\n"
+    str = str.."{myrankname} - Ваше звание (текст)\n-------------------------\n"
+    str = str.."{kvadrat} - Ваш текущий квадрат\n"
+    str = str.."{tag} - Ваш тэг\n"
+    str = str.."{frac} - Ваша фракция\n"
+    str = str.."{city} - Текущий город\n"
+    str = str.."{zone} - Текущая локация\n"
+    str = str.."{time} - Текущее время\n-------------------------\n"
+    str = str.."Последний игрок, выделенный через таргет:\n"
+    str = str.."{tID} - ID игрока\n"
+    str = str.."{tnick} - Ник игрока\n"
+    str = str.."{tfullname} - РП ник игрока\n"
+    str = str.."{tname} - Имя игрока\n"
+    str = str.."{tsurname} - Фамилия игрока\n-------------------------\n"
+    str = str.."Игрок, выбранный через \"/match\":\n"
+    str = str.."{mID} - ID игрока\n"
+    str = str.."{mnick} - Иик игрока\n"
+    str = str.."{mfullname} - РП ник игрока\n"
+    str = str.."{mname} - Имя игрока\n"
+    str = str.."{msurname} - Фамилия игрока\n"
+    ----------------------
+    if data.imgui.bind == 1 then
+      imgui.Text(u8'Для изменения текста необходимо нажать на поле с текстом. Для сохранения наведитесь на поле и нажмите Enter.')
+      imgui.Text(u8'После изменения названия команды необходимо нажать "Сохранить изменения", иначе команда не зарегистрируется в системе.')
+      imgui.Text(u8'Чтобы назначить два действия на одни и те же клавиши, необходимо просто их внести в разные строчки, с указанием задержки.')
+      imgui.Text(u8'Порядок вывода строк равен их порядку в этом списке.')
+      imgui.Text(u8'Вы можете придумать любую команду на свой вкус и для ваших потребностей с помощью специальных \'вставок\'.')
+      imgui.Spacing(); imgui.Separator(); imgui.Spacing()
+      imgui.Columns(2)
+      -------------------
+      for k, v in ipairs(config_keys.binder) do
+        if imgui.HotKey("##HK" .. k, v, tLastKeys, 75) then
+          if not rkeys.isHotKeyDefined(v.v) then
+            if rkeys.isHotKeyDefined(tLastKeys.v) then
+              rkeys.unRegisterHotKey(tLastKeys.v)
+            end
+            rkeys.registerHotKey(v.v, true, onHotKey)
+          end
+          saveData(config_keys, "moonloader/SFAHelper/keys.json")
+        end
+        imgui.SameLine()
+        if tEditData.id ~= k then
+          local sText = v.text:gsub("%[enter%]$", "")
+          imgui.BeginChild("##cliclzone" .. k, imgui.ImVec2(500, 30))
+          imgui.AlignTextToFramePadding()
+          if sText:len() > 0 then
+            imgui.Text(u8(sText))
+          else
+            imgui.TextDisabled(u8("Пустое сообщение ..."))
+          end
+          imgui.EndChild()
+          if imgui.IsItemClicked() then
+            sInputEdit.v = sText:len() > 0 and u8(sText) or ""
+            bIsEnterEdit.v = string.match(v.text, "(.)%[enter%]$") ~= nil
+            tEditData.id = k
+            tEditData.inputActve = true
+          end
+        else
+          local btimeb = imgui.ImInt(v.time)
+          imgui.PushAllowKeyboardFocus(false)
+          imgui.PushItemWidth(imgui.GetWindowSize().x - 525)
+          local save = imgui.InputText("##Edit" .. k, sInputEdit, imgui.InputTextFlags.EnterReturnsTrue)
+          imgui.PopItemWidth()
+          imgui.PopAllowKeyboardFocus()
+          imgui.SameLine()
+          imgui.Checkbox(u8("Ввод") .. "##editCH" .. k, bIsEnterEdit)
+          imgui.SameLine()
+          imgui.PushItemWidth(50)
+          if imgui.InputInt(u8'Задержка', btimeb, 0) then v.time = btimeb.v end
+          imgui.PopItemWidth()
+          if save then
+            config_keys.binder[tEditData.id].text = u8:decode(sInputEdit.v) .. (bIsEnterEdit.v and "[enter]" or "")
+            tEditData.id = -1
+            saveData(config_keys, "moonloader/SFAHelper/keys.json")
+          end
+          if tEditData.inputActve then
+            tEditData.inputActve = false
+            imgui.SetKeyboardFocusHere(-1)
+          end
+        end
+      end
+      if imgui.Button(u8"Добавить строчку") then
+        config_keys.binder[#config_keys.binder + 1] = {text = "", v = {}, time = 0}
+      end
+      imgui.NextColumn()
+      imgui.SetColumnOffset(-1, imgui.GetWindowSize().x - 300)
+      imgui.Text(u8:encode("Список специальных вставок:\n"..str))
+      imgui.NextColumn()
+
+    elseif data.imgui.bind == 2 then
+      str = [[{param} - Первый аргумент в команде
+{pNickByID} - Ник по ID в параметре
+{pFullNameByID} - РП ник по ID в параметре
+{pNameByID} - Имя по ID в параметре
+{pSurnameByID} - Фамилия по ID в параметре
+{param2} - Второй аргумент
+{param3} - Третий аргумент
+-------------------------]].."\n"..str
+      imgui.Text(u8'Для изменения текста необходимо нажать на поле с текстом. Для сохранения наведитесь на поле и нажмите Enter.')
+      imgui.Text(u8'После изменения названия команды необходимо нажать "Сохранить изменения", иначе команда не зарегистрируется в системе.')
+      imgui.Text(u8'Вы можете придумать любую команду на свой вкус и для ваших потребностей с помощью специальных \'вставок\'.')
+      imgui.Spacing(); imgui.Separator(); imgui.Spacing()
+      imgui.Columns(2)
+      -------------------
+      for k, v in ipairs(config_keys.cmd_binder) do
+        local btimeb = imgui.ImInt(1100) 
+        if v.wait ~= nil then btimeb.v = v.wait end
+        imgui.PushItemWidth(100)
+        if sCmdEdit[k] == nil then
+          sCmdEdit[k] = {}
+          sCmdEdit[k].cmd = imgui.ImBuffer(256)
+          sCmdEdit[k].cmd.v = v.cmd
+          sCmdEdit[k].text = {}
+          sCmdEdit[k].delete = {}
+        end
+        if imgui.InputText("##CMD" .. k, sCmdEdit[k].cmd) then
+          sCmdEdit[k].cmd.v = sCmdEdit[k].cmd.v:gsub("/", "")
+          if sampIsChatCommandDefined(v.cmd) then sampUnregisterChatCommand(v.cmd) end
+          v.cmd = sCmdEdit[k].cmd.v
+        end
+        imgui.SameLine(140)
+        imgui.Text(u8'Задержка')
+        imgui.SameLine()
+        imgui.PushItemWidth(50)
+        if imgui.InputInt(u8'##wait'..k, btimeb, 0) then v.wait = btimeb.v end
+        imgui.PopItemWidth()
+        imgui.SameLine()
+        if imgui.Button(u8'Добавить строку##addstr'..k) then
+          v.text[#v.text + 1] = ""
+        end
+        for i = 1, #v.text do
+          if v.text[i] ~= nil then
+            if sCmdEdit[k].text[i] == nil then
+              sCmdEdit[k].text[i] = imgui.ImBuffer(256)
+              sCmdEdit[k].text[i].v = u8:encode(v.text[i])
+            end
+            imgui.PushItemWidth(imgui.GetWindowSize().x - 400)
+            if imgui.InputText("##Edit"..k..i, sCmdEdit[k].text[i]) then
+              v.text[i] = u8:decode(sCmdEdit[k].text[i].v)
+            end
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            imgui.PushItemWidth(50)
+            if imgui.Button(u8"Удалить##deleteCH" .. k .. i) then
+              sampAddChatMessage('ідіть у сраку', 0xffff00)
+            end
+            imgui.PopItemWidth()
+          end
+        end
+        imgui.NewLine()
+      end
+      if imgui.Button(u8"Добавить команду") then
+        config_keys.cmd_binder[#config_keys.cmd_binder + 1] = { cmd = "", text = { "" } }
+      end
+      imgui.NextColumn()
+      imgui.SetColumnOffset(-1, imgui.GetWindowSize().x - 300)
+      imgui.Text(u8:encode("Список специальных вставок:\n"..str))
+      imgui.NextColumn()
+    end
+    imgui.End()     
+  end
   if window['punishlog'].v then
     imgui.SetNextWindowSize(imgui.ImVec2(750, 400), imgui.Cond.FirstUseEver)
     imgui.SetNextWindowPos(imgui.ImVec2(screenx / 2, screeny / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
@@ -3463,22 +3457,31 @@ end
 -- Регистрируем командный биндер
 function registerFastCmd()
   for key, value in pairs(config_keys.cmd_binder) do
-    if value.cmd and value.text then
+    if value.cmd and #value.text > 0 then
       if not sampIsChatCommandDefined(value.cmd) then
         sampRegisterChatCommand(value.cmd, function(pam)
-          -- Делаем невозможным выполнение команды без установленного тэгами кол-ва параметров
-          local params = 0
-          if value.text:find("{param}") or value.text:find("{pNickByID}") or value.text:find("{pFullNameByID}") or value.text:find("{pNameByID}") or value.text:find("{pSurnameByID}") then params = params + 1 end
-          if value.text:find("{param2}") then params = params + 1 end
-          if value.text:find("{param3}") then params = params + 1 end
-          if params > 0 then
-            local args = string.split(pam, " ", params)
-            if #args < params then
-              atext(('Введите: /%s %s %s %s'):format(value.cmd, params > 0 and "[param]" or "", params > 1 and "[param2]" or "", params > 2 and "[param3]" or ""))
-              return
+          lua_thread.create(function()
+            -- Делаем невозможным выполнение команды без установленного тэгами кол-ва параметров
+            for i = 1, #value.text do
+              if value.text[i] ~= nil and #value.text[i] > 0 then
+                local text = value.text[i]
+                local params = 0
+                if text:find("{param}") or text:find("{pNickByID}") or text:find("{pFullNameByID}") or text:find("{pNameByID}") or text:find("{pSurnameByID}") then params = params + 1 end
+                if text:find("{param2}") then params = params + 1 end
+                if text:find("{param3}") then params = params + 1 end
+                if params > 0 then
+                  local args = string.split(pam, " ", params)
+                  if #args < params then
+                    atext(('Введите: /%s %s %s %s'):format(value.cmd, params > 0 and "[param]" or "", params > 1 and "[param2]" or "", params > 2 and "[param3]" or ""))
+                    return
+                  end
+                end
+                sampSendChat(tags(text, pam))
+                if value.wait then wait(value.wait)
+                else wait(1100) end
+              end
             end
-          end
-          sampSendChat(tags(value.text, pam))
+          end)
         end)
       else
         debug_log("(info) Команда-бинд \""..value.cmd.."\" уже существует. Перезапись невозможна", true)
@@ -4134,6 +4137,8 @@ function kvadrat()
   local X, Y, Z = getCharCoordinates(playerPed)
   X = math.ceil((X + 3000) / 250)
   Y = math.ceil((Y * - 1 + 3000) / 250)
+  -- Fix #7469 (27/7/19)
+  if X <= 0 or Y < 1 or Y > #KV then return "Нет" end
   Y = KV[Y]
   local KVX = (Y.."-"..X)
   return KVX
