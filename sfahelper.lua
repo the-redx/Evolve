@@ -1,7 +1,7 @@
-script_name("SFA-Helper") 
+script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.3831")
-SCRIPT_ASSEMBLY = "1.38-rc1"
+script_version("1.3841")
+SCRIPT_ASSEMBLY = "1.38-r1"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -73,7 +73,7 @@ pInfo = {
     membersdate = false,
     tag = nil,
     rpweapons = 0,
-    update37 = false
+    update37 = false,
   },
   gov = {},
   weeks = {0,0,0,0,0,0,0},
@@ -122,7 +122,7 @@ config_keys = {
     { text = "", v = {}, time = 0 },
   },
   cmd_binder = {
-    --{ cmd = "pass", wait = 1100, text = { "Здравия желаю! Я {myrankname}, {myfullname}. Предъявите ваши документы." } },
+    { cmd = "pass", wait = 1100, text = { "Здравия желаю! Я {myrankname}, {myfullname}. Предъявите ваши документы." } },
     { cmd = "uinv", wait = 1100, text = { "/uninvite {param} {param2}" } },
     { cmd = "gr", wait = 1100, text = { "/giverank {param} {param2}" } },
     { cmd = "inv", wait = 1100, text = { "/invite {param}" } },
@@ -265,7 +265,7 @@ updatesInfo = {
   date = "27.07.2019",
   list = {
     "- Добавлена команда для изменения погоды: {ffffff}/sweather [погода 0 - 45];",
-    "- Добавлена команда для изменения погоды: {ffffff}/stime [время 0 - 23];",
+    "- Добавлена команда для изменения время: {ffffff}/stime [время 0 - 23];",
     "- Теперь команда {ffffff}/addtable{cccccc} по умолчанию доступна со звания Майор. Привязка убрана;",
     "- Добавлена РП отыгровка при смене оружия. Изменить режим и клавишу можно в {ffffff}Настройках{cccccc} либо командой {ffffff}/rpweap",
     "Доступны 4 типа РП отыгровки. 0 - Выключить, 1 - Отыгровка только при нажатии на клавишу, 2 - Отыгровка при смене оружия, 3 - Все вместе;",
@@ -348,9 +348,11 @@ function main()
                 end
               end
               if replaced then
-                for i = 1, #config_keys.cmd_binder do
-                  table.insert(config_k.cmd_binder, config_keys.cmd_binder[i])
-                end
+                table.insert(config_k.cmd_binder, { cmd = "uinv", wait = 1100, text = { "/uninvite {param} {param2}" } })
+                table.insert(config_k.cmd_binder, { cmd = "gr", wait = 1100, text = { "/giverank {param} {param2}" } })
+                table.insert(config_k.cmd_binder, { cmd = "inv", wait = 1100, text = { "/invite {param}" } })
+                table.insert(config_k.cmd_binder, { cmd = "cl", wait = 1100, text = { "/clist {param}" } })
+                table.insert(config_k.cmd_binder, { cmd = "rpmask", wait = 1100, text = { "/me достал маску из кармана и надел на лицо", "/clist 32", "/do На лице маска, на форме нет опознавательных знаков. Личность не опознать" } })
               end
             end
             pInfo.settings.update37 = true
@@ -453,6 +455,9 @@ function main()
     debug_log(("(info) Бинды загружены | Время: %.3fs"):format(os.clock() - mstime))
     --------------------=========----------------------
     atext('SFA-Helper успешно загружен (/sh)')
+    if DEBUG_MODE then
+      atext('Вы используете тестовую версию - '..SCRIPT_ASSEMBLY)
+    end
     local day = os.date("%d.%m.%y")
     if pInfo.info.thisWeek == 0 then pInfo.info.thisWeek = os.date("%W") end
     -- Начался новый день
@@ -1573,7 +1578,7 @@ function autoupdate(json_url)
       end
       if updateversion > thisScript().version then
         lua_thread.create(function()
-          atext('Обнаружено обновление. Пытаюсь обновиться c '..thisScript().version..' на '..updateversion)
+          atext('Обнаружено обновление. Пытаюсь обновиться c '..SCRIPT_ASSEMBLY..' на '..updtext..' (тестовая)')
           debug_log("(info) Обнаружено обновление. Версия: "..updateversion, true)
           wait(250)
           local dlstatus = require('moonloader').download_status
