@@ -1,12 +1,18 @@
+-- This file is a SFA-Helper project
+-- Licensed under MIT License
+-- Copyright (c) 2019 redx
+-- https://github.com/the-redx/Evolve
+-- Version 1.39 2623
+
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.3841")
-SCRIPT_ASSEMBLY = "1.38-r1"
+script_version("1.3923")
+SCRIPT_ASSEMBLY = "1.39 2623"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
 require 'lib.sampfuncs'
-------------------
+------------------------
 local lsampev, sampevents = pcall(require, 'lib.samp.events')
                             assert(lsampev, 'Library \'lib.samp.events\' not found')
 local lencoding, encoding = pcall(require, 'encoding')
@@ -27,6 +33,9 @@ local limadd, imadd       = pcall(require, 'imgui_addons')
                             assert(limadd, 'Library \'imgui_addons\' not found')
 local lcopas, copas       = pcall(require, 'copas')
 local lhttp, http         = pcall(require, 'copas.http')
+
+--local json = require "cjson"
+--local util = require "cjson.util"
 --local raknet = require "lib.samp.raknet"
 ------------------
 encoding.default = 'CP1251'
@@ -35,6 +44,21 @@ dlstatus = require('moonloader').download_status
 imgui.ToggleButton = require('imgui_addons').ToggleButton
 imgui.HotKey = require('imgui_addons').HotKey
 --------------------------------------------------------------------
+-- Логгирование
+logger = {
+  usecolor = true,
+  outfile = 'moonloader/SFAHelper/debug.txt',
+  level = DEBUG_MODE and "trace" or "info",
+  modes = {
+    { name = "trace", color = "6A5ACD", },
+    { name = "debug", color = "ADD8E6", },
+    { name = "info",  color = "90ee90", },
+    { name = "warn",  color = "FF7F00", },
+    { name = "error", color = "8b0000", },
+    { name = "fatal", color = "FF00FF", },
+  }
+}
+
 window = {
   ['main'] = imgui.ImBool(false),
   ['target'] = imgui.ImBool(false),
@@ -73,8 +97,10 @@ pInfo = {
     membersdate = false,
     tag = nil,
     rpweapons = 0,
-    update37 = false,
+    autologin = false,
+    password = ""
   },
+  func = {},
   gov = {},
   weeks = {0,0,0,0,0,0,0},
   counter = {0,0,0,0,0,0,0,0,0,0,0,0}
@@ -119,7 +145,7 @@ config_keys = {
   targetplayer = {v = {key.VK_R}},
   weaponkey = {v = {key.VK_Z}},
   binder = {
-    { text = "", v = {}, time = 0 },
+    { text = {""}, v = {}, time = 0 },
   },
   cmd_binder = {
     { cmd = "pass", wait = 1100, text = { "Здравия желаю! Я {myrankname}, {myfullname}. Предъявите ваши документы." } },
@@ -233,10 +259,7 @@ targetMenu = {
   cursor = nil
 }
 -- Для биндера
-tEditData = {
-	id = -1,
-	inputActive = false
-}
+tEditData = {}
 sInputEdit = imgui.ImBuffer(256)
 sCmdEdit = {}
 bIsEnterEdit = imgui.ImBool(false)
@@ -259,19 +282,53 @@ searchlight = nil
 spectate_list = {}
 lectureStatus = 0
 complete = false
+--[[
+    #upper{string}
+    #lower{string}
+    #getFrac{playerid}
+    #secToTime{sec}
+    ------
+    $screen{}
+    $timeScreen{}
+    $target{id}
+    $loc{id/nick, secounds}
+    $punishlog{id, nick}
+    $stime{0-23}
+    $sweather{0-45}
+    $ev{0-1, mesta}
+    $checkbl{id/nick}
+    $checkrank{id/nick}
+    $watch{add/remove/list, id}
+    $blag{id, frac, type}
+    $contract{playerid, rank}
+    $vig{playerid, type, reason}
+    $lecture{start/pause/stop}
+    $addbl{playerid/nick, stepen, dok-va, reason}
+    $match{playerid/''}
+]]
 updatesInfo = {
   version = DEBUG_MODE and SCRIPT_ASSEMBLY.." (тестовая)" or thisScript().version,
-  type = "Промежуточное обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "27.07.2019",
+  type = "Плановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
+  date = "10.08.2019",
   list = {
-    "- Добавлена команда для изменения погоды: {ffffff}/sweather [погода 0 - 45];",
-    "- Добавлена команда для изменения время: {ffffff}/stime [время 0 - 23];",
-    "- Теперь команда {ffffff}/addtable{cccccc} по умолчанию доступна со звания Майор. Привязка убрана;",
-    "- Добавлена РП отыгровка при смене оружия. Изменить режим и клавишу можно в {ffffff}Настройках{cccccc} либо командой {ffffff}/rpweap",
-    "Доступны 4 типа РП отыгровки. 0 - Выключить, 1 - Отыгровка только при нажатии на клавишу, 2 - Отыгровка при смене оружия, 3 - Все вместе;",
-    "- Добавлена команда {ffffff}/punishlog{cccccc}. Позволяет просмотреть наказания игрока. Берет данные из рации за все время;",
-    "- Команды {ffffff}/rpmask, /cl, /inv, /gr, /uinv{cccccc} удалены т.к они могут быть заменены командным биндером;",
-    "- Теперь в командном биндере можно забиндить несколько строк на одну команду;"
+    '{FF5233}-{CCCCCC} В настройках добавлен автологин в игру;',
+    '{FF5233}-{CCCCCC} Изменен клавишный биндер. Теперь не нужно создавать новый бинд для добавления нескольких строк',
+    '  Все старые бинды автоматически приведены к новому виду, но назначать несколько биндов на одну клавишу по прежнему можно;',
+    '{FF5233}-{CCCCCC} Добавлены новые тэги для биндера:',
+    '  {FFFFFF}{data}{cccccc} - Текущая дата в формате DD.MM.YYYY;',
+    '  {FFFFFF}{weaponid}{cccccc} - ID оружия в руках;',
+    '  {FFFFFF}{weaponname}{cccccc} - Название оружия в руках;',
+    '  {FFFFFF}{ammo}{cccccc} - Количество патронов в оружие;',
+    '{FF5233}-{CCCCCC} Добавлены два новых видов тэга в биндерах:',
+    '  1. {FFFFFF}$cmd{param}{CCCCCC} - Позволяет вызвать внутренную команду скрипта из биндера. Вместо {ffffff}cmd{cccccc} подставляется команда, {ffffff}param{cccccc} - агрументы функции.',
+    '    Пример бинда: {ffffff}"$vig{{pFullNameByID} строгий нарушение устава}"{cccccc} при вызове выведет: {ffffff}"Nick_Name получает строгий выговор за нарушение устава"{cccccc}',
+    '    Или: {ffffff}"$screen()"{cccccc} при вызове заскринит экран. При вызове данный тэг автоматически удаляется из бинда, т.е. при в чат тэг не напишет;',
+    '  2. {ffffff}#cmd{param}{cccccc} - Позволяет форматировать аргумент указанной функцией.',
+    '    Пример бинда: {ffffff}"#upper{pFullNameByID}"{ccccc} при вызове выведет ник из параметра в верхнем регистре;',
+    '    Список всех новых тэгов можно найти в теме скрипта на форуме. Там же можно будет найти несколько уже готовых биндов, для лучшего понимания принципа работы;',
+    "\nОстальное:",
+    "{FF5233}-{CCCCCC} Исправлен баг с крашем скрипта при использовании таргет тэгов в биндере;",
+    "{FF5233}-{CCCCCC} Изменена система логгирования для быстрого нахождения ошибок в работе скрипта;"
   }
 }
 adminsList = {}
@@ -286,24 +343,18 @@ function main()
     if not isSampfuncsLoaded() or not isSampLoaded() then return end
     while not isSampAvailable() do wait(100) end
     if not doesDirectoryExist("moonloader\\SFAHelper") then createDirectory("moonloader\\SFAHelper") end
-    -- Очищаем лог, если файла нет, создаем
-    local file = io.open('moonloader/SFAHelper/debug.txt', 'w+')
-    file:close()
-    debug_log('================================================================')
-    debug_log('SFA-Helper version '..SCRIPT_ASSEMBLY..' for SA-MP 0.3.7 loaded.')
-    debug_log('Developers: Edward_Franklin, Thomas_Lawson')
-    debug_log('Copyright (c) 2019, redx')
-    debug_log('================================================================')
+    -- Иницилизируем логгер
+    loggerInit()
     --------------------=========----------------------
     -- Подгружаем необходимые функции, останавливая основной поток до конца выполнения
     local mstime = os.clock()
     loadFiles()
     while complete ~= true do wait(0) end
-    debug_log(("(debug) Библиотеки | Время: %.3fs"):format(os.clock() - mstime))
+    logger.info(("Библиотеки | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
     autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json") -- remove
     while complete ~= true do wait(0) end
-    debug_log(("(debug) Авто-обновления | Время: %.3fs"):format(os.clock() - mstime))
+    logger.info(("Авто-обновления | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
     loadPermissions("https://docs.google.com/spreadsheets/d/1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y/export?format=tsv&id=1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y&gid=1568566199") -- remove
     while complete ~= true do wait(0) end
@@ -316,7 +367,7 @@ function main()
         local config_k = decodeJson(fa:read('*a'))
         if config_k ~= nil then
           -- Дополняет дефолтную таблицу данными из конфига. Если чего то нет в конфиге, будут оставлены дефолтные значения.
-          debug_log("(debug) Starting additionArray. From = 'moonloader/SFAHelper/config.json', TO = pInfo")
+          logger.trace("Starting additionArray. From = 'moonloader/SFAHelper/config.json', TO = pInfo")
           pInfo = additionArray(config_k, pInfo) 
         end 
         fa:close()   
@@ -336,29 +387,55 @@ function main()
       if fa then
         local config_k = decodeJson(fa:read('*a'))
         if config_k ~= nil then
-          if not pInfo.settings.update37 then
-            if config_k.cmd_binder ~= nil then
-              local replaced = false
-              for i = 1, #config_k.cmd_binder do
-                if type(config_k.cmd_binder[i].text) == "string" then
-                  local text = config_k.cmd_binder[i].text
-                  config_k.cmd_binder[i].text = { text }
-                  config_k.cmd_binder[i].wait = 1100
-                  replaced = true
-                end
-              end
-              if replaced then
-                table.insert(config_k.cmd_binder, { cmd = "uinv", wait = 1100, text = { "/uninvite {param} {param2}" } })
-                table.insert(config_k.cmd_binder, { cmd = "gr", wait = 1100, text = { "/giverank {param} {param2}" } })
-                table.insert(config_k.cmd_binder, { cmd = "inv", wait = 1100, text = { "/invite {param}" } })
-                table.insert(config_k.cmd_binder, { cmd = "cl", wait = 1100, text = { "/clist {param}" } })
-                table.insert(config_k.cmd_binder, { cmd = "rpmask", wait = 1100, text = { "/me достал маску из кармана и надел на лицо", "/clist 32", "/do На лице маска, на форме нет опознавательных знаков. Личность не опознать" } })
+          if config_k.binder ~= nil then
+            local replaced = false
+            for i = 1, #config_k.binder do
+              if type(config_k.binder[i].text) == "string" then
+                local text = config_k.binder[i].text
+                config_k.binder[i].text = { text }
+                replaced = true
               end
             end
-            pInfo.settings.update37 = true
+            if replaced then
+              logger.trace('replaced is true (binder)')
+              local newBinder = {}
+              local replacedBinder = {}
+              for i = 1, #config_k.binder do
+                local sKeys = tostring(table.concat(config_k.binder[i].v, " "))
+                if newBinder[sKeys] == nil then
+                  replacedBinder[#replacedBinder + 1] = config_k.binder[i]
+                  newBinder[sKeys] = #replacedBinder
+                else
+                  for j = 1, #config_k.binder[i].text do
+                    replacedBinder[newBinder[sKeys]].text[#replacedBinder[newBinder[sKeys]].text + 1] = config_k.binder[i].text[j]
+                  end
+                end
+              end
+              config_k.binder = replacedBinder
+            end
+          end
+          if config_k.cmd_binder ~= nil then
+            local replaced = false
+            for i = 1, #config_k.cmd_binder do
+              if type(config_k.cmd_binder[i].text) == "string" then
+                local text = config_k.cmd_binder[i].text
+                config_k.cmd_binder[i].text = { text }
+                config_k.cmd_binder[i].wait = 1100
+                replaced = true
+              end
+            end
+            if replaced then
+              logger.trace('replaced is true (cmd_binder)')
+              funcc('upd37', 1)
+              table.insert(config_k.cmd_binder, { cmd = "uinv", wait = 1100, text = { "/uninvite {param} {param2}" } })
+              table.insert(config_k.cmd_binder, { cmd = "gr", wait = 1100, text = { "/giverank {param} {param2}" } })
+              table.insert(config_k.cmd_binder, { cmd = "inv", wait = 1100, text = { "/invite {param}" } })
+              table.insert(config_k.cmd_binder, { cmd = "cl", wait = 1100, text = { "/clist {param}" } })
+              table.insert(config_k.cmd_binder, { cmd = "rpmask", wait = 1100, text = { "/me достал маску из кармана и надел на лицо", "/clist 32", "/do На лице маска, на форме нет опознавательных знаков. Личность не опознать" } })
+            end
           end
           -- Дополняет дефолтную таблицу данными из конфига. Если чего то нет в конфиге, будут оставлены дефолтные значения.
-          debug_log("(debug) Starting additionArray. From = 'moonloader/SFAHelper/keys.json', TO = config_keys")
+          logger.trace("Starting additionArray. From = 'moonloader/SFAHelper/keys.json', TO = config_keys")
           config_keys = additionArray(config_k, config_keys)
         end
         fa:close()
@@ -375,7 +452,7 @@ function main()
         local post_k = decodeJson(fa:read('*a'))
         if post_k ~= nil then
           -- Дополняет дефолтную таблицу данными из конфига. Если чего то нет в конфиге, будут оставлены дефолтные значения.
-          debug_log("(debug) Starting additionArray. From = 'moonloader/SFAHelper/posts.json', TO = postInfo")
+          logger.trace("Starting additionArray. From = 'moonloader/SFAHelper/posts.json', TO = postInfo")
           postInfo = additionArray(post_k, postInfo)
         end
         fa:close()
@@ -385,7 +462,7 @@ function main()
       fa:close()
     end
     saveData(postInfo, "moonloader/SFAHelper/posts.json")
-    debug_log(("(info) Локальные данные загружены | Время: %.3fs"):format(os.clock() - mstime))
+    logger.info(("Локальные данные загружены | Время: %.3fs"):format(os.clock() - mstime))
     --------------------=========----------------------
     sampRegisterChatCommand('stime', cmd_stime)
     sampRegisterChatCommand('sweather', cmd_sweather)
@@ -414,14 +491,21 @@ function main()
     sampRegisterChatCommand('contract', cmd_contract)
     sampRegisterChatCommand('rpweap', cmd_rpweap)
     sampRegisterChatCommand('punishlog', cmd_punishlog)
-    sampRegisterChatCommand('sfahelper', function() window['main'].v = not window['main'].v end)
-    sampRegisterChatCommand('sh', function() window['main'].v = not window['main'].v end)
+    sampRegisterChatCommand('sfahelper', function() 
+      funcc('cmd_sfahelper', 1)
+      window['main'].v = not window['main'].v
+    end)
+    sampRegisterChatCommand('sh', function()
+      funcc('cmd_sh', 1)
+      window['main'].v = not window['main'].v
+    end)
     ----- Команды, для которых было лень создавать функции
     sampRegisterChatCommand('addtable', function()
       if sInfo.fraction ~= "SFA" or pInfo.settings.rank < 12 then
         atext('Команда доступна со звания Майор и выше')
         return
       end
+      funcc('cmd_addtable', 1)
       data.test.googlesender.v = 0
       data.test.nick.v = ""
       data.test.param1.v = ""
@@ -430,21 +514,24 @@ function main()
       window['addtable'].v = not window['addtable'].v
     end)
     sampRegisterChatCommand('abp', function()
+      funcc('cmd_abp', 1)
       pInfo.settings.autobp = not pInfo.settings.autobp
       atext(("Авто-БП %s"):format(pInfo.settings.autobp and "включен" or "выключен"))      
     end)
     sampRegisterChatCommand('shud', function()
+      funcc('cmd_shud', 1)
       window['hud'].v = not window['hud'].v
       pInfo.settings.hud = not pInfo.settings.hud
       atext(("Худ %s"):format(pInfo.settings.hud and "включен" or "выключен"))      
     end)
-    sampRegisterChatCommand('toggletarget', function() 
+    sampRegisterChatCommand('toggletarget', function()
+      funcc('cmd_toggletarget', 1)
       pInfo.settings.target = not pInfo.settings.target
       atext(("Target Bar %s"):format(pInfo.settings.target and "включен" or "выключен"))
     end)
     -- Загрузка командного биндера
     registerFastCmd()
-    debug_log(("(info) Команды загружены | Время: %.3fs"):format(os.clock() - mstime))
+    logger.info(("Команды загружены | Время: %.3fs"):format(os.clock() - mstime))
     --------------------=========----------------------
     punacceptbind = rkeys.registerHotKey(config_keys.punaccept.v, true, punaccept)
     -- Клавишный биндер
@@ -452,7 +539,7 @@ function main()
       rkeys.registerHotKey(v.v, true, onHotKey)
       if v.time == nil then v.time = 0 end
     end
-    debug_log(("(info) Бинды загружены | Время: %.3fs"):format(os.clock() - mstime))
+    logger.info(("Бинды загружены | Время: %.3fs"):format(os.clock() - mstime))
     --------------------=========----------------------
     atext('SFA-Helper успешно загружен (/sh)')
     if DEBUG_MODE then
@@ -470,10 +557,10 @@ function main()
       -- Началась новая идея
       if tonumber(pInfo.info.thisWeek) ~= tonumber(os.date("%W")) then
         atext("Началась новая неделя. Итоги предыдущей недели: "..secToTime(pInfo.info.weekOnline))
-        debug_log("(info) Новая неделя. (weekOnline = "..secToTime(pInfo.info.weekOnline)..")")
+        logger.debug("Новая неделя. (weekOnline = "..secToTime(pInfo.info.weekOnline)..")")
         -- Очищаем все счётчики, кроме настроек
         for key in pairs(pInfo) do
-          if key ~= "settings" and key ~= "gov" then
+          if key ~= "settings" and key ~= "gov" and key ~= "func" then
             for k in pairs(pInfo[key]) do
               pInfo[key][k] = 0
             end
@@ -481,14 +568,14 @@ function main()
         end
         pInfo.info.thisWeek = os.date("%W")
       end
-      debug_log("(info) Новый день. (dayOnline = "..secToTime(pInfo.info.dayOnline)..")")
+      logger.debug("Новый день. (dayOnline = "..secToTime(pInfo.info.dayOnline)..")")
       pInfo.info.day = day
       pInfo.info.dayPM = 0
       pInfo.info.dayAFK = 0
       pInfo.info.dayOnline = 0
       pInfo.info.dayWorkOnline = 0
     end
-    debug_log(("(info) Онлайн успешно обновлен | Время: %.3fs"):format(os.clock() - mstime))
+    logger.info(("Онлайн успешно обновлен | Время: %.3fs"):format(os.clock() - mstime))
     while not sampIsLocalPlayerSpawned() do wait(0) end
     local _, myid = sampGetPlayerIdByCharHandle(playerPed)
     sInfo.authTime = os.date("%d.%m.%y %H:%M:%S")
@@ -496,21 +583,20 @@ function main()
     sInfo.playerid = myid
     sInfo.nick = sampGetPlayerNickname(myid)
     sInfo.weapon = getCurrentCharWeapon(PLAYER_PED)
-    debug_log("(info) Main переменные установлены")
     -- Сбор данных о фракции и ранге
     cmd_stats("checkout")
-    debug_log("(info) Данные о фракции и ранге обновлены")
+    logger.info("Данные о фракции и ранге обновлены")
     secoundTimer()
     changeWeapons()
     loadAdmins()
     if pInfo.settings.hud == true then window['hud'].v = true end
-    debug_log(("(debug) Конец Main функции. | (weekOnline = %d | dayOnline = %d | Время: %.3fs)"):format(pInfo.info.weekOnline, pInfo.info.dayOnline, os.clock() - mstime))
+    logger.debug(("Конец Main функции. | (weekOnline = %d | dayOnline = %d | Время: %.3fs)"):format(pInfo.info.weekOnline, pInfo.info.dayOnline, os.clock() - mstime))
     --------------------=========----------------------
     while true do wait(0)
       -- Если игрок вылетел, заканчиваем рабочий день
       if sampGetGamestate() ~= 3 and sInfo.isWorking == true then
         sInfo.isWorking = false
-        debug_log("(debug) Lost connection. isWorking = false")
+        logger.warn("Связь с сервером разорвана")
       end
       -- Определяем самостоятельные окна, и окна для которых нужка мышка
       if window['target'].v or window['main'].v or window['hud'].v or window['addtable'].v or window['shpora'].v or window['members'].v or window['punishlog'].v or window['binder'].v then imgui.Process = true
@@ -528,6 +614,7 @@ function main()
       end
       -- Сохраняем новые координаты худа
       if isKeyJustPressed(key.VK_LBUTTON) and data.imgui.hudpos then
+        funcc('changeposhud', 1)
         data.imgui.hudpos = false
         if not pInfo.settings.hud then window['hud'].v = false end
         sampToggleCursor(false)
@@ -539,6 +626,7 @@ function main()
       local result, target = getCharPlayerIsTargeting(playerHandle)
       if result then result, player = sampGetPlayerIdByCharHandle(target) end
       if result and isKeyJustPressed(key.VK_MENU) and targetMenu.playerid ~= player then
+        funcc('set_target', 1)
         targetPlayer(player)
         targetID = player
       end
@@ -566,6 +654,7 @@ function cmd_r(args)
     return
   end
   if pInfo.settings.tag ~= nil then
+    funcc('settings.tag', 1)
     sampSendChat('/r '..pInfo.settings.tag..' '..args)
   else
     sampSendChat('/r '..args)
@@ -597,6 +686,7 @@ function cmd_match(args)
     removeBlip(playerRadar)
     playerMarkerId = nil
   end
+  funcc('cmd_match', 1)
   playerMarkerId = id
   playerMarker = addBlipForChar(ped)
   --changeBlipColour(playerMarker, 0xFF0000FF)
@@ -621,6 +711,7 @@ function cmd_addbl(args)
   local type = tonumber(argSt[2])
   if type == nil or type < 1 or type > 4 then atext('Неверные параметры!') return end
   if sInfo.playerid == pid or sInfo.nick == argSt[1] then atext('Вы не можете внести себя в ЧС!') return end
+  funcc('cmd_addbl', 1)
   if pid ~= nil then
     if sampIsPlayerConnected(pid) then
       argSt[1] = sampGetPlayerNickname(pid)
@@ -633,6 +724,7 @@ end
 
 -- Очистка чата
 function cmd_cchat()
+  funcc('cmd_cchat', 1)
   memory.fill(sampGetChatInfoPtr() + 306, 0x0, 25200)
   memory.write(sampGetChatInfoPtr() + 306, 25562, 4, 0x0)
   memory.write(sampGetChatInfoPtr() + 0x63DA, 1, 1)
@@ -658,6 +750,7 @@ function cmd_lecture(args)
     if lectureStatus ~= 0 then atext('Лекция уже запущена/на паузе') return end
     atext('Вывод лекции начался. Для паузы/отмены введите: (/lec)ture pause или (/lec)ture stop')
     lectureStatus = 1
+    funcc('cmd_lecture', 1)
     lua_thread.create(function()
       while true do wait(1)
         if lectureStatus == 0 then break end
@@ -665,8 +758,16 @@ function cmd_lecture(args)
           if string.match(data.imgui.lecturetext[lectureStatus], "^/r .+") then
             -- /r обрабатываем через свою функцию для автотэга
             local bind = string.match(data.imgui.lecturetext[lectureStatus], "^/r (.+)")
-            cmd_r(tags(bind))  
-          else sampSendChat(tags(data.imgui.lecturetext[lectureStatus])) end
+            local textTag = tags(bind)
+            if textTag:len() > 0 then
+              cmd_r(textTag)
+            end
+          else
+            local textTag = tags(data.imgui.lecturetext[lectureStatus])
+            if textTag:len() > 0 then
+              cmd_r(textTag)
+            end
+          end
           lectureStatus = lectureStatus + 1
         end
         if lectureStatus > #data.imgui.lecturetext then
@@ -698,6 +799,7 @@ function cmd_vig(arg)
   if pid == nil then atext('Неверный ID игрока!') return end
   if sInfo.playerid == pid then atext('Вы не можете принять самого себя!') return end
   if not sampIsPlayerConnected(pid) then atext('Игрок оффлайн!') return end
+  funcc('cmd_vig', 1)
   fileLog(pid, 'Выговор', args[2], _, args[3])
   cmd_r(('%s получает "%s" выговор за %s'):format(sampGetPlayerNickname(pid):gsub("_", " "), args[2], args[3]))
   timeScreen()
@@ -717,6 +819,7 @@ function cmd_contract(arg)
   if rank == nil then atext('Неверные параметры!') return end
   if sInfo.playerid == pid then atext('Вы не можете принять самого себя!') return end
   if not sampIsPlayerConnected(pid) then atext('Игрок оффлайн!') return end
+  funcc('cmd_contract', 1)
   sampSendChat('/invite '..pid)
   -- Выдача ранга происходит после строчки об инвайте в чате
   contractId = pid
@@ -742,6 +845,7 @@ function cmd_blag(arg)
   if not sampIsPlayerConnected(pid) then atext('Игрок оффлайн!') return end
   local blags = {"помощь на призыве", "участие в тренировке", "транспортировку"}
   if args[3] < 1 or args[3] > #blags then atext('Неверный тип!') return end
+  funcc('cmd_blag', 1)
   sampSendChat(("/d %s, выражаю благодарность %s за %s"):format(args[2], string.gsub(sampGetPlayerNickname(pid), "_", " "), blags[args[3]]))
 end
 
@@ -755,19 +859,19 @@ function cmd_stats(args)
     local rang = proverkk:match('.+Ранг%:%s+(.+)%s+Работа')
     sInfo.fraction = tostring(frakc)
     if sInfo.fraction == "nil" then sInfo.fraction = "no" end
-    debug_log(('(info) Фракция определена: %s'):format(sInfo.fraction), true)
+    logger.info(('Фракция определена: %s'):format(sInfo.fraction))
     for i = 1, #rankings do
       if rankings[i] == rang then
         pInfo.settings.rank = i
-        debug_log(('(info) Ранг определен: %s[%d]'):format(rang, pInfo.settings.rank), true)
+        logger.info(('Ранг определен: %s[%d]'):format(rang, pInfo.settings.rank))
         break
       end
       if rang == "Нет" then
-        debug_log('(info) Ранга нет в статистике', true)
+        logger.warn('Ранга нет в статистике')
         break
       end
       if i == #rankings then
-        debug_log(('(info) Ранг не определен. Берем старый ранг: %s[%d]'):format(rankings[pInfo.settings.rank], pInfo.settings.rank), true)
+        logger.warn(('Ранг не определен. Берем старый ранг: %s[%d]'):format(rankings[pInfo.settings.rank], pInfo.settings.rank))
       end
     end
     if args == "checkout" then sampCloseCurrentDialogWithButton(1) end
@@ -793,7 +897,8 @@ function cmd_createpost(args)
       return
     end
   end
-  debug_log("(info) Создан новый пост '"..args.."'", true)
+  funcc('cmd_createpost', 1)
+  logger.info("Создан новый пост '"..args.."'")
   postInfo[#postInfo+1] = { name = args, coordX = cx, coordY = cy, coordZ = cz, radius = 15.0 }
   post.string = "" -- Обновляем меню
   saveData(postInfo, "moonloader/SFAHelper/posts.json")
@@ -820,6 +925,7 @@ function cmd_watch(args)
     pid = tonumber(args[2])
     if pid == nil or sInfo.playerid == args[2] then atext('Неверный ID игрока!') return end
     if not sampIsPlayerConnected(pid) then atext('Игрок оффлайн') return end
+    funcc('cmd_watch_add', 1)
     local color = string.format("%06X", ARGBtoRGB(sampGetPlayerColor(pid)))
     spectate_list[#spectate_list+1] = { id = pid, nick = sampGetPlayerNickname(pid), clist = color }
     atext(string.format('Игрок %s[%d] успешно добавлен в панель слежки. Текущий цвет: %s', sampGetPlayerNickname(pid), pid, getcolorname(color)))
@@ -857,6 +963,7 @@ function cmd_checkrank(arg)
     for i = #tempFiles.ranks, 1, -1 do
       local line = tempFiles.ranks[i]
       if line.nick == arg or line.nick == string.gsub(arg, "_", " ") then
+        funcc('cmd_checkrank', 1)
         atext('Последнее повышение игрока '..line.nick..':')
         if line.rank1 ~= nil and line.rank2 ~= nil and line.date ~= nil then
           atext(("С %s на %s ранг | Дата: %s"):format(line.rank1, line.rank2, line.date))
@@ -874,7 +981,7 @@ function cmd_checkrank(arg)
   local updatelink = 'https://docs.google.com/spreadsheets/d/1F8uOhtVSMJIvsiJcyOINZOEAh0cc3PK1_m3oPrLlatw/export?format=tsv&id=1F8uOhtVSMJIvsiJcyOINZOEAh0cc3PK1_m3oPrLlatw&gid=0'
   local downloadpath = getWorkingDirectory() .. '\\SFAHelper\\checkrank.tsv'
   sampAddChatMessage('Загрузка данных...', 0xFFFF00)
-  debug_log("(debug) Отправляем асинхронку. Очередь: "..tostring(asyncQueue))
+  logger.trace("Отправляем асинхронку. Очередь: "..tostring(asyncQueue))
   asyncQueue = true
   httpRequest(updatelink, nil, function(response, code, headers, status)
     if response then
@@ -885,13 +992,13 @@ function cmd_checkrank(arg)
         local arr = string.split(line, "\t")
         tempFiles.ranks[#tempFiles.ranks + 1] = { nick = arr[1], rank1 = arr[2], rank2 = arr[3], date = arr[4], executor = arr[5], reason = arr[6] }
       end
-      debug_log("(info) Обработка ответа успешно завершена", true)
+      logger.trace("Обработка ответа успешно завершена")
       asyncQueue = false
       -- Обновляем время, возвращаемся в функцию
       tempFiles.ranksTime = os.time()
       cmd_checkrank(arg)
     else
-      debug_log("(info) Ответ был получен с ошибкой", true)
+      logger.trace("Ответ был получен с ошибкой")
       asyncQueue = false
     end
   end)
@@ -915,6 +1022,7 @@ function cmd_checkbl(arg)
     for i = #tempFiles.blacklist, 1, -1 do
       local line = tempFiles.blacklist[i]
       if line.nick == arg or line.nick == string.gsub(arg, "_", " ") then
+        funcc('cmd_checkbl', 1)
         local blacklistStepen = { "1 степень", "2 степень", "3 степень", "4 степень", "Не уволен", "Оплатил" }
         atext('Игрок '..line.nick..' найден в Черном Списке!')
         if line.executor ~= nil and line.date ~= nil then 
@@ -934,7 +1042,7 @@ function cmd_checkbl(arg)
   local updatelink = 'https://docs.google.com/spreadsheets/d/1yBkOkDHGgaYqZDW9hY-qG5C5Zr8S3VmEEoFFByazGZ0/export?format=tsv&id=1yBkOkDHGgaYqZDW9hY-qG5C5Zr8S3VmEEoFFByazGZ0&gid=0'
   local downloadpath = getWorkingDirectory() .. '\\SFAHelper\\blacklist.tsv'
   sampAddChatMessage('Загрузка данных...', 0xFFFF00)
-  debug_log("(debug) Отправляем асинхронку. Очередь: "..tostring(asyncQueue))
+  logger.trace("Отправляем асинхронку. Очередь: "..tostring(asyncQueue))
   asyncQueue = true
   httpRequest(updatelink, nil, function(response, code, headers, status)
     if response then
@@ -947,13 +1055,13 @@ function cmd_checkbl(arg)
         if arr[6] ~= nil and arr[7] ~= nil then step = arr[7] end
         tempFiles.blacklist[#tempFiles.blacklist + 1] = { nick = arr[2], stepen = tonumber(step), date = arr[4], executor = arr[1], reason = arr[3] }
       end
-      debug_log("(info) Обработка ответа успешно завершена", true)
+      logger.trace("Обработка ответа успешно завершена")
       asyncQueue = false
       -- Обновляем время, возвращаемся в функцию
       tempFiles.blacklistTime = os.time()
       cmd_checkbl(arg)
     else
-      debug_log("(info) Ответ был получен с ошибкой", true)
+      logger.trace("Ответ был получен с ошибкой")
       asyncQueue = false
     end
   end)
@@ -986,6 +1094,7 @@ function cmd_ev(arg)
     atext('Доступные значения: 0 - Текущее местоположение, 1 - По метке.')
     return
   end
+  funcc('cmd_ev', 1)
   X = math.ceil((X + 3000) / 250)
   Y = math.ceil((Y * - 1 + 3000) / 250)
   Y = KV[Y]
@@ -999,6 +1108,7 @@ function cmd_sweather(arg)
     return
   end    
   local weather = tonumber(arg)
+  funcc('cmd_sweather', 1)
   if weather ~= nil and weather >= 0 and weather <= 45 then
     forceWeatherNow(weather)
     atext('Погода изменена на: '..weather)
@@ -1012,7 +1122,9 @@ function cmd_stime(arg)
     atext('Введите: /stime [время 0-23 | -1 стандартный]')
     return
   end
+  logger.trace(arg)
   local hour = tonumber(arg)
+  logger.trace(hour)
   if hour ~= nil and hour >= 0 and hour <= 23 then
     time = hour
     patch_samp_time_set(true)
@@ -1020,6 +1132,7 @@ function cmd_stime(arg)
       setTimeOfDay(time, 0)
       atext('Время изменено на: '..time)
     end
+    funcc('cmd_stime', 1)
   else
     atext('Значение времени должно быть в диапазоне от 0 до 23.')
     patch_samp_time_set(false)
@@ -1041,6 +1154,7 @@ function cmd_punishlog(nick)
       if fa then
         local punlog = decodeJson(fa:read('*a'))
         if punlog ~= nil then
+          funcc('cmd_punishlog', 1)
           data.punishlog = {}
           local count = 0
           for i = 1, #punlog do
@@ -1078,6 +1192,7 @@ function cmd_rpweap(arg)
   arg = tonumber(arg)
   if arg == nil then atext('Неверное значение!') return end
   if arg > 3 or arg < 0 then atext('Значение может быть от 0 до 3') return end
+  funcc('cmd_rpweap', 1)
   pInfo.settings.rpweapons = arg
   if arg == 0 then atext('РП отыгровки при смене оружия выключены')
   elseif arg == 1 then atext('РП отыгровки активны только при нажатии на клавишу')
@@ -1100,6 +1215,7 @@ function cmd_loc(args)
     if sampIsPlayerConnected(rnick) then name = sampGetPlayerNickname(rnick)
     else atext('Игрок оффлайн') return end
   end
+  funcc('cmd_loc', 1)
   fileLog(name, 'Местоположение', _, args[2], _)
   cmd_r(string.gsub(name, "_", " ")..', ваше местоположение? На ответ '..args[2]..' секунд.')
   addcounter(8, 1)
@@ -1122,6 +1238,7 @@ function cmd_cn(args)
       getID = string.gsub(getID, "_", " ")
       atext("РП Ник \""..getID.."\" успешно скопирован в буфер обмена. Для вставки используйте CTRL + V")
     end
+    funcc('cmd_cn', 1)
     setClipboardText(getID)
   else
     atext("Введите: /cn [id] [0 - RP nick, 1 - NonRP nick]")
@@ -1132,6 +1249,7 @@ end
 -- Раньше работала, после удаления хоста не работает
 function cmd_adm()
   sampAddChatMessage(' Админы Online:', 0xFFFF00)
+  funcc('cmd_adm', 1)
   for i = 0, 1000 do
     if sampIsPlayerConnected(i) then
       for j = 1, #adminsList do
@@ -1154,7 +1272,8 @@ function cmd_reconnect(args)
   if args == nil or args < 1 then
     atext('Неверный параметр!')
     return
-  end   
+  end
+  funcc('cmd_reconnect', 1)
 	lua_thread.create(function()
 		sampSetGamestate(5)
 		sampDisconnectWithReason()
@@ -1168,6 +1287,7 @@ end
 function cmd_members(args)
   if args == "1" then
     membersInfo.mode = 1
+    funcc('cmd_members_1', 1)
   elseif args == "2" then
     membersInfo.players = {}
     membersInfo.work = 0
@@ -1175,7 +1295,9 @@ function cmd_members(args)
     membersInfo.nowork = 0
     membersInfo.mode = 2
     window['members'].v = true
+    funcc('cmd_members_2', 1)
   else
+    funcc('cmd_members_none', 1)
     membersInfo.mode = 0
   end
   sampSendChat('/members')
@@ -1186,6 +1308,7 @@ function cmd_sfaupdates()
   for i = 1, #updatesInfo.list do
     str = str.."{cccccc}"..updatesInfo.list[i].."\n"
   end
+  funcc('cmd_sfaupdates', 1)
   sampShowDialog(61315125, "{954F4F}SFA-Helper | {FFFFFF}Список обновлений", str, "Закрыть", "", DIALOG_STYLE_MSGBOX)
 end
 
@@ -1321,6 +1444,8 @@ end
 -- Вызов таргет меню
 function targetPlayer(id)
   if pInfo.settings.target ~= true then return end
+  id = tonumber(id)
+  if id == nil or not sampIsPlayerConnected(id) then atext('Target Error: Игрок не найден!') return end 
   window['target'].v = true
   targetMenu = {
     playerid = id,
@@ -1360,6 +1485,7 @@ function punaccept()
     if punkey[1].nick then
       if punkey[1].time > os.time() - 1 then atext("Не флуди!") return end
       if punkey[1].time > os.time() - 15 then
+        funcc('punkey_uninvite', 1)
         cmd_r('Боец '..string.gsub(punkey[1].nick, "_", " ")..' уволен из армии. Причина: '..punkey[1].reason)
       end
       punkey[1].nick, punkey[1].reason, punkey[1].time = nil, nil, nil
@@ -1368,6 +1494,7 @@ function punaccept()
     if punkey[2].nick then
       if punkey[2].time > os.time() - 1 then atext("Не флуди!") return end
       if punkey[2].time > os.time() - 15 then
+        funcc('punkey_giverank', 1)
         sampSendChat(('/me достал %s %sа, и передал их человеку напротив'):format(punkey[2].rank > 6 and "погоны" or "лычки", rankings[punkey[2].rank]))
       end
       punkey[2].nick, punkey[2].rank, punkey[2].time = nil, nil, nil
@@ -1376,6 +1503,7 @@ function punaccept()
     if punkey[3].text ~= nil then
       if punkey[3].time > os.time() - 1 then atext("Не флуди!") return end
       if punkey[3].time > os.time() - 15 then
+        funcc('punkey_autopostavki', 1)
         cmd_r(punkey[3].text)
         --------
         if punkey[3].text:match("Состояние %- 300%/300") then
@@ -1416,7 +1544,7 @@ function loadAdmins()
     end
   end
   file:close()
-  debug_log("(info) Загружено "..count.." админов", true)
+  logger.info("Загружено "..count.." админов")
 end
 
 -- Загружаем необходимые файлы
@@ -1424,6 +1552,7 @@ function loadFiles()
   lua_thread.create(function()
     --- Загрузка библиотек
     if not lcopas or not lhttp then
+      funcc('loadfiles_copas', 1)
       atext('Необходимые для работы библиотеки не были найдены. Скачиваем...')
       local direct = {'copas'}
       local files = {'copas.lua', "copas/ftp.lua", 'copas/http.lua', 'copas/limit.lua', 'copas/smtp.lua', 'requests.lua'}
@@ -1452,29 +1581,28 @@ function loadFiles()
       reloadScripts()
     end
     if not doesDirectoryExist("moonloader\\SFAHelper\\lectures") then
+      funcc('loadfiles_lectures', 1)
       createDirectory("moonloader\\SFAHelper\\lectures")
-      debug_log("(info) Директория 'moonloader/SFAHelper/lectures' успешно создана")
+      logger.debug("Директория 'moonloader/SFAHelper/lectures' успешно создана")
       local file = io.open('moonloader/SFAHelper/lectures/firstlecture.txt', "w+")
       file:write("Обычное сообщение\n/s Сообщение с криком\n/b Сообщение в b чат\n/rb Сообщение в рацию\n/w Сообщение шепотом")
       file:flush()
       file:close()
       file = nil
-      debug_log("(info) Первая лекция добавлена")
+      logger.debug("Первая лекция добавлена")
     end
     if not doesDirectoryExist("moonloader\\SFAHelper\\shpora") then
+      funcc('loadfiles_shpora', 1)
       createDirectory("moonloader\\SFAHelper\\shpora")
-      debug_log("(info) Директория 'moonloader/SFAHelper/shpora' успешно создана")
+      logger.debug("Директория 'moonloader/SFAHelper/shpora' успешно создана")
       local file = io.open('moonloader/SFAHelper/shpora/Первая шпора.txt', "w+")
       file:write("Добавить свои шпаргалки вы можете в папке 'moonloader/SFAHelper/shpora'")
       file:flush()
       file:close()
       file = nil
-      --downloadFile('https://raw.githubusercontent.com/the-redx/Evolve/master/SFAHelper/shpora/statute.txt', getWorkingDirectory() .. '\\SFAHelper\\shpora\\Устав.txt') -- remove
-      --downloadFile('https://raw.githubusercontent.com/the-redx/Evolve/master/SFAHelper/shpora/fp.txt', getWorkingDirectory() .. '\\SFAHelper\\shpora\\ФП.txt') -- remove
-      --downloadFile('https://raw.githubusercontent.com/the-redx/Evolve/master/SFAHelper/shpora/boost_system.txt', getWorkingDirectory() .. '\\SFAHelper\\shpora\\Система повышений.txt') -- remove
-      debug_log("(info) Первые шпоры успешно загружены")
+      logger.debug("Первые шпоры успешно загружены")
     end
-    debug_log('(info) Все необходимые файлы успешно загружены')
+    logger.info('Все необходимые файлы успешно загружены')
     complete = true
     return
   end)
@@ -1483,7 +1611,7 @@ end
 -- Старая загрузка полномочий
 function loadPermissions(table_url)
   local nick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(playerPed)))
-  debug_log("(debug) Проверяем права доступа. Очередь: "..tostring(asyncQueue))
+  logger.trace("Проверяем права доступа. Очередь: "..tostring(asyncQueue))
   asyncQueue = true
   httpRequest(table_url, nil, function(response, code, headers, status)
     if response then
@@ -1492,12 +1620,12 @@ function loadPermissions(table_url)
           sInfo.blPermissions = true
         end
       end
-      debug_log("(info) Права пользователей успешно загружены")
+      logger.trace("Права пользователей успешно загружены")
       complete = true
       asyncQueue = false
       return
     else
-      debug_log("(info) Права пользователей не загружены")
+      logger.trace("Права пользователей не загружены")
       complete = true
       asyncQueue = false
       return
@@ -1534,8 +1662,8 @@ function pushradioLog(text)
       file:write(encodeJson(pushLog))
       file:close()
       return
-    else debug_log('(error) Failed to open punishlog.json with "w" flag') end
-  else debug_log('(error) Failed to open punishlog.json with "r" flag') end
+    else logger.error('Не удалось открыть punishlog.json с флагом "w"') end
+  else logger.error('Не удалось открыть punishlog.json с флагом "r"') end
 end
 
 -- Отправляем статистику на хосте (отключено)
@@ -1547,24 +1675,24 @@ function sendStats(url)
     if info.success == true then
       if type(info.permissions) == "table" then
         sInfo.blPermissions = info.permissions.blacklist
-      else debug_log("(info) Ошибка извлечения полномочий: "..info.permissions, true) end
+      else logger.warn("Ошибка извлечения полномочий: "..info.permissions) end
       if type(info.admins) == "table" then
         for k, v in ipairs(info.admins) do
           adminsList[#adminsList + 1] = { nick = v.nick, level = v.level }
         end
-      else debug_log("(info) Ошибка извлечения списка админов: "..info.admins, true) end
+      else logger.warn("Ошибка извлечения списка админов: "..info.admins) end
     else
-      debug_log("(info) Ошибка сервера: "..info.error, true)
+      logger.warn("Ошибка сервера: "..info.error)
     end
-    debug_log("(info) Время выполнения запроса сервером: "..info.response.."s", true)
-  else debug_log("(info) Ответ от сервера некорректный: "..tostring(response.text), true) end
+    logger.trace("Время выполнения запроса сервером: "..info.response.."s")
+  else logger.warn("Ответ от сервера некорректный: "..tostring(response.text)) end
   complete = true
   asyncQueue = false
 end
 
 -- Автообновление
 function autoupdate(json_url)
-  debug_log("(debug) Проверяем наличие обновлений. Очередь: "..tostring(asyncQueue))
+  logger.debug("Проверяем наличие обновлений. Очередь: "..tostring(asyncQueue))
   asyncQueue = true
   httpRequest(json_url, nil, function(response, code, headers, status)
     if response then
@@ -1579,7 +1707,7 @@ function autoupdate(json_url)
       if updateversion > thisScript().version then
         lua_thread.create(function()
           atext('Обнаружено обновление. Пытаюсь обновиться c '..SCRIPT_ASSEMBLY..' на '..updtext..' (тестовая)')
-          debug_log("(info) Обнаружено обновление. Версия: "..updateversion, true)
+          logger.info("Обнаружено обновление. Версия: "..updateversion)
           wait(250)
           local dlstatus = require('moonloader').download_status
           downloadUrlToFile(updatelink, thisScript().path,
@@ -1587,14 +1715,14 @@ function autoupdate(json_url)
               if status == dlstatus.STATUS_DOWNLOADINGDATA then
                 print(string.format('Загружено %d из %d.', p1, p2))
               elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
-                debug_log('(info) Загрузка обновления успешно завершена', true)
+                logger.info('Загрузка обновления успешно завершена')
                 atext('Обновление завершено. Просмотреть список изменений: /shupd')
                 goupdatestatus = true
                 lua_thread.create(function() wait(500) thisScript():reload() end)
               end
               if status == dlstatus.STATUSEX_ENDDOWNLOAD then
                 if goupdatestatus == nil then
-                  debug_log('(info) Обновление прошло неудачно', true)
+                  logger.warn('Обновление прошло неудачно')
                   atext('Обновление прошло неудачно. Запускаю устаревшую версию..')
                   complete = true
                 end
@@ -1603,10 +1731,10 @@ function autoupdate(json_url)
           )
           return
         end)
-      else debug_log("(info) Доступных обновлений нет", true) complete = true end
+      else logger.info("Доступных обновлений нет") complete = true end
       asyncQueue = false 
     else
-      debug_log("(debug) Ответ был получен с ошибкой", true)
+      logger.warn("Ответ был получен с ошибкой")
       asyncQueue = false
       atext('Не удалось проверить обновления')
       complete = true      
@@ -1674,6 +1802,12 @@ end
 
 -- Хук на выход игрока из игры
 function sampevents.onPlayerQuit(playerid, reason)
+  if playerid == targetID then
+    targetID = nil
+  end
+  if playerid == playerMarkerId then
+    playerMarkerId = nil
+  end
   for i = 1, #spectate_list do
     if spectate_list[i] ~= nil then
       if playerid == spectate_list[i].id then
@@ -1705,6 +1839,10 @@ function sampevents.onShowDialog(dialogid, style, title, button1, button2, text)
       autoBP = autoBP + 1
       return
     end)
+  end
+  if dialogid == 1 and #tostring(pInfo.settings.password) >= 6 and pInfo.settings.autologin then
+    sampSendDialogResponse(dialogid, 1, _, tostring(pInfo.settings.password))
+    return false
   end
 end
 
@@ -1753,7 +1891,10 @@ end
 function sampevents.onSetSpawnInfo(team, skin, unk, position, rotation, weapons, ammo)
   lua_thread.create(function()
     wait(1100)
-    if pInfo.settings.clist ~= nil and sInfo.isWorking == true then sampSendChat('/clist '..pInfo.settings.clist) end
+    if pInfo.settings.clist ~= nil and sInfo.isWorking == true then
+      sampSendChat('/clist '..pInfo.settings.clist)
+      funcc('autoclist', 1)
+    end
     return
   end)
 end
@@ -1875,12 +2016,12 @@ function sampevents.onServerMessage(color, text)
     if pInfo.settings.clist ~= nil then
       lua_thread.create(function() wait(250) sampSendChat('/clist '..pInfo.settings.clist) end)
     end
-    debug_log('(info) Рабочий день начат', true)
+    logger.info('Рабочий день начат')
   end
   -- Отслеживаем конец рабочего дня
   if text:match("Рабочий день окончен") and color == 1687547391 then
     sInfo.isWorking = false
-    debug_log('(info) Рабочий день окончен', true)
+    logger.info('Рабочий день окончен')
   end
   -- /giverank
   if text:match("Вы назначили .+ .+%[%d+%]") and color == -1697828097 then
@@ -1919,7 +2060,7 @@ function sampevents.onServerMessage(color, text)
       -- Если вас приняли, начинаем рабочий день
       pInfo.settings.rank = 1
       sInfo.isWorking = true
-      debug_log('(info) Вас приняли. Ранг = 1')
+      logger.debug('Вас приняли. Ранг = 1')
     end  
   end
   if text:match("Доставьте материалы на Зону 51") and color == -86 then -- Загрузился на корабле, лечу в лва
@@ -2003,25 +2144,28 @@ function sampevents.onServerMessage(color, text)
     if sInfo.isSupport == false then sInfo.isSupport = true end
   end
   -- Саппортский /sduty
-  if text:match('Рабочий день начат') and color == -1 then sInfo.isSupport = true end
+  if text:match('Рабочий день начат') and color == -1 then
+    sInfo.isSupport = true
+    funcc('supports', 1)
+  end
   if text:match('Рабочий день окончен') and color == -1 then sInfo.isSupport = false end
   ---------
   if text:match(".+ выгнал вас из организации. Причина: .+") then
     pInfo.settings.rank = 0
     sInfo.isWorking = false
-    debug_log('(info) Вас уволили. Ранг обнулился')
+    logger.debug('Вас уволили. Ранг обнулился')
   end
   if text:match(".+ назначил Вас .+%[.+%]") then
     if sInfo.isWorking == true then
       pInfo.settings.rank = tonumber(select(3, text:match("(.+) назначил Вас (.+)%[(.+)%]$")))
-      debug_log('(info) Вас повысили. Ранг: '..pInfo.settings.rank)
+      logger.debug('Вас повысили. Ранг: '..pInfo.settings.rank)
     end
   end
   -- Рация фракции
   if color == -1920073984 then
     if sInfo.isWorking == false and (sInfo.fraction == "SFA" or sInfo.fraction == "LVA") then
       sInfo.isWorking = true
-      debug_log("(info) Проверка прошла успешно, рабочий день начат.", true)
+      logger.info("Проверка прошла успешно, рабочий день начат.")
     end
     lua_thread.create(function()
       local tt = rusLower(text)
@@ -2034,7 +2178,7 @@ function sampevents.onServerMessage(color, text)
   if color == -8224086 then
     if sInfo.isWorking == false and (sInfo.fraction == "SFA" or sInfo.fraction == "LVA") then
       sInfo.isWorking = true
-      debug_log("(info) Проверка прошла успешно, рабочий день начат.", true)
+      logger.info("Проверка прошла успешно, рабочий день начат.")
     end
     if text:match("^ %[.+%] .+ %w+_%w+:") then
       local frac, rank, name, surname = text:match("^ %[(.+)%] (.+) (%w+)_(%w+):")
@@ -2053,6 +2197,13 @@ function sampevents.onServerMessage(color, text)
       local frac, rk = text:match("Фракция: (.+)  Должность: (.+)")
       data.players[playersAddCounter] = { nick = data.players[playersAddCounter].nick, rank = rk, fraction = frac }
     end
+  end
+end
+
+function onScriptTerminate(scr, quit)
+  logger.trace('Скрипт '..scr.name..' завершен с кодом: '..tostring(quit))
+  if scr == script.this then
+    logger.debug('Завершение скрипта...')
   end
 end
 
@@ -2185,6 +2336,7 @@ function imgui.OnDrawFrame()
       end
       if imgui.Button(u8 'Вызвать игрока', imgui.ImVec2(-0.1, 20)) then
         if sampIsPlayerConnected(data.imgui.player.v) then
+          funcc('imgui_rubka', 1)
           cmd_r(("%s, подойдите в рубку. У вас %s минут"):format(sampGetPlayerNickname(data.imgui.player.v):gsub("_", " "), data.imgui.narkolvo.v))
         end
       end
@@ -2203,6 +2355,7 @@ function imgui.OnDrawFrame()
       end
       if imgui.Button(u8 'Выдать выговор', imgui.ImVec2(-0.1, 20)) then
         if sampIsPlayerConnected(data.imgui.player.v) then
+          funcc('imgui_vig', 1)
           fileLog(data.imgui.player.v, 'Выговор', u8:decode(data.imgui.vigtype.v), _, u8:decode(data.imgui.reason.v))
           cmd_r(('%s получает "%s" выговор за %s'):format(sampGetPlayerNickname(data.imgui.player.v):gsub("_", " "), u8:decode(data.imgui.vigtype.v), u8:decode(data.imgui.reason.v)))
           timeScreen()
@@ -2224,6 +2377,7 @@ function imgui.OnDrawFrame()
       if imgui.Button(u8 'Выдать наряд', imgui.ImVec2(-0.1, 20)) then
         if sampIsPlayerConnected(data.imgui.player.v) then
           addcounter(7, 1)
+          funcc('imgui_naryad', 1)
           fileLog(data.imgui.player.v, 'Наряд', _, data.imgui.narkolvo.v, u8:decode(data.imgui.reason.v))
           cmd_r(('%s получает наряд %s кругов за %s'):format(sampGetPlayerNickname(data.imgui.player.v):gsub("_", " "), data.imgui.narkolvo.v, u8:decode(data.imgui.reason.v)))
           timeScreen()
@@ -2243,6 +2397,7 @@ function imgui.OnDrawFrame()
       end
       if imgui.Button(u8 'Изменить ранг', imgui.ImVec2(-0.1, 20)) then
         if sampIsPlayerConnected(data.imgui.player.v) then
+          funcc('imgui_giverank', 1)
           fileLog(data.imgui.player.v, 'Ранг', _, data.imgui.grang.v, _)
           sampSendChat(('/giverank %s %s'):format(data.imgui.player.v, data.imgui.grang.v))
           timeScreen()
@@ -2261,6 +2416,7 @@ function imgui.OnDrawFrame()
       end
       if imgui.Button(u8 'Принять игрока', imgui.ImVec2(-0.1, 20)) then
         if sampIsPlayerConnected(data.imgui.player.v) then
+          funcc('imgui_invite', 1)
           fileLog(data.imgui.player.v, 'Инвайт', _, 1, _)
           sampSendChat('/invite '..data.imgui.player.v)
         else atext('Игрок оффлайн!') end
@@ -2279,6 +2435,7 @@ function imgui.OnDrawFrame()
       end
       if imgui.Button(u8 'Уволить игрока', imgui.ImVec2(-0.1, 20)) then
         if sampIsPlayerConnected(data.imgui.player.v) then
+          funcc('imgui_uninvite', 1)
           fileLog(data.imgui.player.v, 'Увал', _, _, u8:decode(data.imgui.reason.v))
           sampSendChat(("/uninvite %s %s"):format(data.imgui.player.v, u8:decode(data.imgui.reason.v)))
           timeScreen()
@@ -2298,6 +2455,7 @@ function imgui.OnDrawFrame()
       end
       if imgui.Button(u8 'Запросить местоположение', imgui.ImVec2(-0.1, 20)) then
         if sampIsPlayerConnected(data.imgui.player.v) then
+          funcc('imgui_loc', 1)
           fileLog(data.imgui.player.v, 'Местоположение', _, u8:decode(data.imgui.invrang.v), _)
           cmd_loc(("%s %s"):format(data.imgui.player.v, u8:decode(data.imgui.invrang.v)))
           --timeScreen()
@@ -2310,10 +2468,12 @@ function imgui.OnDrawFrame()
       imgui.Text(u8('/d OG, Занимаю волну гос новостей на %s. Возражения на п.%d'):format(data.imgui.govka.v, sInfo.playerid))
       imgui.Text(u8("/d OG, Напоминаю, волна гос новостей на %s за SFA."):format(data.imgui.govka.v))
       if imgui.Button(u8 'Занять гос. волну', imgui.ImVec2(200, 20)) then
+        funcc('imgui_senddep', 1)
         sampSendChat(('/d OG, Занимаю волну гос новостей на %s. Возражения на п.%d'):format(u8:decode(data.imgui.govka.v), sInfo.playerid))
       end
       imgui.SameLine()
       if imgui.Button(u8 'Напомнить о занятой гос. волне', imgui.ImVec2(200, 20)) then
+        funcc('imgui_senddep_napom', 1)
         sampSendChat(('/d OG, Напоминаю, волна гос новостей на %s за SFA.'):format(u8:decode(data.imgui.govka.v)))
       end
     elseif data.imgui.menu == 13 then
@@ -2337,12 +2497,14 @@ function imgui.OnDrawFrame()
       imgui.PushItemWidth(100)
       local membersdate = imgui.ImBool(pInfo.settings.membersdate)
       local autobp = imgui.ImBool(pInfo.settings.autobp)
+      local autologin = imgui.ImBool(pInfo.settings.autologin)
       local target = imgui.ImBool(pInfo.settings.target)
       local chatconsole = imgui.ImBool(pInfo.settings.chatconsole)
       local doklad = imgui.ImBool(pInfo.settings.autodoklad)
       local hud = imgui.ImBool(pInfo.settings.hud)
       local tagbuffer = imgui.ImBuffer(tostring(pInfo.settings.tag), 256)
       local clistbuffer = imgui.ImBuffer(tostring(pInfo.settings.clist), 256)
+      local passbuffer = imgui.ImBuffer(tostring(pInfo.settings.password), 256)
       ----------
       imgui.Text(u8'Введите ваш Тег')
       if imgui.InputText('##tag', tagbuffer) then
@@ -2367,10 +2529,24 @@ function imgui.OnDrawFrame()
       if pInfo.settings.clist ~= nil then
         imgui.Text(u8'Текущая настройка: /clist '..u8(pInfo.settings.clist))
       end
+      -----
+      if pInfo.settings.autologin then
+        imgui.Spacing()
+        imgui.Text(u8'Введите пароль для автологина')
+        if imgui.InputText('##pass', passbuffer) then
+          pInfo.settings.password = u8:decode(passbuffer.v)
+          logger.trace(pInfo.settings.password)
+        end   
+      end
       imgui.Spacing()
       imgui.Separator()
       imgui.Spacing()
       ------------
+      if imgui.ToggleButton(u8 'autologin##1', autologin) then
+        pInfo.settings.autologin = autologin.v;
+        saveData(pInfo, "moonloader/SFAHelper/config.json")       
+      end
+      imgui.SameLine(); imgui.Text(u8 'Автологин в игру')
       if imgui.ToggleButton(u8 'autobp##1', autobp) then
         pInfo.settings.autobp = autobp.v;
         saveData(pInfo, "moonloader/SFAHelper/config.json")
@@ -2422,12 +2598,13 @@ function imgui.OnDrawFrame()
       if imgui.Button(u8 'Местоположение худа') then data.imgui.hudpos = true; window['main'].v = false end
       imgui.SameLine();
       if imgui.Button(u8'Обновить список админов') then
+        funcc('updateadm', 1)
         atext('Запрос отправлен. Ожидание ответа от сервера...')
-        debug_log('Отправен запрос на обновление админов')
+        logger.info('Отправен запрос на обновление админов')
         local ip, port = sampGetCurrentServerAddress()
         httpRequest('http://opentest3.000webhostapp.com/api.php?act=getadmins&server='..ip..':'..port, nil, function(response, code, headers, status)
           if response then
-            debug_log("Ответ получен. Код: "..code..", Статус: "..status)
+            logger.trace("Ответ получен. Код: "..code..", Статус: "..status)
             local info = decodeJson(response)
             if info.success == true then
               local output = ""
@@ -2442,11 +2619,11 @@ function imgui.OnDrawFrame()
               atext('Список админов успешно обновлен! Загружено '..count..' админов')
               loadAdmins()
             else
-              debug_log(string.format("Ошибка сервера: ", info.error == nil and "Подробности не были получены" or info.error))
+              logger.warn(string.format("Ошибка сервера: ", info.error == nil and "Подробности не были получены" or info.error))
               atext(string.format('Ошибка сервера: ', info.error == nil and "Подробности не были получены" or info.error))
             end
           else
-            debug_log("Ответ не получен. Код: "..code..", Статус: "..status)
+            logger.warn("Ответ не получен. Код: "..code..", Статус: "..status)
             atext('При обработке запроса произошла ошибка. Попробуйте позже')
           end
         end)
@@ -2550,6 +2727,7 @@ function imgui.OnDrawFrame()
       local togglepost = imgui.ImBool(post.active)
       local interval = imgui.ImInt(post.interval)
       if imgui.ToggleButton(u8 'post##1', togglepost) then
+        funcc('enable_autodoklad', 1)
         post.active = togglepost.v;
       end
       imgui.SameLine(); imgui.Text(u8 'Включать автодоклад')
@@ -2595,6 +2773,7 @@ function imgui.OnDrawFrame()
               end
             end
             if found == false then
+              funcc('imgui_watch_add', 1)
               local color = string.format("%06X", ARGBtoRGB(sampGetPlayerColor(data.imgui.player.v)))
               spectate_list[#spectate_list+1] = { id = data.imgui.player.v, nick = sampGetPlayerNickname(data.imgui.player.v), clist = color }
               atext(string.format('Игрок %s[%d] успешно добавлен в панель слежки. Текущий цвет: %s', spectate_list[#spectate_list].nick, spectate_list[#spectate_list].id, getcolorname(color)))
@@ -2749,6 +2928,7 @@ function imgui.OnDrawFrame()
       imgui.Separator()
       if imgui.Button(u8'Объявить') then
         if data.imgui.setgovint.v > 0 then 
+          funcc('imgui_sendgov', 1)
           lua_thread.create(function()
             for i = 2, #pInfo.gov[data.imgui.setgovint.v] do
               local gov = pInfo.gov[data.imgui.setgovint.v][i]
@@ -2775,6 +2955,7 @@ function imgui.OnDrawFrame()
       imgui.NewLine()
       imgui.Separator()
       if imgui.Button(u8'Изменить') then
+        funcc('imgui_changegov', 1)
         local tit = pInfo.gov[data.imgui.setgovint.v][1]
         pInfo.gov[data.imgui.setgovint.v] = {}
         table.insert(pInfo.gov[data.imgui.setgovint.v], tit)
@@ -2809,6 +2990,7 @@ function imgui.OnDrawFrame()
       imgui.NewLine()
       imgui.Separator()
       if imgui.Button(u8'Создать') then
+        funcc('imgui_creategov', 1)
         local len = #pInfo.gov + 1
         if data.imgui.setgov.v ~= nil and data.imgui.setgov.v ~= "" then
           pInfo.gov[len] = {}
@@ -2945,21 +3127,27 @@ function imgui.OnDrawFrame()
         imgui.Text(u8 "Игрок: Не выбрано")
       end
       if imgui.Button(u8'Местоположение', imgui.ImVec2(-0.1, 20)) then
+        funcc('imgui_loc_context', 1)
         cmd_loc(selectedContext.." 30")
       end
       if imgui.Button(u8'Скопировать ник', imgui.ImVec2(-0.1, 20)) then
+        funcc('imgui_cn_context', 1)
         cmd_cn(selectedContext.." 1")
       end
       if imgui.Button(u8'Скопировать РП ник', imgui.ImVec2(-0.1, 20)) then
+        funcc('imgui_cn_context', 1)
         cmd_cn(selectedContext.." 0")
       end
       if imgui.Button(u8'Установить маркер', imgui.ImVec2(-0.1, 20)) then
+        funcc('imgui_match_context', 1)
         cmd_match(""..selectedContext)
       end
       if imgui.Button(u8'Проверить повышку', imgui.ImVec2(-0.1, 20)) then
+        funcc('imgui_checkrank_context', 1)
         cmd_checkrank(""..selectedContext)
       end
       if imgui.Button(u8'Проверить ЧС', imgui.ImVec2(-0.1, 20)) then
+        funcc('imgui_checkbl_context', 1)
         cmd_checkbl(""..selectedContext)
       end
       if imgui.Button(u8'Закрыть', imgui.ImVec2(-0.1, 20)) then
@@ -3013,18 +3201,21 @@ function imgui.OnDrawFrame()
                 if tonumber(param1) ~= nil and tonumber(param1) >= 1 and tonumber(param1) < 15 and tonumber(param2) ~= nil and tonumber(param2) >= 1 and tonumber(param2) < 15 then
                   atext(("Повышение: [Ник: %s] [С ранга: %s] [На ранг: %s] [Причина: %s]"):format(nickname, param1, param2, reason))
                   sendGoogleMessage("giverank", nickname, param1, param2, reason, os.time())
+                  funcc('imgui_sendgoogle_giverank', 1)
                 else atext('Неверные параметры ранга!') end
               else atext('Все поля должны быть заполнены!') end
             elseif data.test.googlesender.v == 2 then
               if nickname ~= "" and reason ~= "" and nickname ~= nil and reason ~= nil then
                 atext(("Увольнение: [Ник: %s] [Причина: %s]"):format(nickname, reason))
                 sendGoogleMessage("uninvite", nickname, _, _, reason, os.time())
+                funcc('imgui_sendgoogle_uninvite', 1)
               else atext('Все поля должны быть заполнены!') end
             elseif data.test.googlesender.v == 3 then
               if nickname ~= "" and nickname ~= nil and reason ~= nil and reason ~= "" and param2 ~= "" and param2 ~= nil then
                 if tonumber(param2) ~= nil and (tonumber(param2) == 1 or tonumber(param2) == 2) then
                   atext(("Контракт: [Ник: %s] [Тип КС: %s] [Взвод: %s]"):format(nickname, param2, reason))
                   sendGoogleMessage("contract", nickname, _, param2, reason, os.time())
+                  funcc('imgui_sendgoogle_contract', 1)
                 else atext('Неверный тип КС') end
               else atext('Все поля должны быть заполнены!') end
             elseif data.test.googlesender.v == 4 then
@@ -3032,6 +3223,7 @@ function imgui.OnDrawFrame()
                 if tonumber(param2) ~= nil and (tonumber(param2) == 1 or tonumber(param2) == 2) then
                   atext(("Выговор: [Ник: %s] [Тип: %s] [Приговор: %s] [Причина: %s]"):format(nickname, param2, param1, reason))
                   sendGoogleMessage("reprimand", nickname, param1, param2, reason, os.time())
+                  funcc('imgui_sendgoogle_reprimand', 1)
                 else atext('Неверный тип выговора') end
               else atext('Все поля должны быть заполнены!') end
             end
@@ -3106,13 +3298,23 @@ function imgui.OnDrawFrame()
       if imgui.MenuItem(u8 'Клавишный биндер') then data.imgui.bind = 1 end
       if imgui.MenuItem(u8 'Командный биндер') then data.imgui.bind = 2 end
       if imgui.MenuItem(u8 'Сохранить изменения') then
+        funcc('imgui_binder_save', 1)
         if data.imgui.bind == 1 then
           local replacedValues = {}
           for k, v in ipairs(config_keys.binder) do
-            if v.text ~= "" and v.text ~= nil then
-              replacedValues[#replacedValues + 1] = v
+            local newValues = {}
+            if v.v ~= 0 then -- edit
+              for i = 1, #v.text do
+                if v.text[i] ~= "" and v.text[i] ~= nil then
+                  newValues[#newValues + 1] = v.text[i]
+                end
+              end
+            end
+            if #newValues > 0 then
+              replacedValues[#replacedValues + 1] = { v = v.v, time = v.time and v.time or 1100, text = newValues }
             end
           end
+          tEditData = {}
           config_keys.binder = replacedValues
         end
         if data.imgui.bind == 2 then
@@ -3171,15 +3373,19 @@ function imgui.OnDrawFrame()
     str = str.."{msurname} - Фамилия игрока\n"
     ----------------------
     if data.imgui.bind == 1 then
-      imgui.Text(u8'Для изменения текста необходимо нажать на поле с текстом. Для сохранения наведитесь на поле и нажмите Enter.')
       imgui.Text(u8'После изменения названия команды необходимо нажать "Сохранить изменения", иначе команда не зарегистрируется в системе.')
-      imgui.Text(u8'Чтобы назначить два действия на одни и те же клавиши, необходимо просто их внести в разные строчки, с указанием задержки.')
       imgui.Text(u8'Вы можете придумать любую команду на свой вкус и для ваших потребностей с помощью специальных "вставок".')
       imgui.Text(u8'Чтобы удалить строку, просто оставьте её пустой и нажмите "Сохранить изменения". Система сама удалить все лишнее.')
       imgui.Spacing(); imgui.Separator(); imgui.Spacing()
       imgui.Columns(2)
       -------------------
       for k, v in ipairs(config_keys.binder) do
+        if tEditData[k] == nil then
+          tEditData[k] = {}
+          tEditData[k].text = {}
+          tEditData[k].isEnter = {}
+        end
+        local btimeb = imgui.ImInt(v.time)
         if imgui.HotKey("##HK" .. k, v, tLastKeys, 75) then
           if not rkeys.isHotKeyDefined(v.v) then
             if rkeys.isHotKeyDefined(tLastKeys.v) then
@@ -3189,49 +3395,42 @@ function imgui.OnDrawFrame()
           end
           saveData(config_keys, "moonloader/SFAHelper/keys.json")
         end
+        imgui.SameLine(100)
+        imgui.Text(u8'Задержка')
         imgui.SameLine()
-        if tEditData.id ~= k then
-          local sText = v.text:gsub("%[enter%]$", "")
-          imgui.BeginChild("##cliclzone" .. k, imgui.ImVec2(500, 30))
-          imgui.AlignTextToFramePadding()
-          if sText:len() > 0 then
-            imgui.Text(u8(sText))
-          else
-            imgui.TextDisabled(u8("Пустое сообщение ..."))
-          end
-          imgui.EndChild()
-          if imgui.IsItemClicked() then
-            sInputEdit.v = sText:len() > 0 and u8(sText) or ""
-            bIsEnterEdit.v = string.match(v.text, "(.)%[enter%]$") ~= nil
-            tEditData.id = k
-            tEditData.inputActve = true
-          end
-        else
-          local btimeb = imgui.ImInt(v.time)
-          imgui.PushAllowKeyboardFocus(false)
-          imgui.PushItemWidth(imgui.GetWindowSize().x - 525)
-          local save = imgui.InputText("##Edit" .. k, sInputEdit, imgui.InputTextFlags.EnterReturnsTrue)
-          imgui.PopItemWidth()
-          imgui.PopAllowKeyboardFocus()
-          imgui.SameLine()
-          imgui.Checkbox(u8("Ввод") .. "##editCH" .. k, bIsEnterEdit)
-          imgui.SameLine()
-          imgui.PushItemWidth(50)
-          if imgui.InputInt(u8'Задержка', btimeb, 0) then v.time = btimeb.v end
-          imgui.PopItemWidth()
-          if save then
-            config_keys.binder[tEditData.id].text = u8:decode(sInputEdit.v) .. (bIsEnterEdit.v and "[enter]" or "")
-            tEditData.id = -1
-            saveData(config_keys, "moonloader/SFAHelper/keys.json")
-          end
-          if tEditData.inputActve then
-            tEditData.inputActve = false
-            imgui.SetKeyboardFocusHere(-1)
+        imgui.PushItemWidth(50)
+        if imgui.InputInt(u8'##time'..k, btimeb, 0) then v.time = btimeb.v end
+        imgui.PopItemWidth()
+        imgui.SameLine()
+        if imgui.Button(u8'Добавить строку##addstr'..k) then
+          v.text[#v.text + 1] = ""
+        end
+        --------
+        for i = 1, #v.text do
+          if v.text[i] ~= nil then
+            if tEditData[k].text[i] == nil then
+              tEditData[k].text[i] = imgui.ImBuffer(256)
+              local sText = v.text[i]:gsub("%[enter%]$", "")
+              tEditData[k].text[i].v = u8:encode(sText)
+              tEditData[k].isEnter[i] = imgui.ImBool(false)
+              tEditData[k].isEnter[i].v = string.match(v.text[i], "(.)%[enter%]$") ~= nil
+            end
+            imgui.PushItemWidth(imgui.GetWindowSize().x - 390)
+            if imgui.InputText("##Edit"..k..i, tEditData[k].text[i]) then
+              v.text[i] = u8:decode(tEditData[k].text[i].v .. (tEditData[k].isEnter[i].v and "[enter]" or ""))
+              tEditData[k].text[i] = nil
+            end
+            imgui.SameLine()
+            if imgui.Checkbox(u8("Ввод").."##editCH"..k..i, tEditData[k].isEnter[i]) then
+              v.text[i] = u8:decode(tEditData[k].text[i].v .. (tEditData[k].isEnter[i].v and "[enter]" or ""))
+            end
+            imgui.PopItemWidth()
           end
         end
+        imgui.NewLine()
       end
-      if imgui.Button(u8"Добавить строчку") then
-        config_keys.binder[#config_keys.binder + 1] = {text = "", v = {}, time = 0}
+      if imgui.Button(u8"Добавить бинд") then
+        config_keys.binder[#config_keys.binder + 1] = {text = {""}, v = {}, time = 0}
       end
       imgui.NextColumn()
       imgui.SetColumnOffset(-1, imgui.GetWindowSize().x - 300)
@@ -3247,7 +3446,6 @@ function imgui.OnDrawFrame()
 {param2} - Второй аргумент
 {param3} - Третий аргумент
 -------------------------]].."\n"..str
-      imgui.Text(u8'Для изменения текста необходимо нажать на поле с текстом. Для сохранения наведитесь на поле и нажмите Enter.')
       imgui.Text(u8'После изменения названия команды необходимо нажать "Сохранить изменения", иначе команда не зарегистрируется в системе.')
       imgui.Text(u8'Вы можете придумать любую команду на свой вкус и для ваших потребностей с помощью специальных "вставок".')
       imgui.Text(u8'Чтобы удалить команду или строку, просто оставьте её пустой и нажмите "Сохранить изменения". Система сама удалить все лишнее.')
@@ -3270,7 +3468,7 @@ function imgui.OnDrawFrame()
           if sampIsChatCommandDefined(v.cmd) then sampUnregisterChatCommand(v.cmd) end
           v.cmd = sCmdEdit[k].cmd.v
         end
-        imgui.SameLine(140)
+        imgui.SameLine(125)
         imgui.Text(u8'Задержка')
         imgui.SameLine()
         imgui.PushItemWidth(50)
@@ -3291,12 +3489,6 @@ function imgui.OnDrawFrame()
               v.text[i] = u8:decode(sCmdEdit[k].text[i].v)
             end
             imgui.PopItemWidth()
-            --[[imgui.SameLine()
-            imgui.PushItemWidth(50)
-            if imgui.Button(u8"Удалить##deleteCH" .. k .. i) then
-              sampAddChatMessage('ідіть у сраку', 0xffff00)
-            end
-            imgui.PopItemWidth()]]
           end
         end
         imgui.NewLine()
@@ -3377,17 +3569,26 @@ function onHotKey(id, keys)
     local sKeys = tostring(table.concat(keys, " "))
     for k, v in pairs(config_keys.binder) do
       if sKeys == tostring(table.concat(v.v, " ")) then
-        if tostring(v.text):len() > 0 then
-          -- Если найдена строчка с биндером, отправляем в чат
-          local bIsEnter = string.match(v.text, "(.)%[enter%]$") ~= nil
-          if bIsEnter then
-            sampSendChat(tags(v.text:gsub("%[enter%]$", ""), nil))
-          else
-            -- Строчка не найдена, просто помещаем текст в input.
-            sampSetChatInputText(tags(v.text, nil))
-            sampSetChatInputEnabled(true)
+        funcc('sendkeybinder', 1)
+        for i = 1, #v.text do
+          if tostring(v.text[i]):len() > 0 then
+            -- Если найдена строчка с биндером, отправляем в чат
+            local bIsEnter = string.match(v.text[i], "(.)%[enter%]$") ~= nil
+            if bIsEnter then
+              local textTag = tags(v.text[i]:gsub("%[enter%]$", ""), nil)
+              if textTag:len() > 0 then
+                sampSendChat(textTag)
+              end
+            else
+              -- Строчка не найдена, просто помещаем текст в input.
+              local textTag = tags(v.text[i], nil)
+              if textTag:len() > 0 then
+                sampSetChatInputText(textTag)
+                sampSetChatInputEnabled(true)
+              end
+            end
+            wait(v.time)
           end
-          wait(v.time)
         end
       end
     end
@@ -3445,7 +3646,7 @@ function sendGoogleMessage(type, name, param1, param2, reason, time)
   elseif type == "blacklist" then
     url = url..("&type=%s&who=%s&reason=%s&date=%s&param1=%s&param2=%s"):format(type, name, encodeURI(u8:encode(reason)), date, encodeURI(u8:encode(param1)), encodeURI(u8:encode(param2)))
   else return end
-  debug_log("(info) Исходящий запрос к Google Script")
+  logger.trace("Исходящий запрос к Google Script")
   local complete = false
   lua_thread.create(function()
     local dlstatus = require('moonloader').download_status
@@ -3454,21 +3655,21 @@ function sendGoogleMessage(type, name, param1, param2, reason, time)
     -- Google Script отклоняет запросы через requests.
     downloadUrlToFile("https://script.google.com/macros/s/AKfycbzTl1YbtWus6nvrHP3RNAO72QfxIJC17AFNF1BlEidr_XKoMjc/exec"..url, downloadpath, function(id, status, p1, p2) -- remove
       if status == dlstatus.STATUS_ENDDOWNLOADDATA then
-        debug_log("(info) Скачан файл '"..downloadpath.."'")
+        logger.trace("Скачан файл '"..downloadpath.."'")
         complete = true
       end
     end)
     while complete ~= true do wait(50) end
-    debug_log("(info) Обработка ответа...")
+    logger.trace("Обработка ответа...")
     local file = io.open("moonloader/SFAHelper/urlRequests.json", "r+")
-    if file == nil then debug_log("(info) Ответ не был получен", true) return end
+    if file == nil then logger.trace("Ответ не был получен") return end
     local cfg = file:read('*a')
     if cfg ~= nil then 
-      debug_log("(info) Входящий запрос от Google Script. Содержимое: "..cfg)
-    else debug_log("(info) Входящий запрос от Google Script. Содержимое: Неверный формат объекта", true) end
+      logger.trace("Входящий запрос от Google Script. Содержимое: "..cfg)
+    else logger.trace("Входящий запрос от Google Script. Содержимое: Неверный формат объекта") end
     file:close()
     wait(50)
-    debug_log("(info) Удаляем файл '"..downloadpath.."'")
+    logger.trace("Удаляем файл '"..downloadpath.."'")
     os.remove(downloadpath)
     return
   end)
@@ -3478,7 +3679,7 @@ function downloadFile(link, filename)
   lua_thread.create(function()
     local dlstatus = require('moonloader').download_status
     wait(250)
-    debug_log("(debug) Скачиваем файл '"..filename.."'")
+    logger.trace("Скачиваем файл '"..filename.."'")
     downloadUrlToFile(link, filename)
     return
   end)
@@ -3506,7 +3707,11 @@ function registerFastCmd()
                     return
                   end
                 end
-                sampSendChat(tags(text, pam))
+                funcc('sendcmdbinder', 1)
+                local textTag = tags(text, pam)
+                if textTag:len() > 0 then
+                  sampSendChat(textTag)
+                end
                 if value.wait then wait(value.wait)
                 else wait(1100) end
               end
@@ -3514,7 +3719,7 @@ function registerFastCmd()
           end)
         end)
       else
-        debug_log("(info) Команда-бинд \""..value.cmd.."\" уже существует. Перезапись невозможна", true)
+        logger.info("Команда-бинд \""..value.cmd.."\" уже существует. Перезапись невозможна")
       end     
     end
   end
@@ -3541,16 +3746,6 @@ end
 function atext(text)
   text = tostring(text)
   sampAddChatMessage(" SFA-Helper | {FFFFFF}"..text, 0x954F4F)
-end
-
-function debug_log(text, print)
-  local file = io.open('moonloader/SFAHelper/debug.txt', 'a')
-	file:write(('[%s || %s] %s\n'):format(os.date('%H:%M:%S'), os.date('%d.%m.%Y'), tostring(text)))
-  file:close()
-  file = nil
-  if print then
-    sampfuncsLog("[ML] {954F4F}(SFA-Helper){CCCCCC} "..tostring(text))
-  end
 end
 
 function saveData(table, path)
@@ -3711,20 +3906,104 @@ function tags(args, param)
   args = args:gsub("{zone}", tostring(playerZone))
   args = args:gsub("{time}", string.format(os.date('%H:%M:%S')))
   ----------
-  if targetID ~= nil then
+  -- Update 1.39
+  args = args:gsub("{date}", string.format(os.date('%d.%m.%Y')))
+  args = args:gsub("{weaponid}", tostring(getCurrentCharWeapon(PLAYER_PED)))
+  args = args:gsub("{weaponname}", tostring(getweaponname(getCurrentCharWeapon(PLAYER_PED))))
+  args = args:gsub("{ammo}", tostring(getAmmoInCharWeapon(PLAYER_PED, getCurrentCharWeapon(PLAYER_PED))))
+  ----------
+  if targetID ~= nil and sampIsPlayerConnected(targetID) then
     args = args:gsub("{tID}", tostring(targetID))
 		args = args:gsub("{tfullname}", tostring(sampGetPlayerNickname(targetID):gsub("_", " ")))
 		args = args:gsub("{tname}", tostring(sampGetPlayerNickname(targetID):gsub("_.*", "")))
 		args = args:gsub("{tsurname}", tostring(sampGetPlayerNickname(targetID):gsub(".*_", "")))
 		args = args:gsub("{tnick}", tostring(sampGetPlayerNickname(targetID)))
   end
-  if playerMarkerId ~= nil then
+  if playerMarkerId ~= nil and sampIsPlayerConnected(playerMarkerId) then
     args = args:gsub("{mID}", tostring(playerMarkerId))
 		args = args:gsub("{mfullname}", tostring(sampGetPlayerNickname(playerMarkerId):gsub("_", " ")))
 		args = args:gsub("{mname}", tostring(sampGetPlayerNickname(playerMarkerId):gsub("_.*", "")))
 		args = args:gsub("{msurname}", tostring(sampGetPlayerNickname(playerMarkerId):gsub(".*_", "")))
 		args = args:gsub("{mnick}", tostring(sampGetPlayerNickname(playerMarkerId)))    
   end
+  ----------
+  local patt = 0
+  while true do
+    local found = args:find('$.-{.-}', patt)
+    if found then
+      local functions = {
+        ["screen"] = screen,
+        ['timeScreen'] = timeScreen,
+        ['target'] = targetPlayer,
+        ['loc'] = cmd_loc,
+        ['punishlog'] = cmd_punishlog,
+        ['stime'] = cmd_stime,
+        ['sweather'] = cmd_sweather,
+        ['ev'] = cmd_ev,
+        ['checkbl'] = cmd_checkbl,
+        ['checkrank'] = cmd_checkrank,
+        ['watch'] = cmd_watch,
+        ['blag'] = cmd_blag,
+        ['contract'] = cmd_contract,
+        ['vig'] = cmd_vig,
+        ['lecture'] = cmd_lecture,
+        ['addbl'] = cmd_addbl,
+        ['match'] = cmd_match,
+      }
+      local cmd, arg = args:match('$(.-){(.-)}', patt)
+      for k, v in pairs(functions) do
+        if cmd == k then
+          v(arg)
+        end
+      end
+      patt = found + 1
+    else break end
+  end
+  -----
+  patt = 0
+  while true do
+    local found = args:find('#.-{.-}', patt)
+    if found then
+      local functions = {
+        ["upper"] = rusUpper,
+        ['lower'] = rusLower,
+        ['getFracById'] = sampGetFraktionBySkin,
+        ['secToTime'] = _secToTime
+      }
+      local cmd, arg = args:match('#(.-){(.-)}', patt)
+      for k, v in pairs(functions) do
+        if cmd == k then
+          args = args:gsub('#'..cmd..'{'..arg..'}', v(arg), 1)
+        end
+      end
+      patt = found + 1
+    else break end
+  end
+  args = args:gsub("$.-{.-}", '')
+  --[[
+    #upper{string}
+    #lower{string}
+    #getFrac{playerid}
+    #secToTime{sec}
+    ------
+    $screen{}
+    $timeScreen{}
+    $target{id}
+    $loc{id/nick, secounds}
+    $punishlog{id, nick}
+    $stime{0-23}
+    $sweather{0-45}
+    $ev{0-1, mesta}
+    $checkbl{id/nick}
+    $checkrank{id/nick}
+    $watch{add/remove/list, id}
+    $blag{id, frac, type}
+    $contract{playerid, rank}
+    $vig{playerid, type, reason}
+    $lecture{start/pause/stop}
+    $addbl{playerid/nick, stepen, dok-va, reason}
+    $match{playerid/''}
+  ]]
 	return args
 end
 
@@ -4176,31 +4455,92 @@ end
 
 function sampGetFraktionBySkin(id)
   local t = 'Гражданский'
-  if sampIsPlayerConnected(id) then
-      local result, ped = sampGetCharHandleBySampPlayerId(id)
-      if result then
-          local skin = getCharModel(ped)
-          if skin == 102 or skin == 103 or skin == 104 or skin == 195 or skin == 21 then t = 'Ballas Gang' end
-          if skin == 105 or skin == 106 or skin == 107 or skin == 269 or skin == 270 or skin == 271 or skin == 86 or skin == 149 or skin == 297 then t = 'Grove Gang' end
-          if skin == 108 or skin == 109 or skin == 110 or skin == 190 or skin == 47 then t = 'Vagos Gang' end
-          if skin == 114 or skin == 115 or skin == 116 or skin == 48 or skin == 44 or skin == 41 or skin == 292 then t = 'Aztec Gang' end
-          if skin == 173 or skin == 174 or skin == 175 or skin == 193 or skin == 226 or skin == 30 or skin == 119 then t = 'Rifa Gang' end
-          if skin == 73 or skin == 191 or skin == 252 or skin == 287 or skin == 61 or skin == 179 or skin == 255 then t = 'Army' end
-          if skin == 57 or skin == 98 or skin == 147 or skin == 150 or skin == 187 or skin == 216 then t = 'Mayor' end
-          if skin == 59 or skin == 172 or skin == 189 or skin == 240 then t = 'Instructors' end
-          if skin == 201 or skin == 247 or skin == 248 or skin == 254 or skin == 248 or skin == 298 then t = 'Bikers' end
-          if skin == 272 or skin == 112 or skin == 125 or skin == 214 or skin == 111  or skin == 126 then t = 'Russian Mafia' end
-          if skin == 113 or skin == 124 or skin == 214 or skin == 223 then t = 'La Cosa Nostra' end
-          if skin == 120 or skin == 123 or skin == 169 or skin == 186 then t = 'Yakuza' end
-          if skin == 211 or skin == 217 or skin == 250 or skin == 261 then t = 'News' end
-          if skin == 70 or skin == 219 or skin == 274 or skin == 275 or skin == 276 or skin == 70 then t = 'Medic' end
-          if skin == 286 or skin == 141 or skin == 163 or skin == 164 or skin == 165 or skin == 166 then t = 'FBI' end
-          if skin == 280 or skin == 265 or skin == 266 or skin == 267 or skin == 281 or skin == 282 or skin == 288 or skin == 284 or skin == 285 or skin == 304 or skin == 305 or skin == 306 or skin == 307 or skin == 309 or skin == 283 or skin == 303 then t = 'Police' end
-      end
+  id = tonumber(id)
+  if id ~= nil and sampIsPlayerConnected(id) then
+    local result, ped = sampGetCharHandleBySampPlayerId(id)
+    if result then
+      local skin = getCharModel(ped)
+      if skin == 102 or skin == 103 or skin == 104 or skin == 195 or skin == 21 then t = 'Ballas Gang' end
+      if skin == 105 or skin == 106 or skin == 107 or skin == 269 or skin == 270 or skin == 271 or skin == 86 or skin == 149 or skin == 297 then t = 'Grove Gang' end
+      if skin == 108 or skin == 109 or skin == 110 or skin == 190 or skin == 47 then t = 'Vagos Gang' end
+      if skin == 114 or skin == 115 or skin == 116 or skin == 48 or skin == 44 or skin == 41 or skin == 292 then t = 'Aztec Gang' end
+      if skin == 173 or skin == 174 or skin == 175 or skin == 193 or skin == 226 or skin == 30 or skin == 119 then t = 'Rifa Gang' end
+      if skin == 73 or skin == 191 or skin == 252 or skin == 287 or skin == 61 or skin == 179 or skin == 255 then t = 'Army' end
+      if skin == 57 or skin == 98 or skin == 147 or skin == 150 or skin == 187 or skin == 216 then t = 'Mayor' end
+      if skin == 59 or skin == 172 or skin == 189 or skin == 240 then t = 'Instructors' end
+      if skin == 201 or skin == 247 or skin == 248 or skin == 254 or skin == 248 or skin == 298 then t = 'Bikers' end
+      if skin == 272 or skin == 112 or skin == 125 or skin == 214 or skin == 111  or skin == 126 then t = 'Russian Mafia' end
+      if skin == 113 or skin == 124 or skin == 214 or skin == 223 then t = 'La Cosa Nostra' end
+      if skin == 120 or skin == 123 or skin == 169 or skin == 186 then t = 'Yakuza' end
+      if skin == 211 or skin == 217 or skin == 250 or skin == 261 then t = 'News' end
+      if skin == 70 or skin == 219 or skin == 274 or skin == 275 or skin == 276 or skin == 70 then t = 'Medic' end
+      if skin == 286 or skin == 141 or skin == 163 or skin == 164 or skin == 165 or skin == 166 then t = 'FBI' end
+      if skin == 280 or skin == 265 or skin == 266 or skin == 267 or skin == 281 or skin == 282 or skin == 288 or skin == 284 or skin == 285 or skin == 304 or skin == 305 or skin == 306 or skin == 307 or skin == 309 or skin == 283 or skin == 303 then t = 'Police' end
+    end
   end
   return t
 end
 
+function funcc(type, add)
+  if pInfo.func[type] == nil then pInfo.func[type] = 0 end
+  pInfo.func[type] = pInfo.func[type] + add
+end
+
+function loggerInit()
+  local levels = {}
+  local round = function(x, increment)
+    increment = increment or 1
+    x = x / increment
+    return (x > 0 and math.floor(x + .5) or math.ceil(x - .5)) * increment
+  end
+  local _tostring = tostring
+  local tostring = function(...)
+    local t = {}
+    for i = 1, select('#', ...) do
+      local x = select(i, ...)
+      if type(x) == "number" then
+        x = round(x, .01)
+      end
+      t[#t + 1] = _tostring(x)
+    end
+    return table.concat(t, " ")
+  end
+  ----------------------
+  for i, v in ipairs(logger.modes) do
+    levels[v.name] = i
+  end
+  ----------------------
+  -- Перезагружаем файл логгера
+  if logger.outfile then
+    local file = io.open('moonloader/SFAHelper/debug.txt', 'w')
+    local dates = '['..os.date('%d.%m.%Y')..' | '..os.date('%H:%M:%S')..']'
+    local text = dates..' ================================================================\n'
+    text = text..dates..'   SFA-Helper version '..SCRIPT_ASSEMBLY..' for SA-MP 0.3.7 loaded.\n'
+    text = text..dates..'   Developers: Edward_Franklin, Thomas_Lawson\n'..dates..'   Copyright (c) 2019, redx\n'
+    text = text..dates..' ================================================================\n'
+    file:write(text)
+    file:close()
+  end
+  ----------------------
+  for i, x in ipairs(logger.modes) do
+    logger[x.name] = function(...)
+      local msg = tostring(...)
+      local info = debug.getinfo(2, "Sl")
+      local lineinfo = thisScript().name .. ":" .. info.currentline
+      if i >= levels[logger.level] then
+        -- Output to console
+        sampfuncsLog(("[ML] %s(%s) {FFFFFF}%s:{CCCCCC} %s"):format(logger.usecolor and "{"..x.color.."}" or "", x.name, lineinfo, msg))
+      end
+      -- Output to log file
+      if logger.outfile then
+        local fp = io.open(logger.outfile, "a")
+        local str = string.format("[%s | %s] (%s) %s: %s\n", os.date('%d.%m.%Y'), os.date('%H:%M:%S'), x.name, lineinfo, msg)
+        fp:write(str)
+        fp:close()
+      end
+    end
+  end
+end
 
 
 --------------------------------[ IMGUI ]--------------------------------
