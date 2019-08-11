@@ -3,12 +3,12 @@
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelperold.luac",
 		"testurl":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelperold.lua",
         "version":"1.38",
-		"testversion":"1.3923",
+		"testversion":"1.3923"
     },
     "sfahelpernew":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.luac",
         "version":"1.38",
-		"versiontext":"1.38 2641",
+		"versiontext":"1.38 2641"
     },
     "sfahelpertest":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.lua",
