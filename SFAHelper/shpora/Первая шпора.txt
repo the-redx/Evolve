@@ -1,0 +1,1 @@
+Добавить свои шпаргалки вы можете в папке 'moonloader/SFAHelper/shpora'
