@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.4-preview2 s palavinkai
+-- Version 1.4-preview3
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4024")
-SCRIPT_ASSEMBLY = "1.4-preview2 s palavinkai"
+script_version("1.4028")
+SCRIPT_ASSEMBLY = "1.4-preview3"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -975,7 +975,7 @@ function cmd_checkbl(arg)
         local blacklistStepen = { "1 степень", "2 степень", "3 степень", "4 степень", "Не уволен", "Оплатил" }
         dtext('Игрок '..line.nick..' найден в Черном Списке!')
         if line.executor ~= nil and line.date ~= nil then 
-          d(("Внёс: %s | Дата: %s"):format(line.executor, line.date))
+          dtext(("Внёс: %s | Дата: %s"):format(line.executor, line.date))
         end
         if line.reason ~= nil and line.stepen ~= nil then
           dtext(("Степень: %s | Причина: %s"):format(blacklistStepen[line.stepen], u8:decode(line.reason)))
@@ -984,7 +984,7 @@ function cmd_checkbl(arg)
         return
       end  
     end
-    atext('Игрок не найден в Черном Списке!')
+    dtext('Игрок не найден в Черном Списке!')
     return
   end
   -- Файл не загружен, или прошло более 3-х минут с момента прошлого обновления
@@ -1049,7 +1049,7 @@ function cmd_checkvig(arg)
       end
     end
     if count == 0 then
-      atext('Игрок не найден в логе выговоров!')
+      dtext('Игрок не найден в логе выговоров!')
     end
     funcc('cmd_checkvig', 1)
     return
@@ -3615,7 +3615,7 @@ imgui_windows.hud = function()
   imgui.SetCursorPosX((300 - imgui.CalcTextSize(titlename).x) / 2)
   imgui.Text(titlename)
   imgui.Separator()
-  imgui.Text(u8:encode(("Ник: %s[%d] | Пинг: %d"):format(sInfo.nick, sInfo.playerid, myping)))
+  imgui.Text(u8:encode(("Ник: %s[%d] | Пинг: %d | FPS: %d"):format(sInfo.nick, sInfo.playerid, myping, imgui.GetIO().Framerate)))
   imgui.Text(u8:encode(("Оружие: %s [%d]"):format(myweaponname, myweaponammo)))
   if isCharInAnyCar(playerPed) then
     local vHandle = storeCarCharIsInNoSave(playerPed)
