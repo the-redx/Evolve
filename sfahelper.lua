@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.4-preview2
+-- Version 1.4-preview2 с палавинкай
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4022")
-SCRIPT_ASSEMBLY = "1.4-preview2"
+script_version("1.4023")
+SCRIPT_ASSEMBLY = "1.4-preview2 с палавинкай"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -347,7 +347,7 @@ function main()
     logger.debug(("Иницилизация настроек | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
     ------
-    autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json")
+    --[[autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json")
     while complete ~= true do wait(0) end
     logger.debug(("Проверка обновлений | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
@@ -355,7 +355,7 @@ function main()
     loadPermissions("https://docs.google.com/spreadsheets/d/1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y/export?format=tsv&id=1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y&gid=1568566199") -- remove
     while complete ~= true do wait(0) end
     logger.debug(("Загрузка прав доступа | Время: %.3fs"):format(os.clock() - mstime))
-    complete = false
+    complete = false]]
     --------------------=========----------------------
     ----- Загружаем конфиги
     local configjson = filesystem.load('config.json')
@@ -933,6 +933,7 @@ function cmd_checkrank(arg)
   asyncQueue = true
   httpRequest(updatelink, nil, function(response, code, headers, status)
     if response then
+      tempFiles.ranks = {}
       -- Регулярка для парсинга строчек, т.к. в запросе все приходит в 1 строчке
       for line in response:gmatch('[^\r\n]+') do
         -- Ichigo_Kurasaki	1	2	21.03.2019	Jonathan Belin	Повышение.
@@ -994,6 +995,7 @@ function cmd_checkbl(arg)
   asyncQueue = true
   httpRequest(updatelink, nil, function(response, code, headers, status)
     if response then
+      tempFiles.blacklist = {}
       -- Регулярка для парсинга строчек, т.к. в запросе все приходит в 1 строчке
       for line in response:gmatch('[^\r\n]+') do
         -- Jayden Ray	Vladimit_Rodionov	Потеря формы , ТК	22.07.2017	http://imgur.com/a/q2w6J  3
@@ -1060,6 +1062,7 @@ function cmd_checkvig(arg)
   asyncQueue = true
   httpRequest(updatelink, nil, function(response, code, headers, status)
     if response then
+      tempFiles.vig = {}
       for line in response:gmatch('[^\r\n]+') do
         -- Warc_Awerio	Denis_Unbrokens	Прогул раб времени/Неадекватное поведение	03.08.2019 - 13.08.2019	Лишение повышения 
         local arr = string.split(line, "\t")
@@ -1717,7 +1720,7 @@ function autoupdate(json_url)
       logger.debug('Версия на сервере: '..tostring(updateversion))
       if updateversion > thisScript().version then
         lua_thread.create(function()
-          atext('Обнаружено обновление. Пытаюсь обновиться c '..SCRIPT_ASSEMBLY..' на '..updateversiontext)
+          atext('Обнаружено обновление. Пытаюсь обновиться c "'..SCRIPT_ASSEMBLY..'" на "'..updateversiontext..'"')
           logger.info("Обнаружено обновление. Версия: "..updateversiontext)
           wait(250)
           local dlstatus = require('moonloader').download_status
@@ -2346,7 +2349,7 @@ function imgui.OnDrawFrame()
     end
     imgui.SetNextWindowSize(imgui.ImVec2(screenx-400, screeny-250), imgui.Cond.FirstUseEver)
     imgui.SetNextWindowPos(imgui.ImVec2(screenx/2, screeny/2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-    imgui.Begin(u8'SFA-Helper | Шпаргалка', window['shpora'].bool, imgui.WindowFlags.MenuBar + imgui.WindowFlags.HorizontalScrollbar)
+    imgui.Begin(u8'SFA-Helper | Шпаргалка', window['shpora'].bool, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.MenuBar + imgui.WindowFlags.HorizontalScrollbar)
     if imgui.BeginMenuBar(u8 'sfahelper') then
       for i = 1, #data.shpora.select do
         -- Выводим назваия файлов в пункты меню, удаляем .txt из названия
@@ -2370,7 +2373,7 @@ function imgui.OnDrawFrame()
     imgui.DisableInput = false
     imgui.SetNextWindowSize(imgui.ImVec2(screenx / 1.5, 625), imgui.Cond.FirstUseEver)
     imgui.SetNextWindowPos(imgui.ImVec2(screenx / 2, screeny / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-    imgui.Begin(u8'SFA-Helper | Биндер', window['binder'].bool, imgui.WindowFlags.MenuBar + imgui.WindowFlags.HorizontalScrollbar)
+    imgui.Begin(u8'SFA-Helper | Биндер', window['binder'].bool, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.MenuBar + imgui.WindowFlags.HorizontalScrollbar)
     -----
     imgui_windows.binder()
     -----
@@ -2537,7 +2540,7 @@ imgui_windows.main = function(menu)
             table.insert(data.lecture.text, line)
           end
           if #data.lecture.text > 0 then
-            atext('Файл лекции успешно загружен! Для запуске введите - (/lec)ture, либо воспользуйтесь меню')
+            atext('Файл лекции успешно загружен! Для запуска введите - (/lec)ture, либо воспользуйтесь меню')
           else atext('Файл лекции пуст!') end
         end
         file:close()
@@ -2985,7 +2988,7 @@ imgui_windows.main = function(menu)
       if imgui.Button(u8 'Выдать выговор', imgui.ImVec2(-0.1, 30)) then
         if sampIsPlayerConnected(data.functions.playerid.v) then
           funcc('imgui_vig', 1) 
-          sampSendChat(('%s получает %s выговор за %s'):format(sampGetPlayerNickname(data.functions.playerid.v):gsub("_", " "), u8:decode(data.functions.vig.v), u8:decode(data.functions.search.v)))
+          cmd_r(('%s получает %s выговор за %s'):format(sampGetPlayerNickname(data.functions.playerid.v):gsub("_", " "), u8:decode(data.functions.vig.v), u8:decode(data.functions.search.v)))
         else atext('Игрок оффлайн!') end
       end
     elseif data.combo.functions.v == 6 then -- Повысить/понизить
@@ -5258,4 +5261,21 @@ function DataURLEncoder(filename)
   --   data = 'image=data:' .. mime .. ';base64,' .. b64data
   -- })
   -- print(response.text)
+end
+
+function fnr() 
+  lua_thread.create(function() 
+    vixodid = {} 
+    status = true 
+    sampSendChat('/members') 
+    while not gotovo do wait(0) end 
+    wait(1400) 
+    for k, v in pairs(vixodid) do 
+      sampSendChat('/sms '..sampGetPlayerIdByNickname(v)..' '..v..' На работу') 
+      wait(1400) 
+    end 
+    gotovo = false 
+    status = false 
+    vixodid = {} 
+  end) 
 end
