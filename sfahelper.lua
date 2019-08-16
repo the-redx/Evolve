@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.4-preview2 с палавинкай
+-- Version 1.4-preview2 s palavinkai
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4023")
-SCRIPT_ASSEMBLY = "1.4-preview2 с палавинкай"
+script_version("1.4024")
+SCRIPT_ASSEMBLY = "1.4-preview2 s palavinkai"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -347,7 +347,7 @@ function main()
     logger.debug(("Иницилизация настроек | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
     ------
-    --[[autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json")
+    autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json")
     while complete ~= true do wait(0) end
     logger.debug(("Проверка обновлений | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
@@ -355,7 +355,7 @@ function main()
     loadPermissions("https://docs.google.com/spreadsheets/d/1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y/export?format=tsv&id=1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y&gid=1568566199") -- remove
     while complete ~= true do wait(0) end
     logger.debug(("Загрузка прав доступа | Время: %.3fs"):format(os.clock() - mstime))
-    complete = false]]
+    complete = false
     --------------------=========----------------------
     ----- Загружаем конфиги
     local configjson = filesystem.load('config.json')
@@ -539,7 +539,7 @@ function main()
         end
       end
       if skip[1] == false then imgui.Process = false end
-      if skip[2] == false then imgui.ShowCursor = false end   
+      if skip[2] == false then imgui.ShowCursor = false end
       -----------
       -- Перемещение худа
       if data.imgui.hudpos then
@@ -2369,8 +2369,6 @@ function imgui.OnDrawFrame()
     imgui.End()
   end
   if window['binder'].bool.v then
-    imgui.LockPlayer = true
-    imgui.DisableInput = false
     imgui.SetNextWindowSize(imgui.ImVec2(screenx / 1.5, 625), imgui.Cond.FirstUseEver)
     imgui.SetNextWindowPos(imgui.ImVec2(screenx / 2, screeny / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
     imgui.Begin(u8'SFA-Helper | Биндер', window['binder'].bool, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.MenuBar + imgui.WindowFlags.HorizontalScrollbar)
