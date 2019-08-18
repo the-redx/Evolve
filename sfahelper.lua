@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.4-preview3
+-- Version 1.4-preview4
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4028")
-SCRIPT_ASSEMBLY = "1.4-preview3"
+script_version("1.4029")
+SCRIPT_ASSEMBLY = "1.4-preview4"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -106,6 +106,7 @@ pInfo = {
     rpweapons = 0,
     autologin = false,
     password = "",
+    oldlogo = false
   },
   func = {},
   gov = govtext,
@@ -151,6 +152,13 @@ data = {
     lecturetime = imgui.ImInt(3),
   },
   functions = {
+    checkbox = {
+      imgui.ImBool(false),
+      imgui.ImBool(false),
+      imgui.ImBool(false),
+      imgui.ImBool(false),
+      imgui.ImBool(false)
+    },
     search = imgui.ImBuffer(256),
     frac = imgui.ImBuffer(256),
     radius = imgui.ImInt(15),
@@ -158,7 +166,8 @@ data = {
     playerid = imgui.ImInt(-1),
     time = imgui.ImInt(1),
     kolvo = imgui.ImInt(1),
-    rank = imgui.ImInt(1)
+    rank = imgui.ImInt(1),
+    export = {}
   },
   gov = {
     textarea = {}
@@ -183,6 +192,7 @@ data = {
     reason = imgui.ImBuffer(256),
   },
   combo = {
+    export = imgui.ImInt(0),
     functions = imgui.ImInt(0),
     gov = imgui.ImInt(0),
     lecture = imgui.ImInt(0),
@@ -279,29 +289,31 @@ updatesInfo = {
   type = "Релиз", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
   date = "18.08.2019",
   list = {
-    {'Полный редизайн скрипта. Меню теперь интуитивно понятное, в {FF5233}Настройках{FFFFFF} можно сменить цвет интерфейса;',
-    'Добавлено меню с {FF5233}FAQ{FFFFFF}, где подробно описана работа каждой функции; {FF5233}(Наебал, нихуя нет, но идея норм)'},
-    {'В меню лекций добавлена возможность запускать лекции без ввода команды /lec'},
+    {'Полный редизайн скрипта. Меню теперь интуитивно понятное, некоторые функции объединены в одну;'},
+    {'В меню лекций добавлена возможность запускать лекции без ввода команды {FF5233}/lec'},
     {'Теперь все настройки/бинды привязаны к определенному аккаунту. Шпоры и лекции остались общими;',
     'Сразу после обновления старые настройки будут перенесены на текущий аккаунт. При входе под новыми аккаунтами все настройки будут {FF5233}по умолчанию;{FFFFFF}',
-    'Все настройки можно переносить между аккаунтами с помощью специальной системы экспорта настроек в {FF5233}Настройках;'},
+    'Все настройки можно переносить между аккаунтами с помощью специальной системы экспорта настроек в {FF5233}/sh - Настройки;'},
     {'Добавлена команда {FF5233}/checkvig{FFFFFF} для проверки выговоров игрока;'},
     {'Добавлена команда {FF5233}/mon [0-1 (опционально)]{FFFFFF}. Выводит состояние склада(-ов) в локальный чат. При вводе {FF5233}/mon 1{FFFFFF} выводит в рацию;',
     'Доступно для {FF5233}SFA{FFFFFF} и {FF5233}LVA{FFFFFF}. Версия SFA сообщает об складе LVA, работает в рубке. Версия LVA сообщает об всех складах, работает по всей территории LVA;'},
     {'Изменена команда {FF5233}/abp{FFFFFF}, теперь можно изменять список оружия, который нужно взять;'},
+    {'Изменена система авто-обновления;'},
     {'Изменен клавишный биндер. Теперь не нужно создавать новый бинд для добавления нескольких строк;',
     'Все старые бинды автоматически приведены к новому виду, но назначать несколько биндов на одну клавишу по прежнему можно;'},
+    {'Практически все функции оптимизированы для {FF5233}любой гос.фракции.{FFFFFF} Теперь работа скрипта не ограничивается армиями;','\n{FF5233}Остальное:'},
+
+    {'В настройка добавлена возможность включить старый логотип Evolve RP;'},
+    {'В настройках добавлен автологин в игру;'},
+    {'Добавлены отыгровки для женского пола. При входе в игру скрипт сам определит пол, но при необходимости его можно изменить в {FF5233}/sh - Настройки;'},
+    {"Исправлены найденные баги;"},
+    {'Изменена система обновлений;'},
+    {"Изменена система логгирования для быстрого нахождения ошибок в работе скрипта;"},
     {'Добавлены новые тэги для биндера:',
     '{FF5233}{date}{FFFFFF} - Текущая дата в формате DD.MM.YYYY;',
     '{FF5233}{weaponid}{FFFFFF} - ID оружия в руках;',
     '{FF5233}{weaponname}{FFFFFF} - Название оружия в руках;',
-    '{FF5233}{ammo}{FFFFFF} - Количество патронов в оружие;','\nОстальное:'},
-    {'Практически все функции оптимизированы для {FF5233}любой гос.фракции.{FFFFFF} Теперь работа скрипта не ограничивается армиями;'},
-    {'В настройках добавлен автологин в игру;'},
-    {'Добавлены отыгровки для женского пола. При входе в игру скрипт сам определит пол, но при необходимости его можно изменить в {FF5233}Настройках;{FFFFFF}'},
-    {"Исправлен баг с крашем скрипта при использовании таргет тэгов в биндере;"},
-    {'Изменена система обновлений;'},
-    {"Изменена система логгирования для быстрого нахождения ошибок в работе скрипта;"}
+    '{FF5233}{ammo}{FFFFFF} - Количество патронов в оружие;'}
   }
 }
 adminsList = {}
@@ -384,7 +396,6 @@ function main()
     logger.debug(("Локальные данные загружены | Время: %.3fs"):format(os.clock() - mstime))
     --------------------=========----------------------
     sampRegisterChatCommand('mon', cmd_mon)
-    sampRegisterChatCommand('test', function() logger.trace(pInfo.settings.clist) end)
     sampRegisterChatCommand('stime', cmd_stime)
     sampRegisterChatCommand('sweather', cmd_sweather)
     sampRegisterChatCommand('loc', cmd_loc)
@@ -517,6 +528,7 @@ function main()
     loadAdmins()
     -- logger.trace('DataURLEncoder')
     -- DataURLEncoder(getWorkingDirectory()..'/img.png')
+    if pInfo.settings.oldlogo == true then enableOldLogo() end
     if pInfo.settings.hud == true then window['hud'].bool.v = true end
     logger.trace(("Конец Main функции. | (weekOnline = %d | dayOnline = %d | Время: %.3fs)"):format(pInfo.info.weekOnline, pInfo.info.dayOnline, os.clock() - mstime))
     --------------------=========----------------------
@@ -626,7 +638,6 @@ function cmd_match(args)
   funcc('cmd_match', 1)
   playerMarkerId = id
   playerMarker = addBlipForChar(ped)
-  --changeBlipColour(playerMarker, 0xFF0000FF)
   local px, py, pz = getCharCoordinates(ped)
   playerRadar = addSpriteBlipForContactPoint(px, py, pz, 14)
   atext(('Маркер установлен на игрока %s[%d]'):format(sampGetPlayerNickname(id), id))
@@ -974,6 +985,10 @@ function cmd_checkbl(arg)
         funcc('cmd_checkbl', 1)
         local blacklistStepen = { "1 степень", "2 степень", "3 степень", "4 степень", "Не уволен", "Оплатил" }
         dtext('Игрок '..line.nick..' найден в Черном Списке!')
+        logger.debug('executor:', line.executor)
+        logger.debug('date:', line.date)
+        logger.debug('reason:', u8:decode(line.reason))
+        logger.debug('stepen:', line.stepen)
         if line.executor ~= nil and line.date ~= nil then 
           dtext(("Внёс: %s | Дата: %s"):format(line.executor, line.date))
         end
@@ -984,7 +999,7 @@ function cmd_checkbl(arg)
         return
       end  
     end
-    dtext('Игрок не найден в Черном Списке!')
+    atext('Игрок не найден в Черном Списке!')
     return
   end
   -- Файл не загружен, или прошло более 3-х минут с момента прошлого обновления
@@ -995,7 +1010,6 @@ function cmd_checkbl(arg)
   asyncQueue = true
   httpRequest(updatelink, nil, function(response, code, headers, status)
     if response then
-      tempFiles.blacklist = {}
       -- Регулярка для парсинга строчек, т.к. в запросе все приходит в 1 строчке
       for line in response:gmatch('[^\r\n]+') do
         -- Jayden Ray	Vladimit_Rodionov	Потеря формы , ТК	22.07.2017	http://imgur.com/a/q2w6J  3
@@ -1283,6 +1297,7 @@ end
 
 -- Раньше работала, после удаления хоста не работает
 function cmd_adm()
+  if sInfo.nick == "FAlfals" or sInfo.nick == "Chase_Yanetto" or sInfo.nick == "Sayz_Armstrong" then return end
   sampAddChatMessage(' Админы Online:', 0xFFFF00)
   funcc('cmd_adm', 1)
   for i = 0, 1000 do
@@ -2241,23 +2256,20 @@ function sampevents.onCreate3DText(id, color, position, distance, testLOS, attac
   -- logger.trace(string.format("ID: %d | Color: %d | posx: %f | posy: %f | posz: %f | Text: %s", id, color, position.x, position.y, position.z, text))
 end
 
-function onReceiveRpc(id, bs)
-  if id == 134 then
-    local tdId = raknetBitStreamReadInt16(bs)
-    for i = 219, 233 do
-      if i == tdId then
-        sampTextdrawCreate(220, "EVOLVE_ROLE_PLAY", 501, 1)
-        sampTextdrawSetStyle(220, 2)
-        sampTextdrawSetLetterSizeAndColor(220, 0.33, 1.3, 0xFF790200)
-        sampTextdrawSetShadow(220, 1, 0x95000000)
-        --second
-        sampTextdrawCreate(221, "EVOLVE-RP.ru", 540, 12.2)
-        sampTextdrawSetLetterSizeAndColor(221, 0.2, 1, -1)
-        sampTextdrawSetStyle(221, 2)
-        return false
-      end
+function enableOldLogo()
+  for i = 219, 233 do
+    if sampTextdrawIsExists(i) then
+      sampTextdrawDelete(i)
     end
   end
+  sampTextdrawCreate(220, "EVOLVE_ROLE_PLAY", 501, 1)
+  sampTextdrawSetStyle(220, 2)
+  sampTextdrawSetLetterSizeAndColor(220, 0.33, 1.3, 0xFF790200)
+  sampTextdrawSetShadow(220, 1, 0x95000000)
+  --second
+  sampTextdrawCreate(221, "EVOLVE-RP.ru", 540, 12.2)
+  sampTextdrawSetLetterSizeAndColor(221, 0.2, 1, -1)
+  sampTextdrawSetStyle(221, 2)
 end
 
 function clearparams()
@@ -2300,6 +2312,7 @@ function imgui.OnDrawFrame()
       if imgui.BeginMenu(u8 'Настройки') then
         if imgui.MenuItem(u8 'Основные настройки') then data.imgui.menu = 31 end
         if imgui.MenuItem(u8 'Авто-БП') then data.imgui.menu = 32 end
+        if imgui.MenuItem(u8 'Экспорт настроек') then data.imgui.menu = 35 end
         if imgui.MenuItem(u8 'Доступные команды') then data.imgui.menu = 33 end
         if imgui.MenuItem(u8 'Перезагрузить скрипт') then data.imgui.menu = 34 end
         imgui.EndMenu()
@@ -3052,6 +3065,7 @@ imgui_windows.main = function(menu)
     local chatconsole = imgui.ImBool(pInfo.settings.chatconsole)
     local doklad = imgui.ImBool(pInfo.settings.autodoklad)
     local hud = imgui.ImBool(pInfo.settings.hud)
+    local oldlogo = imgui.ImBool(pInfo.settings.oldlogo)
     local tagbuffer = imgui.ImBuffer(tostring(pInfo.settings.tag), 256)
     local clistbuffer = imgui.ImBuffer(tostring(pInfo.settings.clist), 256)
     local passbuffer = imgui.ImBuffer(tostring(pInfo.settings.password), 256)
@@ -3137,6 +3151,18 @@ imgui_windows.main = function(menu)
       filesystem.save(pInfo, 'config.json')
     end
     imgui.SameLine(); imgui.Text(u8 'Убрать дату инвайта в /members 1')
+    ------------
+    if imgui.ToggleButton(u8 'oldlogo##1', oldlogo) then
+      pInfo.settings.oldlogo = oldlogo.v;
+      if pInfo.settings.oldlogo == true then
+        enableOldLogo()
+        atext('Старый логотип включен')
+      else
+        atext('Старый логотип выключен. Новый появится при следующем входе в игру')
+      end
+      filesystem.save(pInfo, 'config.json')
+    end
+    imgui.SameLine(); imgui.Text(u8 'Старый логотип Evolve-Rp')
     ------------
     if imgui.ToggleButton(u8 'target##1', target) then
       pInfo.settings.target = target.v;
@@ -3269,6 +3295,80 @@ imgui_windows.main = function(menu)
     atext("Перезагружаемся...")
     showCursor(false)
     thisScript():reload()
+  elseif menu == 35 then
+    imgui.PushItemWidth(175)
+    if #data.functions.export == 0 then
+      lfs = require 'lfs'
+      for file in lfs.dir(getWorkingDirectory()..'\\SFAHelper\\accounts') do
+        if file ~= "." and file ~= ".." and file ~= sInfo.nick then
+          local attr = lfs.attributes(getWorkingDirectory()..'\\SFAHelper\\accounts\\'..file)
+          if attr.mode == "directory" then 
+            table.insert(data.functions.export, file)
+          end
+        end
+      end
+    end
+    local strlist = ""
+    for i = 1, #data.functions.export do
+      strlist = strlist..data.functions.export[i]..'\0'
+    end
+    imgui.Combo('##exportcombo', data.combo.export, u8:encode('Выберите аккаунт\0'..strlist..'\0'))
+    imgui.Separator()
+    if data.combo.export.v > 0 then
+      imgui.Text(u8'Выберите настройки, которые хотите экспортировать:')
+      imgui.Text(u8:encode(data.functions.export[data.combo.export.v]..' -> '..sInfo.nick))
+      imgui.Checkbox(u8 'Настройки', data.functions.checkbox[1])
+      imgui.Checkbox(u8 'Посты', data.functions.checkbox[2])
+      imgui.Checkbox(u8 'Биндер', data.functions.checkbox[3])
+      if imgui.Button(u8'Экспортировать', imgui.ImVec2(120, 30)) then
+        lua_thread.create(function()
+          dtext('Начинчем экспорт настроек...')
+          local count = 0
+          if data.functions.checkbox[1].v then
+            logger.debug('Экспортируем настройки ')
+            local file = io.open("moonloader/SFAHelper/accounts/"..data.functions.export[data.combo.export.v].."/config.json", "r+")
+            if file ~= nil then
+              local cfg = decodeJson(file:read('*a'))
+              if cfg ~= nil then
+                pInfo.settings = cfg.settings
+                count = count + 1
+                filesystem.save(pInfo, 'config.json')
+              else logger.debug('Экспорт не удался. Файл поврежден/занят другим приложением') end
+              file:close()
+            else logger.debug('Экспорт не удался. Файл не найден!') end          
+          end
+          if data.functions.checkbox[2].v then
+            logger.debug('Экспортируем посты')
+            local file = io.open("moonloader/SFAHelper/accounts/"..data.functions.export[data.combo.export.v].."/posts.json", "r+")
+            if file ~= nil then
+              local cfg = decodeJson(file:read('*a'))
+              if cfg ~= nil then
+                postInfo = cfg
+                count = count + 1
+                filesystem.save(postInfo, 'posts.json')
+              else logger.debug('Экспорт постов не удался. Файл поврежден/занят другим приложением') end
+              file:close()
+            else logger.debug('Экспорт постов не удался. Файл не найден!') end          
+          end
+          if data.functions.checkbox[3].v then
+            logger.debug('Экспортируем бинды')
+            local file = io.open("moonloader/SFAHelper/accounts/"..data.functions.export[data.combo.export.v].."/keys.json", "r+")
+            if file ~= nil then
+              local cfg = decodeJson(file:read('*a'))
+              if cfg ~= nil then
+                config_keys = cfg
+                count = count + 1
+                filesystem.save(config_keys, 'keys.json')
+              else logger.debug('Экспорт биндов не удался. Файл поврежден/занят другим приложением') end
+              file:close()
+            else logger.debug('Экспорт биндов не удался. Файл не найден!') end          
+          end
+          dtext("Экспорт закончен. Загружено "..count.." элементов. Перезагружаемся...")
+          showCursor(false)
+          thisScript():reload()
+        end)
+      end
+    end
   elseif menu == 41 then
     for i = #data.punishlog, 1, -1 do
       imgui.Text(u8:encode(("%s | Выдал: %s (%s)"):format(data.punishlog[i].time, data.punishlog[i].from, data.punishlog[i].rank)))
@@ -3279,11 +3379,6 @@ imgui_windows.main = function(menu)
 end
 
 imgui_windows.addtable = function()
--- data.combo.addtable.v = 0
--- data.addtable.nick.v = ""
--- data.addtable.param1.v = ""
--- data.addtable.param2.v = ""
--- data.addtable.reason.v = ""
   imgui.Combo(u8'Выберите тип данных', data.combo.addtable, u8"Не выбрано\0Повышение\0Увольнение\0Контракт\0Выговор\0\0")
   imgui.Separator()
   if data.combo.addtable.v > 0 then
@@ -3615,7 +3710,7 @@ imgui_windows.hud = function()
   imgui.SetCursorPosX((300 - imgui.CalcTextSize(titlename).x) / 2)
   imgui.Text(titlename)
   imgui.Separator()
-  imgui.Text(u8:encode(("Ник: %s[%d] | Пинг: %d | FPS: %d"):format(sInfo.nick, sInfo.playerid, myping, imgui.GetIO().Framerate)))
+  imgui.Text(u8:encode(("Ник: %s[%d] | Пинг: %d"):format(sInfo.nick, sInfo.playerid, myping))) -- imgui.GetIO().Framerate
   imgui.Text(u8:encode(("Оружие: %s [%d]"):format(myweaponname, myweaponammo)))
   if isCharInAnyCar(playerPed) then
     local vHandle = storeCarCharIsInNoSave(playerPed)
@@ -5131,7 +5226,7 @@ function submenus_show(menu, caption, select_button, close_button, back_button)
   end
   return display(menu, 31337, caption or menu.title)
 end
-
+--[[
 base64 = {}
 function base64.encode(data)
   local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
@@ -5259,21 +5354,4 @@ function DataURLEncoder(filename)
   --   data = 'image=data:' .. mime .. ';base64,' .. b64data
   -- })
   -- print(response.text)
-end
-
-function fnr() 
-  lua_thread.create(function() 
-    vixodid = {} 
-    status = true 
-    sampSendChat('/members') 
-    while not gotovo do wait(0) end 
-    wait(1400) 
-    for k, v in pairs(vixodid) do 
-      sampSendChat('/sms '..sampGetPlayerIdByNickname(v)..' '..v..' На работу') 
-      wait(1400) 
-    end 
-    gotovo = false 
-    status = false 
-    vixodid = {} 
-  end) 
-end
+end]]
