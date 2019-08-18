@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.4-preview4
+-- Version 1.4-release
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4029")
-SCRIPT_ASSEMBLY = "1.4-preview4"
+script_version("1.4030")
+SCRIPT_ASSEMBLY = "1.4-release"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -2079,13 +2079,12 @@ function sampevents.onServerMessage(color, text)
           contractRank = nil
           return
         end)
-      end  
+      end
       addcounter(1, 1)
     elseif kogo == sInfo.nick then
-      -- Если вас приняли, начинаем рабочий день
-      pInfo.settings.rank = 1
       sInfo.isWorking = true
-      logger.debug('Вас приняли. Ранг = 1')
+      logger.debug('Вас приняли. Проверяем ранг и фракцию')
+      cmd_stats("checkout")
     end  
   end
   if text:match("Доставьте материалы на Зону 51") and color == -86 then -- Загрузился на корабле, лечу в лва
@@ -2738,7 +2737,7 @@ imgui_windows.main = function(menu)
         gov = gov:gsub("{time}", u8:decode(data.functions.search.v))
         imgui.Text(u8:encode(("/gov %s"):format(gov)))
       end
-    else imgui.Text(u8'Нет данных для отображения') end
+    else imgui.Text(u8'Нет данных ля отображения') end
     ------
     if imgui.Button(u8'Объявить') then
       if data.combo.gov.v > 0 then 
@@ -3271,7 +3270,7 @@ imgui_windows.main = function(menu)
     imgui.TextColoredRGB('{FFFFFF}/rpweap [тип]'); imgui.SameLine(225.0); imgui.Text(u8'Изменить тип РП отыгровки оружия')
     imgui.TextColoredRGB('{FFFFFF}/punishlog [id/nick]'); imgui.SameLine(225.0); imgui.Text(u8'Просмотр наказаний игрока')
     imgui.TextColoredRGB('{FFFFFF}/members [0-2]'); imgui.SameLine(225.0); imgui.Text(u8'Просмотреть мемберс')
-    imgui.TextColoredRGB('{FFFFFF}/mon'); imgui.SameLine(225.0); imgui.TextColoredRGB('Отправить состояние склада в рацию {954F4F}(Доступно SFA/LVA)')
+    imgui.TextColoredRGB('{FFFFFF}/mon [0-1 (опционально)]'); imgui.SameLine(225.0); imgui.TextColoredRGB('Отправить состояние склада в рацию {954F4F}(Доступно SFA/LVA)')
     imgui.TextColoredRGB('{FFFFFF}/cn [id] [0-1]'); imgui.SameLine(225.0); imgui.Text(u8'Скопировать ник. 0 - RP ник, 1 - NonRP ник')
     imgui.TextColoredRGB('{FFFFFF}/ev [0-1] [места]'); imgui.SameLine(225.0); imgui.Text(u8'Запросить эвакуацию. 0 - текущий квадрат, 1 - по метке')
     imgui.TextColoredRGB('{FFFFFF}/loc [id/nick] [секунды]'); imgui.SameLine(225.0); imgui.Text(u8'Запросить местоположение бойца')
