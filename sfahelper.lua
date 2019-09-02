@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.4-release
+-- Version 1.41-beta1
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4030")
-SCRIPT_ASSEMBLY = "1.4-release"
+script_version("1.4101")
+SCRIPT_ASSEMBLY = "1.41-beta1"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -33,6 +33,9 @@ local limadd, imadd       = pcall(require, 'imgui_addons')
                             assert(limadd, 'Library \'imgui_addons\' not found')
 local lcopas, copas       = pcall(require, 'copas')
 local lhttp, http         = pcall(require, 'copas.http')
+local llfs, lfs           = pcall(require,  'lfs')
+local lbass, bass         = pcall(require, 'bass')
+local lffi, ffi           = pcall(require, 'ffi')
 --local json = require "cjson"
 --local util = require "cjson.util"
 --local raknet = require "lib.samp.raknet"
@@ -65,9 +68,10 @@ window = {
   ['members'] = { bool = imgui.ImBool(false), cursor = true, draw = true } ,
   ['addtable'] = { bool = imgui.ImBool(false), cursor = true, draw = true },
   ['hud'] = { bool = imgui.ImBool(false), cursor = false, draw = true },
-  ['binder'] = { bool = imgui.ImBool(false), cursor = true, draw = true },
+  ['binder'] = { bool = imgui.ImBool(false), cursor = false, draw = false },
 }
 screenx, screeny = getScreenResolution()
+reloadScriptsParam = false
 govtext = {
   {'Реклама призыва','[Army SF]: Уважаемые жители штата, в {time} объявлен призыв в San-Fierro Army!','[Army SF]: Требования: 3 года проживания в штате, не иметь проблем с законом не состоять в ЧС.','[Army SF]: Призывной пункт: Больница города San Fierro. Навигатор Л-2. Спасибо за внимание.'},
   {'Начало призыва','[Army SF]: Уважаемые жители штата Evolve, призыв в San-Fierro Army начался!','[Army SF]: Требования: 3 года проживания в штате, не иметь проблем с законом не состоять в ЧС.','[Army SF]: Призывной пункт - Больница города San Fierro. Навигатор Л-2. Спасибо за внимание.'},
@@ -93,6 +97,8 @@ pInfo = {
     hud = true,
     hudX = screenx / 1.5,
     hudY = screeny - 250,
+    hudset = {false, true, true, true, true, true, false, true, true, true, false},
+    hudopacity = 1.0,
     chatconsole = false,
     target = true,
     autobp = false,
@@ -106,12 +112,77 @@ pInfo = {
     rpweapons = 0,
     autologin = false,
     password = "",
-    oldlogo = false
+    oldlogo = false,
+    ranknames = {[0] = 'Нет', 'Рядовой', 'Ефрейтор', 'Мл.Сержант', 'Сержант', 'Ст.Сержант', 'Старшина', 'Прапорщик', 'Мл.Лейтенант', 'Лейтенант', 'Ст.Лейтенант', 'Капитан', 'Майор', 'Подполковник', 'Полковник', 'Генерал'}
   },
   func = {},
   gov = govtext,
   weeks = {0,0,0,0,0,0,0},
   counter = {0,0,0,0,0,0,0,0,0,0,0,0}
+}
+-- Локализация
+localInfo = {
+  autopost = {
+    title = "Авто-поставки",
+    load = {'Загрузил материалы', "На связи борт - {id}. Загрузился на сухогрузе. Беру курс на ГС Army LV.", "На связи борт - {id}. Загрузилась на сухогрузе. Беру курс на ГС Army LV."},
+    unload = {'Разгрузил материалы', "На связи борт - {id}. Разгрузился на ГС Army LV. Состояние - {sklad}/300", "На связи борт - {id}. Разгрузилась на ГС Army LV. Состояние - {sklad}/300"},
+    start = {'Начал поставки', "На связи борт - {id}. Начал поставку боеприпасов на ГС Army LV.", "На связи борт - {id}. Начала поставку боеприпасов на ГС Army LV."},
+    ends = {'Закончил поставки', "На связи борт - {id}. Завершил поставки на ГС Army LV, беру курс на часть.", "На связи борт - {id}. Завершила поставки на ГС Army LV, беру курс на часть."},
+    startp = {'Начал поставки в порту', "10-15", "10-15"},
+    endp = {'Закончил поставки в порту', "10-16", "10-16"}
+  },
+  post = {
+    title = "Авто-доклад",
+    ends = {"Покинул пост", "Покинул пост: «{post}».", "Покинула пост: «{post}»." },
+    start = {"Заступил на пост", "Заступил на пост: «{post}».", "Заступила на пост: «{post}»."},
+    doklad = {"Доклад", "Пост: «{post}». Количество бойцов: {count}. Состояние: code 1", "Пост: «{post}». Количество бойцов: {count}. Состояние: code 1"}
+  },
+  punaccept = {
+    title = "Действия с игроками",
+    vig = {"Выдать выговор", "{id} получает {type} выговор за {reason}", "{id} получает {type} выговор за {reason}"},
+    blag = {"Выразить благодарность", "/d {frac}, выражаю благодарность {id} за {reason}", "/d {frac}, выражаю благодарность {id} за {reason}"},
+    loc = {"Запросить местоположение", '{nick}, ваше местоположение? На ответ {sec} секунд.', '{nick}, ваше местоположение? На ответ {sec} секунд.'},
+    rubka = {"Вызвать в рубку", "{id}, подойдите в рубку. У вас {min} минут", "{id}, подойдите в рубку. У вас {min} минут"},
+    naryad = {"Выдать наряд", '{id} получает наряд {count} кругов за {reason}', '{id} получает наряд {count} кругов за {reason}'}
+  },
+  rpguns = {
+    title = "РП отыгровки оружия",
+    autobp = {"Отыгровка в Авто-БП", '/me взял комплекты оружия и боеприпасов из склада', '/me взяла комплекты оружия и боеприпасов из склада'},
+    [0] = {"Спрятал оружие", "/me спрятал оружие", "/me спрятала оружие"},
+    [1] = {"Кастет", "/me достал с кармана кастет и надел его на правую руку", "/me достала с кармана кастет и надела его на правую руку"},
+    [3] = {"Дубинка", "/me быстрым движением руки снял с поясного держателя дубинку", "/me быстрым движением руки сняла с поясного держателя дубинку"},
+    [4] = {"Нож", "/me незаметным движением руки достал с под ремня нож", "/me незаметным движением руки достала с под ремня нож"},
+    [9] = {"Бензопила", "/me взял бензопилу в руки и завел её", "/me взяла бензопилу в руки и завела её"},
+    [16] = {"Граната", "/me достал гранату с сумки и выдернул с неё чеку", "/me достала гранату с сумки и выдернула с неё чеку"},
+    [17] = {"Дымовая граната", "/me надел противогаз, затем достал с сумки слезоточивую гранату", "/me надела противогаз, затем достала с сумки слезоточивую гранату"},
+    [18] = {"Коктейль молотова", "/me достал с сумки коктейль молотова и поджёг тряпку", "/me достала с сумки коктейль молотова и поддожгла тряпку"},
+    [22] = {"Colt 9mm", "/me достал с кобуры пистолет марки ТТ - 9 и проготовил его к стрельбе", "/me достала с кобуры пистолет марки ТТ - 9 и проготовила его к стрельбе"},
+    [23] = {"Silenced 9mm", "/me достал с крепления электрошокер и нажал на кнопку \"On\"", "/me достала с крепления электрошокер и нажала на кнопку \"On\""},
+    [24] = {'Desert Eagle', "/me достал с кобуры пистолет марки \"Desert Eagle\" и перезарядил его", "/me достала с кобуры пистолет марки \"Desert Eagle\" и перезарядила его"},
+    [25] = {'Shotgun', "/me достал с чехла на спине помповый дробовик и зарядил его", "/me достал с чехла на спине помповый дробовик и зарядил его"},
+    [26] = {'Sawnoff Shotgun', "/me достал с чехла обрез и зарядил его", "/me достала с чехла обрез и зарядила его"},
+    [27] = {'Combat Shotgun', "/me достал с чехла скорострельный дробовик и вставил в него патроны", "/me достала с чехла скорострельный дробовик и вставила в него патроны"},
+    [28] = {'Micro Uzi', "/me снял с крепления \"Micro Uz\" и перезарядил его", "/me сняла с крепления \"Micro Uz\" и перезарядила его"},
+    [29] = {'MP5', "/me cнял с плеча пистолет-пулемет \"MP-5\" и перезарядил его", "/me cняла с плеча пистолет-пулемет \"MP-5\" и перезарядила его"},
+    [30] = {'АК-47', "/me снял с плеча автомат \"Калашникова\" и передернул затвор", "/me сняла с плеча автомат \"Калашникова\" и передернула затвор"},
+    [31] = {'M4A1', "/me снял с плеча карабин \"M4A1\" и передернул затвор", "/me сняла с плеча карабин \"M4A1\" и передернула затвор"},
+    [33] = {'Rifle', "/me снял с плеча полу-автоматическую винтовку и перезарядил её", "/me сняла с плеча полу-автоматическую винтовку и перезарядила её"},
+    [34] = {'Sniper Rifle', "/me достал с кейса снайперскую винтовку затем вставил магазин и перезарядил её", "/me достала с кейса снайперскую винтовку затем вставила магазин и перезарядила её"}
+  },
+  rp = {
+    title = "РП отыгровки",
+    uninvite = {"Отыгровка увольнения", "/me достал КПК, после чего отметил личное дело {nick} как «Уволен»", "/me достала КПК, после чего отметила личное дело {nick} как «Уволен»"},
+    giverank = {"Отыгровка повышения", '/me достал {type} {rankname}а, и передал их человеку напротив', '/me достала {type} {rankname}а, и передала их человеку напротив'},
+    uninviter = {"Отыгровка увольнения (/r)", 'Боец {nick} уволен из армии. Причина: {reason}', 'Боец {nick} уволен из армии. Причина: {reason}'},
+  },
+  others = {
+    title = "Остальное",
+    dep = {"Занять гос волну", '/d OG, Занимаю волну гос новостей на {time}. Возражения на п.{id}', '/d OG, Занимаю волну гос новостей на {time}. Возражения на п.{id}'},
+    dept = {"Напомнить о гос волне", "/d OG, Напоминаю, волна гос новостей на {time} за SFA.", "/d OG, Напоминаю, волна гос новостей на {time} за SFA."},
+    mon = {"Мониторинг (SFA)", 'Состояние склада Армии LV - {sklad} тонн', 'Состояние склада Армии LV - {sklad} тонн'},
+    monl = {"Мониторинг (LVA)", 'Мониторинг: LSPD - {lspd} | SFPD - {sfpd} | LVPD - {lvpd} | SFa - {sfa} | FBI - {fbi}', 'Мониторинг: LSPD - {lspd} | SFPD - {sfpd} | LVPD - {lvpd} | SFa - {sfa} | FBI - {fbi}'},
+    ev = {"Запросить эвакуацию", 'Запрашиваю эвакуацию! Сектор: {kv}, Количество мест: {mesta}', 'Запрашиваю эвакуацию! Сектор: {kv}, Количество мест: {mesta}'}
+  }
 }
 -- Таблица для хранения клавиш, биндера
 config_keys = {
@@ -152,13 +223,7 @@ data = {
     lecturetime = imgui.ImInt(3),
   },
   functions = {
-    checkbox = {
-      imgui.ImBool(false),
-      imgui.ImBool(false),
-      imgui.ImBool(false),
-      imgui.ImBool(false),
-      imgui.ImBool(false)
-    },
+    checkbox = {},
     search = imgui.ImBuffer(256),
     frac = imgui.ImBuffer(256),
     radius = imgui.ImInt(15),
@@ -225,6 +290,8 @@ post = {
 sInfo = {
   updateAFK = 0,
   fraction = "no",
+  tazer = false,
+  server = "",
   nick = "",
   playerid = -1,
   flood = 0,
@@ -260,16 +327,18 @@ targetMenu = {
   cursor = nil
 }
 -- Для биндера
-tEditData = {}
-sInputEdit = imgui.ImBuffer(256)
-sCmdEdit = {}
-bIsEnterEdit = imgui.ImBool(false)
+tEditData = { id = 0, cmd = '', buffer = '', wait = 1100 }
+tEditKeys = { id = 0, v = {}, buffer = '', wait = 1100 }
 tLastKeys = {}
 ------------------------------------------------
+radioStream = nil
+selectRadio = { id = 1, title = "Свое радио", volume = 0.6, url = "", stream = 0 }
+changeText = { id = 0, sex = 1, values = {} }
 contractId = nil
 playersAddCounter = 1
 giveDMG = nil
 playerMarker = nil
+hudSizeY = 190
 playerMarkerId = nil
 playerRadar = nil
 selectedContext = nil
@@ -285,51 +354,46 @@ spectate_list = {}
 lectureStatus = 0
 complete = false
 updatesInfo = {
-  version = DEBUG_MODE and SCRIPT_ASSEMBLY.." (тестовая)" or thisScript().version,
+  version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
   type = "Релиз", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "18.08.2019",
+  date = "08.09.2019",
   list = {
-    {'Полный редизайн скрипта. Меню теперь интуитивно понятное, некоторые функции объединены в одну;'},
-    {'В меню лекций добавлена возможность запускать лекции без ввода команды {FF5233}/lec'},
-    {'Теперь все настройки/бинды привязаны к определенному аккаунту. Шпоры и лекции остались общими;',
-    'Сразу после обновления старые настройки будут перенесены на текущий аккаунт. При входе под новыми аккаунтами все настройки будут {FF5233}по умолчанию;{FFFFFF}',
-    'Все настройки можно переносить между аккаунтами с помощью специальной системы экспорта настроек в {FF5233}/sh - Настройки;'},
-    {'Добавлена команда {FF5233}/checkvig{FFFFFF} для проверки выговоров игрока;'},
-    {'Добавлена команда {FF5233}/mon [0-1 (опционально)]{FFFFFF}. Выводит состояние склада(-ов) в локальный чат. При вводе {FF5233}/mon 1{FFFFFF} выводит в рацию;',
-    'Доступно для {FF5233}SFA{FFFFFF} и {FF5233}LVA{FFFFFF}. Версия SFA сообщает об складе LVA, работает в рубке. Версия LVA сообщает об всех складах, работает по всей территории LVA;'},
-    {'Изменена команда {FF5233}/abp{FFFFFF}, теперь можно изменять список оружия, который нужно взять;'},
-    {'Изменена система авто-обновления;'},
-    {'Изменен клавишный биндер. Теперь не нужно создавать новый бинд для добавления нескольких строк;',
-    'Все старые бинды автоматически приведены к новому виду, но назначать несколько биндов на одну клавишу по прежнему можно;'},
-    {'Практически все функции оптимизированы для {FF5233}любой гос.фракции.{FFFFFF} Теперь работа скрипта не ограничивается армиями;','\n{FF5233}Остальное:'},
-
-    {'В настройка добавлена возможность включить старый логотип Evolve RP;'},
-    {'В настройках добавлен автологин в игру;'},
-    {'Добавлены отыгровки для женского пола. При входе в игру скрипт сам определит пол, но при необходимости его можно изменить в {FF5233}/sh - Настройки;'},
-    {"Исправлены найденные баги;"},
-    {'Изменена система обновлений;'},
-    {"Изменена система логгирования для быстрого нахождения ошибок в работе скрипта;"},
-    {'Добавлены новые тэги для биндера:',
-    '{FF5233}{date}{FFFFFF} - Текущая дата в формате DD.MM.YYYY;',
-    '{FF5233}{weaponid}{FFFFFF} - ID оружия в руках;',
-    '{FF5233}{weaponname}{FFFFFF} - Название оружия в руках;',
-    '{FF5233}{ammo}{FFFFFF} - Количество патронов в оружие;'}
+    {'Добавлено радио, которое работает даже при сворачивании игры. Добавлено множество радиостанций, есть возможность включить свое радио;',
+    'Активация радио - команда {FF5233}/shradio{FFFFFF}, либо {FF5233}/sh - Основное - Радио;'},
+    {'Добавлена система динамических рангов. Теперь ранги подстраиваются под вашу фракцию и сервер (Только ERP);'},
+    {'Добавлена возможность подстроить под себя все отыгровки/доклады/прочее в {FF5233}/sh - Настройки - Изменение отыгровок;'},
+    {'Теперь можно изменять худ под свои потребности в {FF5233}/sh - Настройки - Настройки худа;'},
+    {'Изменен биндер. Меню приведено в более понятный для новичка вид и более удобный вид для всех пользователей;', '\n{FF5233}Остальное'},
+    {'Удален пункт в настройках \'Старое лого\';'},
+    {'Команды работы с таблицами теперь привязаны к своему серверу;'},
+    {'Пофикшен модуль работы с внешними файлами;'}
+    -- {'Добавлена возможность создавать "клавиши быстрого доступа", при нажатии на которую можно будет открыть меню, спросить документы и т.д'},
+    -- {'Мы преобразовали Target Menu, теперь при его вызове можно не открывая меню взаимодействовать с игроком'},
+    -- {'Теперь в специальном меню можно создавать свои заметки, которые не удаляются после перезахода в игру'},
+    -- {'Доработано меню биндеров для лучшего его понимания и взаимодействия с ним. Пофикшены баги, связанные с меню биндера'},
+    -- {'Система событий'}
   }
 }
 adminsList = {}
 zoness = {}
+tCarsName = {"Landstalker", "Bravura", "Buffalo", "Linerunner", "Perrenial", "Sentinel", "Dumper", "Firetruck", "Trashmaster", "Stretch", "Manana", "Infernus",
+"Voodoo", "Pony", "Mule", "Cheetah", "Ambulance", "Leviathan", "Moonbeam", "Esperanto", "Taxi", "Washington", "Bobcat", "Whoopee", "BFInjection", "Hunter",
+"Premier", "Enforcer", "Securicar", "Banshee", "Predator", "Bus", "Rhino", "Barracks", "Hotknife", "Trailer", "Previon", "Coach", "Cabbie", "Stallion", "Rumpo",
+"RCBandit", "Romero","Packer", "Monster", "Admiral", "Squalo", "Seasparrow", "Pizzaboy", "Tram", "Trailer", "Turismo", "Speeder", "Reefer", "Tropic", "Flatbed",
+"Yankee", "Caddy", "Solair", "Berkley'sRCVan", "Skimmer", "PCJ-600", "Faggio", "Freeway", "RCBaron", "RCRaider", "Glendale", "Oceanic", "Sanchez", "Sparrow",
+"Patriot", "Quad", "Coastguard", "Dinghy", "Hermes", "Sabre", "Rustler", "ZR-350", "Walton", "Regina", "Comet", "BMX", "Burrito", "Camper", "Marquis", "Baggage",
+"Dozer", "Maverick", "NewsChopper", "Rancher", "FBIRancher", "Virgo", "Greenwood", "Jetmax", "Hotring", "Sandking", "BlistaCompact", "PoliceMaverick",
+"Boxvillde", "Benson", "Mesa", "RCGoblin", "HotringRacerA", "HotringRacerB", "BloodringBanger", "Rancher", "SuperGT", "Elegant", "Journey", "Bike",
+"MountainBike", "Beagle", "Cropduster", "Stunt", "Tanker", "Roadtrain", "Nebula", "Majestic", "Buccaneer", "Shamal", "hydra", "FCR-900", "NRG-500", "HPV1000",
+"CementTruck", "TowTruck", "Fortune", "Cadrona", "FBITruck", "Willard", "Forklift", "Tractor", "Combine", "Feltzer", "Remington", "Slamvan", "Blade", "Freight",
+"Streak", "Vortex", "Vincent", "Bullet", "Clover", "Sadler", "Firetruck", "Hustler", "Intruder", "Primo", "Cargobob", "Tampa", "Sunrise", "Merit", "Utility", "Nevada",
+"Yosemite", "Windsor", "Monster", "Monster", "Uranus", "Jester", "Sultan", "Stratum", "Elegy", "Raindance", "RCTiger", "Flash", "Tahoma", "Savanna", "Bandito",
+"FreightFlat", "StreakCarriage", "Kart", "Mower", "Dune", "Sweeper", "Broadway", "Tornado", "AT-400", "DFT-30", "Huntley", "Stafford", "BF-400", "NewsVan",
+"Tug", "Trailer", "Emperor", "Wayfarer", "Euros", "Hotdog", "Club", "FreightBox", "Trailer", "Andromada", "Dodo", "RCCam", "Launch", "PoliceCar", "PoliceCar",
+"PoliceCar", "PoliceRanger", "Picador", "S.W.A.T", "Alpha", "Phoenix", "GlendaleShit", "SadlerShit", "Luggage A", "Luggage B", "Stairs", "Boxville", "Tiller",
+"UtilityTrailer"}
 counterNames = {"Принято игроков", "Уволено игроков", "Повышего игроков", "Проведено лекций (/lecture)", "Проведено на посту", "Проведено на КПП", "Выдано нарядов (Меню)", "Запрошено локаций (/loc | Меню)", "Запрошено ЧСов", "Поставок на LVa", "Поставок на LSa"}
-rankings = {
-  ["SFA"] = {[0] = "Нет", "Рядовой", "Ефрейтор", "Мл.Сержант", "Сержант", "Ст.Сержант", "Старшина", "Прапорщик", "Мл.Лейтенант", "Лейтенант", "Ст.Лейтенант", "Капитан", "Майор", "Подполковник", "Полковник", "Генерал"},
-  ["LVA"] = {[0] = "Нет", "Рядовой", "Ефрейтор", "Мл.Сержант", "Сержант", "Ст.Сержант", "Старшина", "Прапорщик", "Мл.Лейтенант", "Лейтенант", "Ст.Лейтенант", "Капитан", "Майор", "Подполковник", "Полковник", "Генерал"},
-  ["LSPD"] = {[0] = "Нет", "Кадет", "Офицер", "Мл.Сержант", "Сержант", "Прапорщик", "Ст.Прапорщик", "Мл.Лейтенант", "Лейтенант", "Ст.Лейтенант", "Капитан", "Майор", "Подполковник", "Полковник", "Шериф"},
-  ["SFPD"] = {[0] = "Нет", "Кадет", "Офицер", "Мл.Сержант", "Сержант", "Прапорщик", "Ст.Прапорщик", "Мл.Лейтенант", "Лейтенант", "Ст.Лейтенант", "Капитан", "Майор", "Подполковник", "Полковник", "Шериф"},
-  ["LVPD"] = {[0] = "Нет", "Кадет", "Офицер", "Мл.Сержант", "Сержант", "Прапорщик", "Ст.Прапорщик", "Мл.Лейтенант", "Лейтенант", "Ст.Лейтенант", "Капитан", "Майор", "Подполковник", "Полковник", "Шериф"},
-  ["Instructors"] = {[0] = "Нет", "Стажёр", "Консультант", "Экзаменатор", "Мл.Инструктор", "Инструктор", "Координатор", "Мл.Менеджер", "Ст.Менеджер", "Директор", "Управляющий"},
-  ["FBI"] = {[0] = "Нет", "Стажёр", "Дежурный", "Мл.Агент", "Агент DEA", "Агент CID", "Глава DEA", "Глава CID", "Инспектор", "Зам.Директора", "Директор"},
-  ["Medic"] = {[0] = "Нет", "Интерн", "Санитар", "Мед.Брат", "Спасатель", "Нарколог", "Доктор", "Психолог", "Хирург", "Зам.Глав.Врача", "Глав.Врач"},
-  ["no"] = {[0] = "Нет"},
-}
+rankings = { ["SFA"] = true, ["LVA"] = true, ["LSPD"] = true, ["SFPD"] = true, ["LVPD"] = true, ["Instructors"] = true, ["FBI"] = true, ["Medic"] = true }
 dayName = {"Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"}
 --------------------------------------------------------------------
 
@@ -386,10 +450,18 @@ function main()
     end 
     filesystem.save(config_keys, 'keys.json')
     ----------
+    local localjson = filesystem.load('local.json')
+    if localjson ~= nil then
+      localjson = filesystem.performOld('local.json', localjson)
+      logger.trace("Start additionArray to 'localInfo'")
+      localInfo = additionArray(localjson, localInfo) 
+    end 
+    filesystem.save(localInfo, 'local.json')
+    ----------
     local postsjson = filesystem.load('posts.json')
     if postsjson ~= nil then
       postsjson = filesystem.performOld('posts.json', postsjson)
-      logger.trace("Start additionArray to 'pInfo'")
+      logger.trace("Start additionArray to 'postInfo'")
       postInfo = additionArray(postsjson, postInfo) 
     end
     filesystem.save(postInfo, 'posts.json')
@@ -430,6 +502,10 @@ function main()
     sampRegisterChatCommand('contract', cmd_contract)
     sampRegisterChatCommand('rpweap', cmd_rpweap)
     sampRegisterChatCommand('punishlog', cmd_punishlog)
+    sampRegisterChatCommand('shradio', function()
+      window['main'].bool.v = not window['main'].bool.v
+      data.imgui.menu = 3
+    end)
     sampRegisterChatCommand('sfahelper', function() 
       funcc('cmd_sfahelper', 1)
       window['main'].bool.v = not window['main'].bool.v
@@ -444,6 +520,7 @@ function main()
         atext('Команда доступна со звания Майор и выше')
         return
       end
+      if sInfo.server ~= "185.169.134.67:7777" then dtext('Данная команда не доступна для вашего сервера') return end
       funcc('cmd_addtable', 1)
       data.combo.addtable.v = 0
       data.addtable.nick.v = ""
@@ -516,10 +593,12 @@ function main()
     logger.debug(("Онлайн успешно обновлен | Время: %.3fs"):format(os.clock() - mstime))
     while not sampIsLocalPlayerSpawned() do wait(0) end
     local _, myid = sampGetPlayerIdByCharHandle(playerPed)
-    sInfo.authTime = os.date("%d.%m.%y %H:%M:%S")
+    local serverip, serverport = sampGetCurrentServerAddress()
     sInfo.updateAFK = os.time()
+    sInfo.authTime = os.date("%d.%m.%y %H:%M:%S")
     sInfo.playerid = myid
     sInfo.nick = sampGetPlayerNickname(myid)
+    sInfo.server = serverip..":"..serverport
     sInfo.weapon = getCurrentCharWeapon(PLAYER_PED)
     -- Сбор данных о фракции и ранге
     cmd_stats("checkout")
@@ -528,7 +607,6 @@ function main()
     loadAdmins()
     -- logger.trace('DataURLEncoder')
     -- DataURLEncoder(getWorkingDirectory()..'/img.png')
-    if pInfo.settings.oldlogo == true then enableOldLogo() end
     if pInfo.settings.hud == true then window['hud'].bool.v = true end
     logger.trace(("Конец Main функции. | (weekOnline = %d | dayOnline = %d | Время: %.3fs)"):format(pInfo.info.weekOnline, pInfo.info.dayOnline, os.clock() - mstime))
     --------------------=========----------------------
@@ -561,6 +639,11 @@ function main()
         pInfo.settings.hudX = curX
         pInfo.settings.hudY = curY
       end
+      if window['main'].bool.v and (data.imgui.menu == 21 or data.imgui.menu == 22) then
+        window['binder'].bool.v = true
+      else
+        window['binder'].bool.v = false
+      end
       -- Сохраняем новые координаты худа
       if isKeyJustPressed(key.VK_LBUTTON) and data.imgui.hudpos then
         funcc('changeposhud', 1)
@@ -569,6 +652,9 @@ function main()
         sampToggleCursor(false)
         window['main'].bool.v = true
         filesystem.save(pInfo, 'config.json')
+      end
+      if selectRadio.stream == 1 and renderStream then
+        renderFontDrawText(renderStream, ("%s - %s"):format(selectRadio.streamTitle and selectRadio.streamTitle or "", selectRadio.streamUrl and selectRadio.streamUrl or ""), 150, screeny-20, -1)
       end
       ------------------
       -- Таргет меню
@@ -647,6 +733,7 @@ end
 -- Добавление в ЧС
 function cmd_addbl(args)
   if sInfo.blPermissions == false then dtext('Для работы с данной командой необходима привязка!') return end
+  if sInfo.server ~= "185.169.134.67:7777" then dtext('Данная команда не доступна для вашего сервера') return end
   if #args == 0 then
     dtext('Введите: /addbl [playerid/nick] [степень (1-4)] [доказательства] [причина]')
     dtext('Для вноса игрока в ЧС без доказательств, введите \'-\' в соответствующее поле')
@@ -748,8 +835,11 @@ function cmd_vig(arg)
   if sInfo.playerid == pid then dtext('Вы не можете принять самого себя!') return end
   if not sampIsPlayerConnected(pid) then dtext('Игрок оффлайн!') return end
   funcc('cmd_vig', 1)
-  cmd_r(('%s получает "%s" выговор за %s'):format(sampGetPlayerNickname(pid):gsub("_", " "), args[2], args[3]))
-  timeScreen()
+  cmd_r(localVars("punaccept", "vig", {
+    ["id"] = sampGetPlayerNickname(pid):gsub("_", " "),
+    ["type"] = args[2],
+    ["reason"] = args[3]
+  }))
 end
 
 -- Контракт
@@ -793,7 +883,11 @@ function cmd_blag(arg)
   local blags = {"помощь на призыве", "участие в тренировке", "транспортировку"}
   if args[3] < 1 or args[3] > #blags then dtext('Неверный тип!') return end
   funcc('cmd_blag', 1)
-  sampSendChat(("/d %s, выражаю благодарность %s за %s"):format(args[2], string.gsub(sampGetPlayerNickname(pid), "_", " "), blags[args[3]]))
+  sampSendChat(localVars("punaccept", "blag", {
+    ["frac"] = args[2],
+    ["id"] = string.gsub(sampGetPlayerNickname(pid), "_", " "),
+    ["reason"] = blags[args[3]]
+  }))
 end
 
 -- Считываем фракцию и ранг
@@ -815,8 +909,8 @@ function cmd_stats(args)
     logger.info(('Фракция определена: %s'):format(sInfo.fraction))
     logger.info(('Пол определен: %s'):format(pInfo.settings.sex == 1 and "Мужской" or "Женский"))
     if rankings[sInfo.fraction] ~= nil then
-      for i = 1, #rankings[sInfo.fraction] do
-        if rankings[sInfo.fraction][i] == rang then
+      for i = 1, #pInfo.settings.ranknames do
+        if pInfo.settings.ranknames[i] == rang then
           pInfo.settings.rank = i
           logger.info(('Ранг определен: %s[%d]'):format(rang, pInfo.settings.rank))
           break
@@ -825,8 +919,8 @@ function cmd_stats(args)
           logger.warn('Ранга нет в статистике')
           break
         end
-        if i == #rankings[sInfo.fraction] then
-          logger.warn(('Ранг не определен. Берем старый ранг: %s[%d]'):format(rankings[sInfo.fraction][pInfo.settings.rank], pInfo.settings.rank))
+        if i == #pInfo.settings.ranknames then
+          logger.warn('Ранг не определен')
         end
       end
     else
@@ -908,6 +1002,7 @@ end
 function cmd_checkrank(arg)
   if sInfo.fraction ~= "SFA" then dtext('Команда доступна только игрокам из SFA') return end
   if sInfo.isWorking == false then dtext('Необходимо начать рабочий день!') return end
+  if sInfo.server ~= "185.169.134.67:7777" then dtext('Данная команда не доступна для вашего сервера') return end
   if #arg == 0 then
     dtext('Введите: /checkrank [id / nick]')
     return
@@ -968,6 +1063,7 @@ end
 function cmd_checkbl(arg)
   if sInfo.fraction ~= "SFA" then dtext('Команда доступна только игрокам из SFA') return end
   if sInfo.isWorking == false then dtext('Необходимо начать рабочий день!') return end
+  if sInfo.server ~= "185.169.134.67:7777" then dtext('Данная команда не доступна для вашего сервера') return end
   if #arg == 0 then
     dtext('Введите: /checkbl [id / nick]')
     return
@@ -1035,6 +1131,7 @@ end
 function cmd_checkvig(arg)
   if sInfo.fraction ~= "SFA" then dtext('Команда доступна только игрокам из SFA') return end
   if sInfo.isWorking == false then dtext('Необходимо начать рабочий день!') return end
+  if sInfo.server ~= "185.169.134.67:7777" then dtext('Данная команда не доступна для вашего сервера') return end
   if #arg == 0 then
     dtext('Введите: /checkvig [id / nick]')
     return
@@ -1124,8 +1221,11 @@ function cmd_ev(arg)
   X = math.ceil((X + 3000) / 250)
   Y = math.ceil((Y * - 1 + 3000) / 250)
   Y = KV[Y]
-  kvx = (Y.."-"..X)   
-  cmd_r('Запрашиваю эвакуацию! Сектор: '..kvx..", Количество мест: "..args[2])
+  kvx = (Y.."-"..X)
+  cmd_r(localVars("others", "ev", {
+    ['kv'] = kvx,
+    ['mesta'] = args[2]
+  }))
 end
 
 function cmd_sweather(arg)
@@ -1149,7 +1249,7 @@ function cmd_mon(arg)
     if monitoring[4] == nil then dtext('Не удалось получить состояние склада!') return end
     ----------
     if arg == "1" then
-      cmd_r('Состояние склада Армии LV - '..math.floor(monitoring[4] / 1000)..' тонн')
+      cmd_r(localVars('others', 'mon', { ['sklad'] = math.floor(monitoring[4] / 1000) }))
     else
       atext('Мониторинг: LVA - '..monitoring[4])
     end
@@ -1160,8 +1260,13 @@ function cmd_mon(arg)
     end
     ----------
     if arg == "1" then
-      cmd_r(('Мониторинг: LSPD - %d | SFPD - %d | LVPD - %d | SFa - %d | FBI - %d'):format( 
-        math.floor(monitoring[1] / 1000), math.floor(monitoring[2] / 1000), math.floor(monitoring[3] / 1000), math.floor(monitoring[4] / 1000), math.floor(monitoring[6] / 1000)))
+      cmd_r(localVars('others', 'mon', {
+        ['lspd'] = math.floor(monitoring[1] / 1000),
+        ['sfpd'] = math.floor(monitoring[2] / 1000),
+        ['lvpd'] = math.floor(monitoring[3] / 1000),
+        ['sfa'] = math.floor(monitoring[4] / 1000),
+        ['fbi'] = math.floor(monitoring[6] / 1000),
+      }))
     else
       atext(('Мониторинг: LSPD - %d | SFPD - %d | LVPD - %d | SFA - %d | LSP - %d | FBI - %d'):format(math.floor(monitoring[1] / 1000), math.floor(monitoring[2] / 1000), math.floor(monitoring[3] / 1000), math.floor(monitoring[4] / 1000), math.floor(monitoring[5] / 1000), math.floor(monitoring[6] / 1000)))
     end
@@ -1266,7 +1371,10 @@ function cmd_loc(args)
     else dtext('Игрок оффлайн') return end
   end
   funcc('cmd_loc', 1)
-  cmd_r(string.gsub(name, "_", " ")..', ваше местоположение? На ответ '..args[2]..' секунд.')
+  cmd_r(localVars("punaccept", "loc", {
+    ['nick'] = string.gsub(name, "_", " "),
+    ['sec'] = args[2]
+  }))
   addcounter(8, 1)
 end
 
@@ -1378,33 +1486,7 @@ function changeWeapons()
         if isKeyJustPressed(config_keys.weaponkey.v[1]) and (pInfo.settings.rpweapons == 1 or pInfo.settings.rpweapons == 3)
         or (pInfo.settings.rpweapons == 2 or pInfo.settings.rpweapons == 3) and weapon ~= sInfo.weapon then
           if sInfo.flood <= os.clock() - 1.1 then
-            local setsex = pInfo.settings.sex == 1 and "" or "а"
-            local weaponrp = {
-              [0] = "спрятал"..setsex.." оружие",
-              [1] = "достал"..setsex.." с кармана кастет и надел"..setsex.." его на правую руку",
-              [3] = "быстрым движением руки снял"..setsex.." с поясного держателя дубинку",
-              [4] = "незаметным движением руки достал"..setsex.." с под ремня нож",
-              [9] = "взял бензопилу в руки и завел"..setsex.." её",
-              [16] = "достал"..setsex.." гранату с сумки и выдернул"..setsex.." с неё чеку",
-              [17] = "надел"..setsex.." противогаз, затем достал"..setsex.." с сумки слезоточивую гранату",
-              [18] = "достал"..setsex.." с сумки коктейль молотова и поддож"..(pInfo.settings.sex == 1 and "ег" or "гла").." тряпку",
-              [22] = "достал"..setsex.." с кобуры пистолет марки \"ТТ - 9\" и проготовил"..setsex.." его к стрельбе",
-              [23] = "достал"..setsex.." с крепления электрошокер и нажал"..setsex.." на кнопку \"On\"",
-              [24] = "достал"..setsex.." с кобуры пистолет марки \"Desert Eagle\" и перезарядил"..setsex.." его",
-              [25] = "достал"..setsex.." с чехла на спине помповый дробовик и зарядил"..setsex.." его",
-              [26] = "достал"..setsex.." с чехла обрез и зарядил"..setsex.." его",
-              [27] = "достал"..setsex.." с чехла скорострельный дробовик и вставил"..setsex.." в него патроны",
-              [28] = "снял"..setsex.." с крепления \"Micro Uz\" и перезарядил"..setsex.." его",
-              [29] = "cнял"..setsex.." с плеча пистолет-пулемет \"MP-5\" и перезарядил"..setsex.." его",
-              [30] = "снял"..setsex.." с плеча автомат \"Калашникова\" и передернул"..setsex.." затвор",
-              [31] = "снял"..setsex.." с плеча карабин \"M4A1\" и передернул"..setsex.." затвор",
-              [33] = "снял"..setsex.." с плеча полу-автоматическую винтовку и перезарядил"..setsex.." её",
-              [34] = "достал"..setsex.." с кейса снайперскую винтовку затем вставил"..setsex.." магазин и перезарядил"..setsex.." её",
-            }
-            local rpot = weaponrp[weapon]
-            if rpot ~= nil then
-              sampSendChat('/me '..rpot)
-            end
+            sampSendChat(localVars('rpguns', weapon, {}))
           end
         end
       end
@@ -1455,7 +1537,7 @@ function secoundTimer()
             else addcounter(5, 1) end
             if post.lastpost ~= i then
               punkeyActive = 3
-              punkey[3].text = ("Заступил%s на пост: «%s»."):format(pInfo.settings.sex == 1 and "" or "а", pi.name)
+              punkey[3].text = localVars("post", "start", { ['post'] = pi.name })
               punkey[3].time = os.time()
               atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения об заступлении на пост '%s'"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + "), pi.name))
               post.lastpost = i
@@ -1475,14 +1557,17 @@ function secoundTimer()
                   end
                 end
               end
-              cmd_r(("Пост: «%s». Количество бойцов: %d. Состояние: code 1"):format(pi.name, count))
+              cmd_r(localVars("post", "doklad", {
+                ['post'] = pi.name,
+                ['count'] = count
+              }))
               post.next = 0
             end
             post.next = post.next + 1
             break
           elseif post.lastpost == i then
             punkeyActive = 3
-            punkey[3].text = ('Покинул%s пост: «%s».'):format(pInfo.settings.sex == 1 and "" or "а", pi.name)
+            punkey[3].text = localVars("post", "ends", { ['post'] = pi.name })
             punkey[3].time = os.time()
             atext(("Нажмите {139904}\"%s\"{FFFFFF} чтобы оповестить об уходе с поста '%s'"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + "), pi.name))
             post.lastpost = 0
@@ -1539,7 +1624,10 @@ function punaccept()
       if punkey[1].time > os.time() - 1 then dtext("Не флуди!") return end
       if punkey[1].time > os.time() - 15 then
         funcc('punkey_uninvite', 1)
-        cmd_r('Боец '..string.gsub(punkey[1].nick, "_", " ")..' уволен из армии. Причина: '..punkey[1].reason)
+        cmd_r(localVars('rp', 'uninviter', {
+          ['nick'] = string.gsub(punkey[1].nick, "_", " "),
+          ['reason'] = punkey[1].reason
+        }))
       end
       punkey[1].nick, punkey[1].reason, punkey[1].time = nil, nil, nil
     end
@@ -1548,7 +1636,10 @@ function punaccept()
       if punkey[2].time > os.time() - 1 then dtext("Не флуди!") return end
       if punkey[2].time > os.time() - 15 then
         funcc('punkey_giverank', 1)
-        sampSendChat(('/me достал'..(pInfo.settings.sex == 1 and "" or "а")..' %s %sа, и передал их человеку напротив'):format(punkey[2].rank > 6 and "погоны" or "лычки", rankings[sInfo.fraction][punkey[2].rank]))
+        sampSendChat(localVars("rp", "giverank", {
+          ['type'] = punkey[2].rank > 6 and "погоны" or "лычки",
+          ['rankname'] = pInfo.settings.ranknames[punkey[2].rank]
+        }))
       end
       punkey[2].nick, punkey[2].rank, punkey[2].time = nil, nil, nil
     end
@@ -1561,7 +1652,7 @@ function punaccept()
         --------
         if punkey[3].text:match("Состояние %- 300%/300") then
           punkeyActive = 3
-          punkey[3].text = ("На связи борт - %d. Завершил"..(pInfo.settings.sex == 1 and "" or "а").." поставки на ГС Army LV, беру курс на часть."):format(sInfo.playerid)
+          punkey[3].text = localVars("autopost", "ends", { ['id'] = sInfo.playerid })
           punkey[3].time = os.time()
           atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения в рацию об окончании поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
           return
@@ -1593,6 +1684,35 @@ end
 function loadFiles()
   lua_thread.create(function()
     --- Загрузка библиотек
+    if not lbass then
+      funcc('loadfiles_bass', 1)
+      atext('Устанавливаем библиотеку BASS...')
+      local files = {'bass.lua'}
+      for k, v in pairs(files) do
+        copas_download_status = 'proccess'
+        downloadUrlToFile('https://raw.githubusercontent.com/the-redx/Evolve/master/lib/'..v, 'moonloader/lib/'..v, function(id, status, p1, p2)
+          if status == dlstatus.STATUS_DOWNLOADINGDATA then
+            copas_download_status = 'proccess'
+            print(string.format('Загружено %d килобайт из %d килобайт.', p1, p2))
+          elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
+            copas_download_status = 'succ'
+          elseif status == 64 then
+            copas_download_status = 'failed'
+          end
+        end)
+        while copas_download_status == 'proccess' do wait(0) end
+        if copas_download_status == 'failed' then
+          atext('Не удалось загрузить библиотеку \'bass\'')
+          reloadScriptsParam = true
+          thisScript():unload()
+        else
+          print(v..' был загружен')
+        end
+      end
+      atext('Библиотека установлена')
+      reloadScriptsParam = true
+      reloadScripts()      
+    end
     if not lcopas or not lhttp then
       funcc('loadfiles_copas', 1)
       atext('Необходимые для работы библиотеки не были найдены. Скачиваем...')
@@ -1614,12 +1734,14 @@ function loadFiles()
         while copas_download_status == 'proccess' do wait(0) end
         if copas_download_status == 'failed' then
           atext('Не удалось загрузить библиотеку \'copas\'')
+          reloadScriptsParam = true
           thisScript():unload()
         else
           print(v..' был загружен')
         end
       end
       atext('Все необходимые библиотеки были загружены')
+      reloadScriptsParam = true
       reloadScripts()
     end
     if not doesDirectoryExist("moonloader\\SFAHelper\\lectures") then
@@ -1747,7 +1869,11 @@ function autoupdate(json_url)
                 logger.info('Загрузка обновления успешно завершена')
                 atext('Обновление завершено. Просмотреть список изменений: /shupd')
                 goupdatestatus = true
-                lua_thread.create(function() wait(500) thisScript():reload() end)
+                lua_thread.create(function()
+                  wait(500)
+                  reloadScriptsParam = true
+                  thisScript():reload()
+                end)
               end
               if status == dlstatus.STATUSEX_ENDDOWNLOAD then
                 if goupdatestatus == nil then
@@ -1870,7 +1996,7 @@ function sampevents.onShowDialog(dialogid, style, title, button1, button2, text)
         sampCloseCurrentDialogWithButton(0)
         if pInfo.settings.rpweapons > 0 then
           wait(250)
-          sampSendChat('/me взял'..(pInfo.settings.sex == 1 and "" or "а")..' комплекты оружия и боеприпасов из склада')
+          sampSendChat(localVars("rpguns", "autobp", {}))
         end
       end
     end)
@@ -1926,6 +2052,16 @@ function sampevents.onSetSpawnInfo(team, skin, unk, position, rotation, weapons,
   end)
 end
 
+function sampevents.onSendClientJoin(version, mod, nick)
+  local _, myid = sampGetPlayerIdByCharHandle(playerPed)
+  local serverip, serverport = sampGetCurrentServerAddress()
+  sInfo.authTime = os.date("%d.%m.%y %H:%M:%S")
+  sInfo.playerid = myid
+  sInfo.nick = nick
+  sInfo.server = serverip..":"..serverport
+  dtext(("NICK: %s | ID: %d | SERVER: %s"):format(sInfo.nick, sInfo.playerid, sInfo.server))
+end
+
 -- Очень большой хук на всякий хлам
 function sampevents.onServerMessage(color, text)
   if pInfo.settings.chatconsole then sampfuncsLog(tostring(text)) end
@@ -1977,10 +2113,13 @@ function sampevents.onServerMessage(color, text)
     end
     if text:match("") and color == -1 and membersInfo.mode >= 2 then return false end
     -----------------
-    if text:match("^ ID: %d+ | .+%[%d+%] %- {.+}.+{FFFFFF} | {FFFFFF}%[AFK%]%: .+ секунд$") then
-      local id, _, rank, status, afk = text:match("^ ID: (%d+) | (.+)%[(%d+)%] %- (.+){FFFFFF} | {FFFFFF}%[AFK%]%: (.+) секунд$")
+    if text:match("^ ID: %d+ | .- | .-%: .-%[%d+%] %- {.+}.+{FFFFFF} | {FFFFFF}%[AFK%]%: .+ секунд$") then
+      local id, date, nick, rankname, rank, status, afk = text:match("^ ID: (%d+) | (.-) | (.-)%: (.-)%[(%d+)%] %- (.+){FFFFFF} | {FFFFFF}%[AFK%]%: (.+) секунд$")
       id = tonumber(id)
       rank = tonumber(rank)
+      if pInfo.settings.ranknames[rank] ~= rankname then
+        pInfo.settings.ranknames[rank] = rankname
+      end
       if status == "{008000}На работе" then 
         status = true
         membersInfo.work = membersInfo.work + 1
@@ -1998,7 +2137,7 @@ function sampevents.onServerMessage(color, text)
         streamed, _ = sampGetCharHandleBySampPlayerId(id)
         -- Убираем даты инвайта
         if pInfo.settings.membersdate == true then
-          text = ("ID: %d | %s: %s[%d] - %s{FFFFFF} | [AFK]: %s секунд"):format(id, sampGetPlayerNickname(id), rankings[sInfo.fraction][rank], rank, status and "{008000}На работе" or "{ae433d}Выходной", afk)
+          text = ("ID: %d | %s: %s[%d] - %s{FFFFFF} | [AFK]: %s секунд"):format(id, sampGetPlayerNickname(id), pInfo.settings.ranknames[rank], rank, status and "{008000}На работе" or "{ae433d}Выходной", afk)
         end
         if id == sInfo.playerid then sampAddChatMessage(text, sampGetPlayerColor(id))
         else sampAddChatMessage(string.format("%s - %s", text, streamed and "{00BF80}in stream" or "{ec3737}not in stream"), sampGetPlayerColor(id)) end
@@ -2008,9 +2147,12 @@ function sampevents.onServerMessage(color, text)
         return false
       end
     elseif text:match("^ ID: %d+ | .+%[%d+%] %- {.+}.+{FFFFFF}$") then
-      local id, _, rank, status = text:match("^ ID: (%d+) | (.+)%[(%d+)%] %- (.+){FFFFFF}$")
+      local id, date, nick, rankname, rank, status = text:match("^ ID: (%d+) | (.-) | (.-)%: (.-)%[(%d+)%] %- (.+){FFFFFF}$")
       id = tonumber(id)
       rank = tonumber(rank)
+      if pInfo.settings.ranknames[rank] ~= rankname then
+        pInfo.settings.ranknames[rank] = rankname
+      end
       if status == "{008000}На работе" then 
         status = true
         membersInfo.work = membersInfo.work + 1
@@ -2026,7 +2168,7 @@ function sampevents.onServerMessage(color, text)
       if membersInfo.mode == 1 then
         streamed, _ = sampGetCharHandleBySampPlayerId(id)
         if pInfo.settings.membersdate == true then
-          text = ("ID: %d | %s: %s[%d] - %s{FFFFFF}"):format(id, sampGetPlayerNickname(id), rankings[sInfo.fraction][rank], rank, status and "{008000}На работе" or "{ae433d}Выходной")
+          text = ("ID: %d | %s: %s[%d] - %s{FFFFFF}"):format(id, sampGetPlayerNickname(id), pInfo.settings.ranknames[rank], rank, status and "{008000}На работе" or "{ae433d}Выходной")
         end
         if id == sInfo.playerid then sampAddChatMessage(text, sampGetPlayerColor(id))
         else sampAddChatMessage(string.format("%s - %s", text, streamed and "{00BF80}in stream" or "{ec3737}not in stream"), sampGetPlayerColor(id)) end
@@ -2090,7 +2232,7 @@ function sampevents.onServerMessage(color, text)
   if text:match("Доставьте материалы на Зону 51") and color == -86 then -- Загрузился на корабле, лечу в лва
     if pInfo.settings.autodoklad == true then
       punkeyActive = 3
-      punkey[3].text = ("На связи борт - %d. Загрузил"..(pInfo.settings.sex == 1 and "ся" or "ась").." на сухогрузе. Беру курс на ГС Army LV."):format(sInfo.playerid)
+      punkey[3].text = localVars("autopost", "load", { ['id'] = sInfo.playerid })
       punkey[3].time = os.time()
       atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
     end
@@ -2100,7 +2242,7 @@ function sampevents.onServerMessage(color, text)
     if pInfo.settings.autodoklad == true then
       local materials = tonumber(text:match("На складе Зоны 51 (%d+)/300000 материалов"))
       punkeyActive = 3
-      punkey[3].text = ("На связи борт - %d. Разгрузил"..(pInfo.settings.sex == 1 and "ся" or "ась").." на ГС Army LV. Состояние - %d/300"):format(sInfo.playerid, math.floor((materials / 1000) + 0.5))
+      punkey[3].text = localVars("autopost", "unload", { ['id'] = sInfo.playerid, ['sklad'] = math.floor((materials / 1000) + 0.5) })
       punkey[3].time = os.time()
       atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
     end
@@ -2109,13 +2251,13 @@ function sampevents.onServerMessage(color, text)
     if pInfo.settings.autodoklad == true then
       if color == -1697828182 then -- Сел в вертолет на ЛВа
         punkeyActive = 3
-        punkey[3].text = ("На связи борт - %d. Начал"..(pInfo.settings.sex == 1 and "" or "а").." поставку боеприпасов на ГС Army LV."):format(sInfo.playerid)
+        punkey[3].text = localVars("autopost", "start", { ['id'] = sInfo.playerid })
         punkey[3].time = os.time()
         atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения об начале поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
       elseif color == -86 then -- Сел в вертолет на ЛСа
         if isCharInArea2d(PLAYER_PED, 2720.00 + 150, -2448.29 + 150, 2720.00 - 150, -2448.29 - 150, false) then
           punkeyActive = 3
-          punkey[3].text = "10-15"
+          punkey[3].text = localVars("autopost", "startp")
           punkey[3].time = os.time()
           atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения об начале поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))         
         end
@@ -2132,7 +2274,7 @@ function sampevents.onServerMessage(color, text)
     if pInfo.settings.autodoklad == true then
       local materials = tonumber(text:match("На складе LSA (%d+)/300000 материалов"))
       punkeyActive = 3
-      punkey[3].text = "10-16"
+      punkey[3].text = localVars("autopost", "endp")
       punkey[3].time = os.time()
       atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения в рацию об окончании поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
     end
@@ -2144,9 +2286,7 @@ function sampevents.onServerMessage(color, text)
       addcounter(2, 1)
       lua_thread.create(function()
         wait(1250)
-        sampSendChat("/me достал"..(pInfo.settings.sex == 1 and "" or "а").." КПК, после чего зашел в базу данных военнослужащих")
-        wait(1250)
-        sampSendChat("/me отметил"..(pInfo.settings.sex == 1 and "" or "а").." личное дело "..string.gsub(pNick, "_", " ").." как «Уволен»")
+        sampSendChat(localVars("rp", "uninvite", { ['nick'] = string.gsub(pNick, "_", " ") }))
         wait(100)
         punkeyActive = 1
         punkey[1].nick = pNick
@@ -2173,6 +2313,12 @@ function sampevents.onServerMessage(color, text)
   end
   if text:match('Рабочий день окончен') and color == -1 then sInfo.isSupport = false end
   ---------
+  if text:match("Вы поменяли пули на резиновые") then
+    sInfo.tazer = true
+  end
+  if text:match("Вы поменяли пули на обычные") then
+    sInfo.tazer = false
+  end
   if text:match(".+ выгнал вас из организации. Причина: .+") then
     pInfo.settings.rank = 0
     sInfo.isWorking = false
@@ -2223,10 +2369,16 @@ function sampevents.onServerMessage(color, text)
   end
 end
 
-function onScriptTerminate(scr, quit)
-  logger.trace('Скрипт '..scr.name..' завершен с кодом: '..tostring(quit))
+function onScriptTerminate(scr, quitGame)
+  logger.trace('Скрипт '..scr.name..' завершен')
   if scr == script.this then
-    logger.debug('Завершение скрипта...')
+    if radioStream ~= nil then bass.BASS_StreamFree(radioStream) end
+    logger.debug(string.format('Завершение скрипта. Причина: ', quitGame == true and "Выход из игры" or "Принудительное завершение / Краш"))
+    if not quitGame and reloadScriptsParam == false then
+      showCursor(false)
+      atext("SFA-Helper завершил свою работу. Причина: Принудительное завершение / Краш")
+      atext("Для восстановния работы используйте {954F4F}Ctrl + R{FFFFFF}, либо перезайдите в игру")
+    end
   end
 end
 
@@ -2255,23 +2407,8 @@ function sampevents.onCreate3DText(id, color, position, distance, testLOS, attac
   -- logger.trace(string.format("ID: %d | Color: %d | posx: %f | posy: %f | posz: %f | Text: %s", id, color, position.x, position.y, position.z, text))
 end
 
-function enableOldLogo()
-  for i = 219, 233 do
-    if sampTextdrawIsExists(i) then
-      sampTextdrawDelete(i)
-    end
-  end
-  sampTextdrawCreate(220, "EVOLVE_ROLE_PLAY", 501, 1)
-  sampTextdrawSetStyle(220, 2)
-  sampTextdrawSetLetterSizeAndColor(220, 0.33, 1.3, 0xFF790200)
-  sampTextdrawSetShadow(220, 1, 0x95000000)
-  --second
-  sampTextdrawCreate(221, "EVOLVE-RP.ru", 540, 12.2)
-  sampTextdrawSetLetterSizeAndColor(221, 0.2, 1, -1)
-  sampTextdrawSetStyle(221, 2)
-end
-
 function clearparams()
+  data.functions.checkbox = {}
   data.functions.search.v = ""
   data.functions.playerid.v = -1
   data.functions.radius.v = 15
@@ -2292,6 +2429,8 @@ function imgui.OnDrawFrame()
       if imgui.BeginMenu(u8 'Основное') then
         if imgui.MenuItem(u8 'Главное меню') then data.imgui.menu = 1 end
         if imgui.MenuItem(u8 'Другие счётчики') then data.imgui.menu = 2 end
+        if imgui.MenuItem(u8 'Радио') then data.imgui.menu = 3 end
+        if imgui.MenuItem(u8 'Доступные команды') then data.imgui.menu = 4 end
         imgui.EndMenu()
       end
       if imgui.BeginMenu(u8'Функции') then
@@ -2306,13 +2445,14 @@ function imgui.OnDrawFrame()
         imgui.EndMenu()
       end
       if imgui.MenuItem(u8 'Действие с игроком') then clearparams(); data.imgui.menu = 20 end
-      if imgui.MenuItem(u8 'Биндер') then window['binder'].bool.v = true end
+      if imgui.MenuItem(u8 'Биндер') then window['binder'].bool.v = true; data.imgui.menu = 21 end
       if imgui.MenuItem(u8 'Шпора') then window['shpora'].bool.v = true end
       if imgui.BeginMenu(u8 'Настройки') then
         if imgui.MenuItem(u8 'Основные настройки') then data.imgui.menu = 31 end
         if imgui.MenuItem(u8 'Авто-БП') then data.imgui.menu = 32 end
-        if imgui.MenuItem(u8 'Экспорт настроек') then data.imgui.menu = 35 end
-        if imgui.MenuItem(u8 'Доступные команды') then data.imgui.menu = 33 end
+        if imgui.MenuItem(u8 'Изменение отыгровок') then data.imgui.menu = 33 end
+        if imgui.MenuItem(u8 'Настройки худа') then clearparams(); data.imgui.menu = 36 end
+        if imgui.MenuItem(u8 'Экспорт настроек') then clearparams(); data.imgui.menu = 35 end
         if imgui.MenuItem(u8 'Перезагрузить скрипт') then data.imgui.menu = 34 end
         imgui.EndMenu()
       end
@@ -2333,18 +2473,14 @@ function imgui.OnDrawFrame()
   if window['shpora'].bool.v then
     if data.shpora.page ~= 0 then
       if data.shpora.loaded == false then
-        -- Первая загрузка шпоры, ищём файлы в директории, записываем в таблицу
-        -- findFirstFile имеет баг, если ни одного файла не будет найдено, произойдет краш скрипта.
         data.shpora.select = {}
-        local handle, name = findFirstFile("moonloader/SFAHelper/shpora/*.txt")
-        if name ~= nil then
-          table.insert(data.shpora.select, name)
-          while true do
-            name = findNextFile(handle)
-            if name == nil then break end
-            table.insert(data.shpora.select, name)
+        for file in lfs.dir(getWorkingDirectory()..'\\SFAHelper\\shpora') do
+          if file ~= "." and file ~= ".." then
+            local attr = lfs.attributes(getWorkingDirectory()..'\\SFAHelper\\shpora\\'..file)
+            if attr.mode == "file" then 
+              table.insert(data.shpora.select, file)
+            end
           end
-          findClose(handle)
         end
         data.shpora.page = 1
         data.shpora.loaded = true
@@ -2381,9 +2517,9 @@ function imgui.OnDrawFrame()
     imgui.End()
   end
   if window['binder'].bool.v then
-    imgui.SetNextWindowSize(imgui.ImVec2(screenx / 1.5, 625), imgui.Cond.FirstUseEver)
-    imgui.SetNextWindowPos(imgui.ImVec2(screenx / 2, screeny / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-    imgui.Begin(u8'SFA-Helper | Биндер', window['binder'].bool, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.MenuBar + imgui.WindowFlags.HorizontalScrollbar)
+    imgui.SetNextWindowSize(imgui.ImVec2(200, 300), imgui.Cond.FirstUseEver)
+    imgui.SetNextWindowPos(imgui.ImVec2(screenx - 200, (screeny / 2) - 150), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+    imgui.Begin('##binderhelper', window['binder'].bool, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize + imgui.WindowFlags.AlwaysAutoResize + imgui.WindowFlags.NoTitleBar)
     -----
     imgui_windows.binder()
     -----
@@ -2398,7 +2534,7 @@ function imgui.OnDrawFrame()
   end
   if window['hud'].bool.v then
     imgui.SetNextWindowPos(imgui.ImVec2(pInfo.settings.hudX, pInfo.settings.hudY), imgui.ImVec2(0.5, 0.5))
-    imgui.SetNextWindowSize(imgui.ImVec2(320, 190), imgui.Cond.FirstUseEver)
+    imgui.SetNextWindowSize(imgui.ImVec2(320, hudSizeY), imgui.Cond.Always)
     imgui.Begin('notitle', window['hud'].bool, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoMove)
     imgui_windows.hud()
     imgui.End()
@@ -2444,7 +2580,7 @@ imgui_windows.main = function(menu)
     imgui.Text(u8"Ник:"); imgui.SameLine(225.0); imgui.Text(('%s[%d]'):format(sInfo.nick, sInfo.playerid))
     imgui.Text(u8"Рабочий день:"); imgui.SameLine(225.0); imgui.TextColoredRGB(string.format('%s', sInfo.isWorking == true and "{00bf80}Начат" or "{ec3737}Окончен"))
     if sInfo.isWorking == true and pInfo.settings.rank > 0 then
-      imgui.Text(u8"Звание:"); imgui.SameLine(225.0); imgui.Text(('%s[%d]'):format(u8:encode(rankings[sInfo.fraction][pInfo.settings.rank]), pInfo.settings.rank))
+      imgui.Text(u8"Звание:"); imgui.SameLine(225.0); imgui.Text(('%s[%d]'):format(u8:encode(pInfo.settings.ranknames[pInfo.settings.rank]), pInfo.settings.rank))
     end
     imgui.Text(u8"Время авторизации:"); imgui.SameLine(225.0); imgui.Text(('%s'):format(sInfo.authTime))
     imgui.Separator()
@@ -2510,12 +2646,156 @@ imgui_windows.main = function(menu)
     imgui.EndChild()
     imgui.NextColumn()
     imgui.Columns(1)
+  elseif menu == 3 then
+    local radiolist = {
+      { text = "Свое радио", url = "" },
+      { text = "Radio Record", url = "http://air.radiorecord.ru:805/rr_320" },
+      { text = "Evolve FM", url = "http://185.58.204.232:8000/evolve.ogg" },
+      { text = "Европа Плюс", url = "http://ep128.hostingradio.ru:8030/ep128" },
+      { text = "Хит-FM [UA]", url = "http://www.hitfm.ua/HitFM.m3u" },
+      { text = "KISS FM [UA]", url = "http://www.kissfm.ua/KissFM.m3u" },
+      { text = "Радио Мелодия [UA]", url = "http://melodia.ipfm.net/RadioMelodia" },
+      { text = "Русское радио", url = "https://rusradio.hostingradio.ru/rusradio128.mp3" },
+      { text = "Радио Energy", url = "http://ic2.101.ru:8000/v1_1" },
+      { text = "Ретро FM", url = "http://retroserver.streamr.ru:8043/retro128" },
+      { text = "SOUNDPARK DEEP", url = "http://185.220.35.56:8000/128" },
+      { text = "Авторадио", url = "http://ic2.101.ru:8000/v3_1" },
+      { text = "Russian Mix - Radio Record", url = "http://air.radiorecord.ru:805/rus_128" },
+      { text = "DFM", url = "https://dfm.hostingradio.ru/dfm128.mp3" },
+      { text = "Новое Радио", url = "http://icecast.newradio.cdnvideo.ru/newradio3" },
+      { text = "Люкс FM [UA]", url = "http://icecastdc.luxnet.ua/lux_mp3" },
+      { text = "Новое Радио [BY]", url = "http://live.novoeradio.by:8000/novoeradio-aac" },
+      { text = "Радио NS [KZ]", url = "http://89.219.35.26:8000/radions" },
+      { text = "Radio Jan [AM]", url = "http://s7.voscast.com:10258" }
+    }
+    imgui.Columns(2, _, false)
+    imgui.PushStyleColor(imgui.Col.ChildWindowBg, imgui.ImVec4(0.06, 0.05, 0.07, 1.00))
+    imgui.SetColumnWidth(-1, 160.0)
+    imgui.BeginChild('##1', imgui.ImVec2(160, -1), imgui.WindowFlags.AlwaysAutoResize)
+    for k, v in ipairs(radiolist) do
+      if imgui.Selectable(u8:encode(v.text), selectRadio.id == k and true or false) then
+        selectRadio.id = k
+        selectRadio.title = v.text
+        selectRadio.url = v.url
+      end
+    end
+    imgui.EndChild()
+    imgui.NextColumn()
+    imgui.BeginChild('##2', imgui.ImVec2(imgui.GetWindowWidth() - 150, -1))
+    local volume = imgui.ImFloat(selectRadio.volume)
+    local inptext = imgui.ImBuffer(tostring(selectRadio.url), 256)
+    imgui.Text(u8:encode('Радио - '..selectRadio.title))
+    imgui.Spacing()
+    if selectRadio.id == 1 then
+      imgui.Text(u8'Введите прямую ссылку на радио')
+      if imgui.InputText('##inputtext', inptext) then
+        selectRadio.url = inptext.v
+      end
+      imgui.Spacing()
+    end
+    imgui.Text(u8'Громкость')
+    if imgui.SliderFloat('##sliderfloat', volume, 0.0, 1.0, "%.1f", 1) then
+      selectRadio.volume = volume.v
+      if bass ~= nil and radioStream ~= nil then
+        bass.BASS_ChannelSetAttribute(radioStream, BASS_ATTRIB_VOL, selectRadio.volume)
+      end
+    end
+    imgui.Spacing()
+    if selectRadio.stream == 1 then
+      if imgui.Button(u8'Выключить') then
+        if radioStream ~= nil and bass ~= nil then
+          bass.BASS_StreamFree(radioStream)
+          selectRadio.stream = 0
+          renderStream = nil
+          radioStream = nil
+        end
+      end
+    elseif selectRadio.stream == 0 then
+      if imgui.Button(u8'Включить') then
+        if bass ~= nil then
+          radioStream = bass.BASS_StreamCreateURL(selectRadio.url, 0, bassFlagsOrOperation({BASS_STREAM_BLOCK, BASS_STREAM_STATUS, BASS_STREAM_AUTOFREE}), nil, nil)
+          bass.BASS_ChannelPlay(radioStream, true)
+          if radioStream ~= nil then
+            atext('Радио включено')
+            bass.BASS_ChannelSetAttribute(radioStream, BASS_ATTRIB_VOL, selectRadio.volume)
+            renderStream = renderCreateFont("Arial", 9, 5)
+            selectRadio.stream = 1
+            lua_thread.create(function()
+              while true do
+                if selectRadio.stream ~= 1 then break end
+                local tag_meta = bass.BASS_ChannelGetTags(radioStream, BASS_TAG_META) -- StreamTitle='xxx';StreamUrl='xxx';
+                selectRadio.streamTitle = ""
+                selectRadio.streamUrl = selectRadio.title
+                if tag_meta ~= nil then
+                  tag_meta = u8:decode(ffi.string(tag_meta))
+                  local streamTitle = tag_meta:match("StreamTitle='(.-)'")
+                  local streamUrl = tag_meta:match("StreamUrl='(.-)'")
+                  if streamTitle ~= nil then
+                    selectRadio.streamTitle = streamTitle
+                  end
+                  if streamUrl ~= nil then
+                    selectRadio.streamUrl = streamUrl
+                  end
+                end
+                wait(10000)
+              end
+            end)
+          else dtext('Не удалось подключиться к аудиопотоку') end
+        end
+      end
+    end
+    imgui.EndChild()
+    imgui.NextColumn()
+    imgui.PopStyleColor()
+    imgui.Columns(1)
+  elseif menu == 4 then
+    local spacing = 225.0
+    imgui.TextColoredRGB('{FFFFFF}/sh'); imgui.SameLine(spacing); imgui.Text(u8'Открыть главное меню скрипта')
+    imgui.TextColoredRGB('{FFFFFF}/shupd'); imgui.SameLine(spacing); imgui.Text(u8'Просмотреть последнее обновление')
+    imgui.TextColoredRGB('{FFFFFF}/abp'); imgui.SameLine(spacing); imgui.Text(u8'Вызвать меню Авто-БП')
+    imgui.TextColoredRGB('{FFFFFF}/shud'); imgui.SameLine(spacing); imgui.Text(u8'Включить/Выключить худ')
+    imgui.TextColoredRGB('{FFFFFF}/starget'); imgui.SameLine(spacing); imgui.Text(u8'Вкючить/Отключить таргет меню')
+    imgui.TextColoredRGB('{FFFFFF}/rpweap [тип]'); imgui.SameLine(spacing); imgui.Text(u8'Изменить тип РП отыгровки оружия')
+    imgui.TextColoredRGB('{FFFFFF}/punishlog [id/nick]'); imgui.SameLine(spacing); imgui.Text(u8'Просмотр наказаний игрока')
+    imgui.TextColoredRGB('{FFFFFF}/members [0-2]'); imgui.SameLine(spacing); imgui.Text(u8'Просмотреть мемберс')
+    imgui.TextColoredRGB('{FFFFFF}/mon [0-1 (опционально)]'); imgui.SameLine(spacing); imgui.TextColoredRGB('Отправить состояние склада в рацию {954F4F}(Доступно SFA/LVA)')
+    imgui.TextColoredRGB('{FFFFFF}/cn [id] [0-1]'); imgui.SameLine(spacing); imgui.Text(u8'Скопировать ник. 0 - RP ник, 1 - NonRP ник')
+    imgui.TextColoredRGB('{FFFFFF}/ev [0-1] [места]'); imgui.SameLine(spacing); imgui.Text(u8'Запросить эвакуацию. 0 - текущий квадрат, 1 - по метке')
+    imgui.TextColoredRGB('{FFFFFF}/loc [id/nick] [секунды]'); imgui.SameLine(spacing); imgui.Text(u8'Запросить местоположение бойца')
+    imgui.TextColoredRGB('{FFFFFF}/watch [add/remove/list] [id]'); imgui.SameLine(spacing); imgui.Text(u8'Панель слежки за цветом ника игрока')
+    imgui.TextColoredRGB('{FFFFFF}/checkrank [id/nick]'); imgui.SameLine(spacing); imgui.TextColoredRGB('Просмотреть последнее повышение игрока. {954F4F}(Доступно SFA)')
+    imgui.TextColoredRGB('{FFFFFF}/checkbl [id/nick]'); imgui.SameLine(spacing); imgui.TextColoredRGB('Проверить игрока в Черном Списке. {954F4F}(Доступно SFA)')
+    imgui.TextColoredRGB('{FFFFFF}/checkvig [id/nick]'); imgui.SameLine(spacing); imgui.TextColoredRGB('Просмотреть выговоры игрока. {954F4F}(Доступно SFA)')
+    imgui.TextColoredRGB('{FFFFFF}/cchat'); imgui.SameLine(spacing); imgui.Text(u8'Очистить чат')
+    imgui.TextColoredRGB('{FFFFFF}/adm'); imgui.SameLine(spacing); imgui.Text(u8'Альтернатива команде /admins')
+    imgui.TextColoredRGB('{FFFFFF}(/lec)ture [start/pause/stop]'); imgui.SameLine(spacing); imgui.Text(u8'Вывести подготовленную лекцию в чат')
+    imgui.TextColoredRGB('{FFFFFF}/createpost [название]'); imgui.SameLine(spacing); imgui.Text(u8'Создать пост, для автодокладов')
+    imgui.TextColoredRGB('{FFFFFF}/addbl'); imgui.SameLine(spacing); imgui.TextColoredRGB('Добавить игрока в Черный Список {954F4F}(Доступно по привязке)')
+    imgui.TextColoredRGB('{FFFFFF}/addtable'); imgui.SameLine(spacing); imgui.TextColoredRGB('Добавить игрока в таблицу {954F4F}(Доступно SFA 12+)')
+    imgui.TextColoredRGB('{FFFFFF}/vig [id] [тип] [причина]'); imgui.SameLine(spacing); imgui.Text(u8'Выдать игроку выговор')
+    imgui.TextColoredRGB('{FFFFFF}/reconnect [секунды]'); imgui.SameLine(spacing); imgui.Text(u8'Переподключение к серверу')
+    imgui.TextColoredRGB('{FFFFFF}/blag [id] [фракция] [тип]'); imgui.SameLine(spacing); imgui.Text(u8'Выразить игроку благодарность в департамент')
+    imgui.TextColoredRGB('{FFFFFF}/match [id/nick]'); imgui.SameLine(spacing); imgui.Text(u8'Отображение местонахождение игрока на радаре')
+    imgui.TextColoredRGB('{FFFFFF}/sweather [погода 0 - 45]'); imgui.SameLine(spacing); imgui.Text(u8'Изменить погоду на указанную')
+    imgui.TextColoredRGB('{FFFFFF}/stime [время 0 - 23]'); imgui.SameLine(spacing); imgui.Text(u8'Изменить время на указанное')
+    imgui.TextColoredRGB('{FFFFFF}/shradio'); imgui.SameLine(spacing); imgui.Text(u8'Открыть меню радио')
   elseif menu == 11 then
     imgui.PushItemWidth(150)
     if data.lecture.string == "" then
       -- Загружаем список лекций и помещаем в таблицу
-      local handle, name = findFirstFile("moonloader/SFAHelper/lectures/*.txt")
-      if name == nil then
+      data.combo.lecture.v = 0
+      data.lecture.list = {}
+      data.lecture.string = u8"Не выбрано\0"
+      for file in lfs.dir(getWorkingDirectory()..'\\SFAHelper\\lectures') do
+        if file ~= "." and file ~= ".." then
+          local attr = lfs.attributes(getWorkingDirectory()..'\\SFAHelper\\lectures\\'..file)
+          if attr.mode == "file" then 
+            table.insert(data.lecture.list, file)
+            data.lecture.string = data.lecture.string..u8:encode(file)..'\0'
+          end
+        end
+      end
+      if #data.lecture.list == 0 then
         name = "firstlecture.txt"
         local file = io.open('moonloader/SFAHelper/lectures/firstlecture.txt', "w+")
         file:write("Обычное сообщение\n/s Сообщение с криком\n/b Сообщение в b чат\n/rb Сообщение в рацию\n/w Сообщение шепотом")
@@ -2523,17 +2803,6 @@ imgui_windows.main = function(menu)
         file:close()
         file = nil
       end
-      data.combo.lecture.v = 0
-      data.lecture.string = u8 "Не выбрано\0"
-      table.insert(data.lecture.list, name)
-      data.lecture.string = data.lecture.string..u8:encode(name).."\0"
-      while true do
-        name = findNextFile(handle)
-        if name == nil then break end
-        table.insert(data.lecture.list, name)
-        data.lecture.string = data.lecture.string..u8:encode(name).."\0"
-      end
-      findClose(handle)
       data.lecture.string = data.lecture.string.."\0"
     end
     imgui.Columns(2, _, false)
@@ -2662,18 +2931,29 @@ imgui_windows.main = function(menu)
     end
   elseif menu == 13 then
     imgui.PushItemWidth(200)
-    imgui.InputText(u8 'Введите время говки в формате **:**, **:** и т.д.', data.functions.search)
+    imgui.Text(u8'Введите время говки в формате **:**, **:** и т.д.')
+    imgui.InputText('##inputtext', data.functions.search)
     imgui.Separator()
-    imgui.Text(u8('/d OG, Занимаю волну гос новостей на %s. Возражения на п.%d'):format(data.functions.search.v, sInfo.playerid))
-    imgui.Text(u8("/d OG, Напоминаю, волна гос новостей на %s за SFA."):format(data.functions.search.v))
+    imgui.Text(u8:encode(localVars('others', 'dep', {
+      ['time'] = data.functions.search.v,
+      ['id'] = sInfo.playerid
+    })))
+    imgui.Text(u8:encode(localVars('others', 'dept', {
+      ['time'] = data.functions.search.v
+    })))
     if imgui.Button(u8 'Занять гос. волну', imgui.ImVec2(200, 20)) then
       funcc('imgui_senddep', 1)
-      sampSendChat(('/d OG, Занимаю волну гос новостей на %s. Возражения на п.%d'):format(u8:decode(data.functions.search.v), sInfo.playerid))
+      sampSendChat(localVars('others', 'dep', {
+        ['time'] = u8:decode(data.functions.search.v),
+        ['id'] = sInfo.playerid
+      }))
     end
     imgui.SameLine()
     if imgui.Button(u8 'Напомнить о занятой гос. волне', imgui.ImVec2(200, 20)) then
       funcc('imgui_senddep_napom', 1)
-      sampSendChat(('/d OG, Напоминаю, волна гос новостей на %s за SFA.'):format(u8:decode(data.functions.search.v)))
+      sampSendChat(localVars('others', 'dept', {
+        ['time'] = u8:decode(data.functions.search.v)
+      }))
     end
   elseif menu == 14 then
     imgui.PushItemWidth(200)
@@ -2737,7 +3017,7 @@ imgui_windows.main = function(menu)
         gov = gov:gsub("{time}", u8:decode(data.functions.search.v))
         imgui.Text(u8:encode(("/gov %s"):format(gov)))
       end
-    else imgui.Text(u8'Нет данных ля отображения') end
+    else imgui.Text(u8'Нет данных для отображения') end
     ------
     if imgui.Button(u8'Объявить') then
       if data.combo.gov.v > 0 then 
@@ -2922,7 +3202,10 @@ imgui_windows.main = function(menu)
       if imgui.Button(u8 'Вызвать игрока', imgui.ImVec2(-0.1, 30)) then
         if sampIsPlayerConnected(data.functions.playerid.v) then
           funcc('imgui_rubka', 1)
-          cmd_r(("%s, подойдите в рубку. У вас %s минут"):format(sampGetPlayerNickname(data.functions.playerid.v):gsub("_", " "), data.functions.time.v))
+          cmd_r(localVars("punaccept", "rubka", {
+            ['id'] = sampGetPlayerNickname(data.functions.playerid.v):gsub("_", " "),
+            ['min'] = data.functions.time.v
+          }))
         end
       end
     elseif data.combo.functions.v == 2 then -- Выдать наряд
@@ -2942,7 +3225,11 @@ imgui_windows.main = function(menu)
         if sampIsPlayerConnected(data.functions.playerid.v) then
           addcounter(7, 1)
           funcc('imgui_naryad', 1)
-          cmd_r(('%s получает наряд %s кругов за %s'):format(sampGetPlayerNickname(data.functions.playerid.v):gsub("_", " "), data.functions.kolvo.v, u8:decode(data.functions.search.v)))
+          cmd_r(localVars("punaccept", "naryad", {
+            ['id'] = sampGetPlayerNickname(data.functions.playerid.v):gsub("_", " "),
+            ['count'] = data.functions.kolvo.v,
+            ['reason'] = u8:decode(data.functions.search.v)
+          }))
         else atext('Игрок оффлайн!') end
       end
     elseif data.combo.functions.v == 3 then -- Выразить благодарность
@@ -2954,7 +3241,11 @@ imgui_windows.main = function(menu)
       imgui.InputText('##reason', data.functions.search)
       imgui.Spacing()
       if sampIsPlayerConnected(data.functions.playerid.v) then
-        imgui.Text(u8 ('Вывод: /d %s, выражаю благодарность %s за %s'):format(data.functions.frac.v, sampGetPlayerNickname(data.functions.playerid.v):gsub('_', ' '), data.functions.search.v))
+        imgui.Text(u8:encode('Вывод: '..localVars("punaccept", "blag", {
+          ['frac'] = data.functions.frac.v,
+          ['id'] = sampGetPlayerNickname(data.functions.playerid.v):gsub("_", " "),
+          ['reason'] = data.functions.search.v
+        })))
       else
         imgui.Text(u8 ("Игрок с ID %s не подключен к серверу"):format(data.functions.playerid.v))
       end
@@ -2962,7 +3253,11 @@ imgui_windows.main = function(menu)
         if sampIsPlayerConnected(data.functions.playerid.v) then
           addcounter(7, 1)
           funcc('imgui_blag', 1)
-          sampSendChat(('/d %s, выражаю благодарность %s за %s'):format(u8:encode(data.functions.frac.v), sampGetPlayerNickname(data.functions.playerid.v):gsub("_", " "), u8:decode(data.functions.search.v)))
+          cmd_r(localVars("punaccept", "blag", {
+            ['frac'] = u8:encode(data.functions.frac.v),
+            ['id'] = sampGetPlayerNickname(data.functions.playerid.v):gsub("_", " "),
+            ['reason'] = u8:decode(data.functions.search.v)
+          }))
         else atext('Игрок оффлайн!') end
       end
     elseif data.combo.functions.v == 4 then -- Запросить местоположение
@@ -2979,7 +3274,11 @@ imgui_windows.main = function(menu)
       if imgui.Button(u8 'Запросить местоположение', imgui.ImVec2(-0.1, 30)) then
         if sampIsPlayerConnected(data.functions.playerid.v) then
           funcc('imgui_loc', 1)
-          cmd_r(("%s, ваше местоположение. На ответ %s секунд"):format(sampGetPlayerNickname(data.functions.playerid.v):gsub('_', ' '), u8:decode(data.functions.time.v)))
+          local name = sampGetPlayerNickname(data.functions.playerid.v)
+          cmd_r(localVars("punaccept", "loc", {
+            ['nick'] = name:gsub('_', ' '),
+            ['sec'] = u8:decode(data.functions.time.v)
+          }))
         else atext('Игрок оффлайн!') end
       end
     elseif data.combo.functions.v == 5 then -- Выдать выговор
@@ -2997,8 +3296,12 @@ imgui_windows.main = function(menu)
       end
       if imgui.Button(u8 'Выдать выговор', imgui.ImVec2(-0.1, 30)) then
         if sampIsPlayerConnected(data.functions.playerid.v) then
-          funcc('imgui_vig', 1) 
-          cmd_r(('%s получает %s выговор за %s'):format(sampGetPlayerNickname(data.functions.playerid.v):gsub("_", " "), u8:decode(data.functions.vig.v), u8:decode(data.functions.search.v)))
+          funcc('imgui_vig', 1)
+          cmd_r(localVars("punaccept", "vig", {
+            ['id'] = sampGetPlayerNickname(data.functions.playerid.v):gsub("_", " "),
+            ['type'] = u8:decode(data.functions.vig.v),
+            ['reason'] = u8:decode(data.functions.search.v)
+          }))
         else atext('Игрок оффлайн!') end
       end
     elseif data.combo.functions.v == 6 then -- Повысить/понизить
@@ -3057,6 +3360,177 @@ imgui_windows.main = function(menu)
         else atext('Игрок оффлайн!') end
       end
     end
+  elseif menu == 21 then
+    imgui.Columns(2, _, false)
+    imgui.PushStyleColor(imgui.Col.ChildWindowBg, imgui.ImVec4(0.06, 0.05, 0.07, 1.00))
+    imgui.SetColumnWidth(-1, 160.0)
+    if imgui.Button(u8'Командный биндер', imgui.ImVec2(140, 30)) then
+      data.imgui.menu = 22
+    end
+    imgui.Spacing()
+    imgui.BeginChild('##1', imgui.ImVec2(160, -1), imgui.WindowFlags.AlwaysAutoResize)
+    if imgui.Selectable(u8'Добавить бинд', tEditKeys.id == 0 and true or false) then
+      tEditKeys = { id = 0, v = {}, buffer = '', wait = 1100 }
+    end
+    for k, v in ipairs(config_keys.binder) do
+      if imgui.Selectable(u8'Клавиша: '..table.concat(rkeys.getKeysName(v.v), " + "), tEditKeys.id == k and true or false) then
+        local buff = ""
+        for i = 1, #v.text do
+          buff = buff .. v.text[i] .. '\n'
+        end
+        tEditKeys = { id = k, v = v.v, buffer = buff, wait = v.time }
+      end
+    end
+    imgui.EndChild()
+    imgui.NextColumn()
+    imgui.BeginChild('##2', imgui.ImVec2(imgui.GetWindowWidth() - 150, -1))
+    local inputint = imgui.ImInt(tEditKeys.wait)
+    local inputbuffer = imgui.ImBuffer(tostring(u8:encode(tEditKeys.buffer)), 1028)
+    imgui.PushItemWidth(100.0)
+    imgui.Text(u8'Клавиша:')
+    imgui.SameLine()
+    if imgui.HotKey("##HK", tEditKeys, tLastKeys, 75) then
+      if not rkeys.isHotKeyDefined(tEditKeys.v) then
+        if rkeys.isHotKeyDefined(tLastKeys.v) then
+          rkeys.unRegisterHotKey(tLastKeys.v)
+        end
+        rkeys.registerHotKey(tEditKeys.v, true, onHotKey)
+      end
+      filesystem.save(config_keys, 'keys.json')
+    end
+    imgui.Spacing()
+    imgui.Text(u8'Задержка (в мс)')
+    imgui.SameLine()
+    if imgui.InputInt('##inint', inputint, 0) then
+      tEditKeys.wait = inputint.v
+    end
+    imgui.Spacing()
+    imgui.PopItemWidth()
+    if imgui.InputTextMultiline('##intextmulti', inputbuffer, imgui.ImVec2(imgui.GetWindowWidth(), 190)) then
+      tEditKeys.buffer = u8:decode(inputbuffer.v)
+    end
+    if imgui.Button(u8'Сохранить', imgui.ImVec2(120, 30)) then
+      if tEditKeys.wait > 0 and #tEditKeys.v > 0 and tEditKeys.buffer ~= "" then
+        local buffer = {}
+        for line in tEditKeys.buffer:gmatch('[^\r\n]+') do
+          table.insert(buffer, line)
+        end
+        if tEditKeys.id > 0 then
+          config_keys.binder[tEditKeys.id].time = tEditKeys.wait
+          config_keys.binder[tEditKeys.id].text = buffer
+          config_keys.binder[tEditKeys.id].v = tEditKeys.v
+          dtext('Данные успешно сохранены')
+        else
+          table.insert(config_keys.binder, { v = tEditKeys.v, time = tEditKeys.wait and tEditKeys.wait or 1100, text = buffer })
+          dtext('Команда успешно создана')
+        end
+        filesystem.save(config_keys, 'keys.json')
+      else dtext('Все поля должны быть заполнены!') end
+    end
+    imgui.SameLine()
+    if imgui.Button(u8'Удалить', imgui.ImVec2(120, 30)) then
+      if tEditKeys.id > 0 then
+        local replacedValues = {}
+        for k, v in ipairs(config_keys.binder) do
+          if k ~= tEditKeys.id then
+            replacedValues[#replacedValues + 1] = v
+          end
+        end
+        config_keys.binder = replacedValues
+        filesystem.save(config_keys, 'keys.json')
+        dtext('Команда успешно удалена!')
+        tEditKeys = { id = 0, v = {}, buffer = '', wait = 1100 }
+      else dtext('Такой команды не существует!') end
+    end
+    ------------
+    imgui.EndChild()
+    imgui.PopStyleColor()
+    imgui.Columns(1)
+  elseif menu == 22 then
+    imgui.Columns(2, _, false)
+    imgui.PushStyleColor(imgui.Col.ChildWindowBg, imgui.ImVec4(0.06, 0.05, 0.07, 1.00))
+    imgui.SetColumnWidth(-1, 160.0)
+    if imgui.Button(u8'Клавишный биндер', imgui.ImVec2(140, 30)) then
+      data.imgui.menu = 21
+    end
+    imgui.BeginChild('##1', imgui.ImVec2(160, -1), imgui.WindowFlags.AlwaysAutoResize)
+    if imgui.Selectable(u8'Добавить команду', tEditData.id == 0 and true or false) then
+      tEditData = { id = 0, cmd = '', buffer = '', wait = 1100 }
+    end
+    for k, v in ipairs(config_keys.cmd_binder) do
+      if imgui.Selectable(u8'Команда: /'..v.cmd, tEditData.id == k and true or false) then
+        local buff = ""
+        for i = 1, #v.text do
+          buff = buff .. v.text[i] .. '\n'
+        end
+        tEditData = { id = k, cmd = v.cmd, buffer = buff, wait = v.wait }
+      end
+    end
+    imgui.EndChild()
+    imgui.NextColumn()
+    imgui.BeginChild('##2', imgui.ImVec2(imgui.GetWindowWidth() - 150, -1))
+    local inputvalue = imgui.ImBuffer(tostring(tEditData.cmd), 128)
+    local inputint = imgui.ImInt(tEditData.wait)
+    local inputbuffer = imgui.ImBuffer(tostring(u8:encode(tEditData.buffer)), 1028)
+    imgui.PushItemWidth(100.0)
+    imgui.Text(u8'Команда: /')
+    imgui.SameLine()
+    if imgui.InputText('##intext', inputvalue) then
+      tEditData.cmd = inputvalue.v
+    end
+    imgui.Spacing()
+    imgui.Text(u8'Задержка (в мс)')
+    imgui.SameLine()
+    if imgui.InputInt('##inint', inputint, 0) then
+      tEditData.wait = inputint.v
+    end
+    imgui.Spacing()
+    imgui.PopItemWidth()
+    if imgui.InputTextMultiline('##intextmulti', inputbuffer, imgui.ImVec2(imgui.GetWindowWidth(), 190)) then
+      tEditData.buffer = u8:decode(inputbuffer.v)
+    end
+    if imgui.Button(u8'Сохранить', imgui.ImVec2(120, 30)) then
+      if tEditData.wait > 0 and tEditData.cmd ~= "" and tEditData.buffer ~= "" then
+        local buffer = {}
+        for line in tEditData.buffer:gmatch('[^\r\n]+') do
+          table.insert(buffer, line)
+        end
+        if tEditData.id > 0 then
+          config_keys.cmd_binder[tEditData.id].wait = tEditData.wait
+          config_keys.cmd_binder[tEditData.id].cmd = tEditData.cmd
+          config_keys.cmd_binder[tEditData.id].text = buffer
+          dtext('Данные успешно сохранены')
+        else
+          table.insert(config_keys.cmd_binder, { wait = tEditData.wait, cmd = tEditData.cmd, text = buffer })
+          dtext('Команда успешно создана')
+        end
+        for k, v in ipairs(config_keys.cmd_binder) do
+          if sampIsChatCommandDefined(v.cmd) then sampUnregisterChatCommand(v.cmd) end
+        end
+        registerFastCmd()
+        filesystem.save(config_keys, 'keys.json')
+      else dtext('Все поля должны быть заполнены!') end
+    end
+    imgui.SameLine()
+    if imgui.Button(u8'Удалить', imgui.ImVec2(120, 30)) then
+      if tEditData.id > 0 then
+        local replacedValues = {}
+        for k, v in ipairs(config_keys.cmd_binder) do
+          if sampIsChatCommandDefined(v.cmd) then sampUnregisterChatCommand(v.cmd) end
+          if k ~= tEditData.id then
+            replacedValues[#replacedValues + 1] = v
+          end
+        end
+        config_keys.cmd_binder = replacedValues
+        registerFastCmd()
+        filesystem.save(config_keys, 'keys.json')
+        dtext('Команда успешно удалена!')
+        tEditData = { id = 0, cmd = '', buffer = '', wait = 1100 }
+      else dtext('Такой команды не существует!') end
+    end
+    imgui.EndChild()
+    imgui.PopStyleColor()
+    imgui.Columns(1)   
   elseif menu == 31 then
     local membersdate = imgui.ImBool(pInfo.settings.membersdate)
     local autologin = imgui.ImBool(pInfo.settings.autologin)
@@ -3064,7 +3538,6 @@ imgui_windows.main = function(menu)
     local chatconsole = imgui.ImBool(pInfo.settings.chatconsole)
     local doklad = imgui.ImBool(pInfo.settings.autodoklad)
     local hud = imgui.ImBool(pInfo.settings.hud)
-    local oldlogo = imgui.ImBool(pInfo.settings.oldlogo)
     local tagbuffer = imgui.ImBuffer(tostring(pInfo.settings.tag), 256)
     local clistbuffer = imgui.ImBuffer(tostring(pInfo.settings.clist), 256)
     local passbuffer = imgui.ImBuffer(tostring(pInfo.settings.password), 256)
@@ -3150,18 +3623,6 @@ imgui_windows.main = function(menu)
       filesystem.save(pInfo, 'config.json')
     end
     imgui.SameLine(); imgui.Text(u8 'Убрать дату инвайта в /members 1')
-    ------------
-    if imgui.ToggleButton(u8 'oldlogo##1', oldlogo) then
-      pInfo.settings.oldlogo = oldlogo.v;
-      if pInfo.settings.oldlogo == true then
-        enableOldLogo()
-        atext('Старый логотип включен')
-      else
-        atext('Старый логотип выключен. Новый появится при следующем входе в игру')
-      end
-      filesystem.save(pInfo, 'config.json')
-    end
-    imgui.SameLine(); imgui.Text(u8 'Старый логотип Evolve-Rp')
     ------------
     if imgui.ToggleButton(u8 'target##1', target) then
       pInfo.settings.target = target.v;
@@ -3262,42 +3723,67 @@ imgui_windows.main = function(menu)
       imgui.PopItemWidth()
     end
   elseif menu == 33 then
-    imgui.TextColoredRGB('{FFFFFF}/sh'); imgui.SameLine(225.0); imgui.Text(u8'Открыть главное меню скрипта')
-    imgui.TextColoredRGB('{FFFFFF}/shupd'); imgui.SameLine(225.0); imgui.Text(u8'Просмотреть последнее обновление')
-    imgui.TextColoredRGB('{FFFFFF}/abp'); imgui.SameLine(225.0); imgui.Text(u8'Вызвать меню Авто-БП')
-    imgui.TextColoredRGB('{FFFFFF}/shud'); imgui.SameLine(225.0); imgui.Text(u8'Включить/Выключить худ')
-    imgui.TextColoredRGB('{FFFFFF}/starget'); imgui.SameLine(225.0); imgui.Text(u8'Вкючить/Отключить таргет меню')
-    imgui.TextColoredRGB('{FFFFFF}/rpweap [тип]'); imgui.SameLine(225.0); imgui.Text(u8'Изменить тип РП отыгровки оружия')
-    imgui.TextColoredRGB('{FFFFFF}/punishlog [id/nick]'); imgui.SameLine(225.0); imgui.Text(u8'Просмотр наказаний игрока')
-    imgui.TextColoredRGB('{FFFFFF}/members [0-2]'); imgui.SameLine(225.0); imgui.Text(u8'Просмотреть мемберс')
-    imgui.TextColoredRGB('{FFFFFF}/mon [0-1 (опционально)]'); imgui.SameLine(225.0); imgui.TextColoredRGB('Отправить состояние склада в рацию {954F4F}(Доступно SFA/LVA)')
-    imgui.TextColoredRGB('{FFFFFF}/cn [id] [0-1]'); imgui.SameLine(225.0); imgui.Text(u8'Скопировать ник. 0 - RP ник, 1 - NonRP ник')
-    imgui.TextColoredRGB('{FFFFFF}/ev [0-1] [места]'); imgui.SameLine(225.0); imgui.Text(u8'Запросить эвакуацию. 0 - текущий квадрат, 1 - по метке')
-    imgui.TextColoredRGB('{FFFFFF}/loc [id/nick] [секунды]'); imgui.SameLine(225.0); imgui.Text(u8'Запросить местоположение бойца')
-    imgui.TextColoredRGB('{FFFFFF}/watch [add/remove/list] [id]'); imgui.SameLine(225.0); imgui.Text(u8'Панель слежки за цветом ника игрока')
-    imgui.TextColoredRGB('{FFFFFF}/checkrank [id/nick]'); imgui.SameLine(225.0); imgui.TextColoredRGB('Просмотреть последнее повышение игрока. {954F4F}(Доступно SFA)')
-    imgui.TextColoredRGB('{FFFFFF}/checkbl [id/nick]'); imgui.SameLine(225.0); imgui.TextColoredRGB('Проверить игрока в Черном Списке. {954F4F}(Доступно SFA)')
-    imgui.TextColoredRGB('{FFFFFF}/checkvig [id/nick]'); imgui.SameLine(225.0); imgui.TextColoredRGB('Просмотреть выговоры игрока. {954F4F}(Доступно SFA)')
-    imgui.TextColoredRGB('{FFFFFF}/cchat'); imgui.SameLine(225.0); imgui.Text(u8'Очистить чат')
-    imgui.TextColoredRGB('{FFFFFF}/adm'); imgui.SameLine(225.0); imgui.Text(u8'Альтернатива команде /admins')
-    imgui.TextColoredRGB('{FFFFFF}(/lec)ture [start/pause/stop]'); imgui.SameLine(225.0); imgui.Text(u8'Вывести подготовленную лекцию в чат')
-    imgui.TextColoredRGB('{FFFFFF}/createpost [название]'); imgui.SameLine(225.0); imgui.Text(u8'Создать пост, для автодокладов')
-    imgui.TextColoredRGB('{FFFFFF}/addbl'); imgui.SameLine(225.0); imgui.TextColoredRGB('Добавить игрока в Черный Список {954F4F}(Доступно по привязке)')
-    imgui.TextColoredRGB('{FFFFFF}/addtable'); imgui.SameLine(225.0); imgui.TextColoredRGB('Добавить игрока в таблицу {954F4F}(Доступно SFA 12+)')
-    imgui.TextColoredRGB('{FFFFFF}/vig [id] [тип] [причина]'); imgui.SameLine(225.0); imgui.Text(u8'Выдать игроку выговор')
-    imgui.TextColoredRGB('{FFFFFF}/reconnect [секунды]'); imgui.SameLine(225.0); imgui.Text(u8'Переподключение к серверу')
-    imgui.TextColoredRGB('{FFFFFF}/blag [id] [фракция] [тип]'); imgui.SameLine(225.0); imgui.Text(u8'Выразить игроку благодарность в департамент')
-    imgui.TextColoredRGB('{FFFFFF}/match [id/nick]'); imgui.SameLine(225.0); imgui.Text(u8'Отображение местонахождение игрока на радаре')
-    imgui.TextColoredRGB('{FFFFFF}/sweather [погода 0 - 45]'); imgui.SameLine(225.0); imgui.Text(u8'Изменить погоду на указанную')
-    imgui.TextColoredRGB('{FFFFFF}/stime [время 0 - 23]'); imgui.SameLine(225.0); imgui.Text(u8'Изменить время на указанное')
+    imgui.Columns(2, _, false)
+    imgui.PushStyleColor(imgui.Col.ChildWindowBg, imgui.ImVec4(0.06, 0.05, 0.07, 1.00))
+    imgui.SetColumnWidth(-1, 160.0)
+    if changeText.sex == 1 then
+      if imgui.Button(u8'Женские отыгровки', imgui.ImVec2(140, 30)) then
+        changeText.sex = 2
+      end
+    else
+      if imgui.Button(u8'Мужские отыгровки', imgui.ImVec2(140, 30)) then
+        changeText.sex = 1
+      end
+    end
+    imgui.Spacing()
+    imgui.BeginChild('##1', imgui.ImVec2(160, -1), imgui.WindowFlags.AlwaysAutoResize)
+    if imgui.Selectable(u8'Выберите раздел', changeText.id == 0 and true or false) then
+      changeText = { id = 0, sex = pInfo.settings.sex, values = {} }
+    end
+    for k, v in pairs(localInfo) do
+      if imgui.Selectable(u8:encode(v.title), changeText.id == k and true or false) then
+        changeText = { id = k, sex = pInfo.settings.sex, values = v }
+      end
+    end
+    imgui.EndChild()
+    imgui.NextColumn()
+    imgui.BeginChild('##2', imgui.ImVec2(imgui.GetWindowWidth() - 150, -1))
+    imgui.PushItemWidth(imgui.GetWindowWidth())
+    --local inputtext = {}
+    for k, v in pairs(changeText.values) do
+      if k ~= "title" then
+        local inputtext = imgui.ImBuffer(tostring(u8:encode(v[changeText.sex + 1])), 256)
+        imgui.Text(u8:encode(v[1]))
+        if imgui.InputText('##intext'..k, inputtext, 0) then
+          v[changeText.sex + 1] = u8:decode(inputtext.v)
+        end
+      end
+    end
+    imgui.PopItemWidth()
+    if changeText.id ~= 0 then
+      if imgui.Button(u8'Сохранить', imgui.ImVec2(120, 30)) then
+        localInfo[changeText.id] = changeText.values
+        filesystem.save(localInfo, 'local.json')
+        atext('Данные сохранены')
+      end
+    end
+    ------------
+    imgui.EndChild()
+    imgui.PopStyleColor()
+    imgui.Columns(1)
   elseif menu == 34 then
     atext("Перезагружаемся...")
     showCursor(false)
+    reloadScriptsParam = true
     thisScript():reload()
   elseif menu == 35 then
     imgui.PushItemWidth(175)
+    if #data.functions.checkbox == 0 then
+      for i = 1, 5 do
+        data.functions.checkbox[i] = imgui.ImBool(false)
+      end
+    end
     if #data.functions.export == 0 then
-      lfs = require 'lfs'
       for file in lfs.dir(getWorkingDirectory()..'\\SFAHelper\\accounts') do
         if file ~= "." and file ~= ".." and file ~= sInfo.nick then
           local attr = lfs.attributes(getWorkingDirectory()..'\\SFAHelper\\accounts\\'..file)
@@ -3319,6 +3805,7 @@ imgui_windows.main = function(menu)
       imgui.Checkbox(u8 'Настройки', data.functions.checkbox[1])
       imgui.Checkbox(u8 'Посты', data.functions.checkbox[2])
       imgui.Checkbox(u8 'Биндер', data.functions.checkbox[3])
+      imgui.Checkbox(u8 'Отыгровки', data.functions.checkbox[4])
       if imgui.Button(u8'Экспортировать', imgui.ImVec2(120, 30)) then
         lua_thread.create(function()
           dtext('Начинчем экспорт настроек...')
@@ -3362,12 +3849,46 @@ imgui_windows.main = function(menu)
               file:close()
             else logger.debug('Экспорт биндов не удался. Файл не найден!') end          
           end
+          if data.functions.checkbox[4].v then
+            logger.debug('Экспортируем отыгровки')
+            local file = io.open("moonloader/SFAHelper/accounts/"..data.functions.export[data.combo.export.v].."/local.json", "r+")
+            if file ~= nil then
+              local cfg = decodeJson(file:read('*a'))
+              if cfg ~= nil then
+                localInfo = cfg
+                count = count + 1
+                filesystem.save(localInfo, 'local.json')
+              else logger.debug('Экспорт отыгровок не удался. Файл поврежден/занят другим приложением') end
+              file:close()
+            else logger.debug('Экспорт отыгровок не удался. Файл не найден!') end          
+          end
           dtext("Экспорт закончен. Загружено "..count.." элементов. Перезагружаемся...")
           showCursor(false)
+          reloadScriptsParam = true
           thisScript():reload()
         end)
       end
     end
+  elseif menu == 36 then
+    local menuText = {"FPS", "Оружие", "Автомобиль", "Локация", 'Время', "Статус таргет-бара", 'Тазер', "Шапка", "Пинг", "Квадрат", "Здоровье, бронь"}
+    local opacity = imgui.ImFloat(pInfo.settings.hudopacity)
+    imgui.Text(u8'Прозрачность худа (не работает)')
+    if imgui.SliderFloat('##sliderfloat', opacity, 0.0, 1.0, "%.1f", 1) then
+      pInfo.settings.hudopacity = opacity.v
+      dtext(pInfo.settings.hudopacity)
+    end
+    for i = 1, #pInfo.settings.hudset do
+      if data.functions.checkbox[i] == nil then
+        data.functions.checkbox[i] = imgui.ImBool(pInfo.settings.hudset[i])
+      end
+      imgui.Checkbox(u8:encode(menuText[i]), data.functions.checkbox[i])
+      if data.functions.checkbox[i].v ~= pInfo.settings.hudset[i] then
+        pInfo.settings.hudset[i] = data.functions.checkbox[i].v
+        filesystem.save(pInfo, 'config.json')
+      end
+    end
+    -- FPS, Оружие, Автомобиль, Локация, Время, Статус таргет-бара, Тазер, Шапка, 9 = ping, 10 = квадрат, 11 - здоровье, бронь
+    -- pInfo.settings.hudset = {false, true, true, true, true, true, false, true}
   elseif menu == 41 then
     for i = #data.punishlog, 1, -1 do
       imgui.Text(u8:encode(("%s | Выдал: %s (%s)"):format(data.punishlog[i].time, data.punishlog[i].from, data.punishlog[i].rank)))
@@ -3449,187 +3970,22 @@ imgui_windows.addtable = function()
   end
 end
 imgui_windows.binder = function()
-  imgui.PushItemWidth(500)
-  if imgui.BeginMenuBar(u8 'binder') then
-    if imgui.MenuItem(u8 'Клавишный биндер') then data.imgui.bind = 1 end
-    if imgui.MenuItem(u8 'Командный биндер') then data.imgui.bind = 2 end
-    if imgui.MenuItem(u8 'Сохранить изменения') then
-      funcc('imgui_binder_save', 1)
-      if data.imgui.bind == 1 then
-        local replacedValues = {}
-        for k, v in ipairs(config_keys.binder) do
-          local newValues = {}
-          if v.v ~= 0 then -- edit
-            for i = 1, #v.text do
-              if v.text[i] ~= "" and v.text[i] ~= nil then
-                newValues[#newValues + 1] = v.text[i]
-              end
-            end
-          end
-          if #newValues > 0 then
-            replacedValues[#replacedValues + 1] = { v = v.v, time = v.time and v.time or 1100, text = newValues }
-          end
-        end
-        tEditData = {}
-        config_keys.binder = replacedValues
-      end
-      if data.imgui.bind == 2 then
-        local replacedValues = {}
-        for k, v in ipairs(config_keys.cmd_binder) do
-          if sampIsChatCommandDefined(v.cmd) then sampUnregisterChatCommand(v.cmd) end
-          local newValues = {}
-          if v.cmd ~= "" then
-            for i = 1, #v.text do
-              if v.text[i] ~= "" and v.text ~= nil then
-                newValues[#newValues + 1] = v.text[i]
-              end
-            end
-          end
-          if #newValues > 0 then
-            replacedValues[#replacedValues + 1] = { cmd = v.cmd, wait = v.wait and v.wait or 1100, text = newValues }
-          end
-        end
-        sCmdEdit = {}
-        config_keys.cmd_binder = replacedValues
-        registerFastCmd()
-      end
-      atext('Биндер успешно изменен!')
-      filesystem.save(config_keys, 'keys.json')
-    end
-    imgui.EndMenuBar()
-  end
-  ----------------------
   local str = "{mynick} - Ваш ник\n{myfullname} - Ваш РП ник\n{myname} - Ваше имя\n{mysurname} - Ваша фамилия\n{myid} - Ваш ID\n"
-  str = str.."{myhp} - Ваше здоровье\n{myarm} - Ваша броня\n{myrank} - Ваш ранг (числовой)\n{myrankname} - Ваше звание (текст)\n-------------------------\n"
+  str = str.."{myhp} - Ваше здоровье\n{myarm} - Ваша броня\n{myrank} - Ваш ранг (числовой)\n{myrankname} - Ваше звание (текст)\n"
   str = str.."{kvadrat} - Ваш текущий квадрат\n{tag} - Ваш тэг\n{frac} - Ваша фракция\n{city} - Текущий город\n{zone} - Текущая локация\n{time} - Текущее время\n"
-  str = str.."{date} - Текущая дата в формате DD.MM.YYYY\n{weaponid} - ID оружия в руках\n{weaponname} - Название оружия в руках\n{ammo} - Количество патронов в оружие\n-------------------------\n"
+  str = str.."{date} - Текущая дата в формате DD.MM.YYYY\n{weaponid} - ID оружия в руках\n{weaponname} - Название оружия в руках\n{ammo} - Количество патронов в оружие\n"
   str = str.."Последний игрок, выделенный через таргет:\n{tID} - ID игрока\n{tnick} - Ник игрока\n"
-  str = str.."{tfullname} - РП ник игрока\n{tname} - Имя игрока\n{tsurname} - Фамилия игрока\n-------------------------\n"
+  str = str.."{tfullname} - РП ник игрока\n{tname} - Имя игрока\n{tsurname} - Фамилия игрока\n"
   str = str.."Игрок, выбранный через \"/match\":\n{mID} - ID игрока\n{mnick} - Иик игрока\n{mfullname} - РП ник игрока\n{mname} - Имя игрока\n{msurname} - Фамилия игрока\n"
-  ----------------------
-  if data.imgui.bind == 1 then
-    imgui.Text(u8'После изменения названия команды необходимо нажать "Сохранить изменения", иначе команда не зарегистрируется в системе.')
-    imgui.Text(u8'Вы можете придумать любую команду на свой вкус и для ваших потребностей с помощью специальных "вставок".')
-    imgui.Text(u8'Чтобы удалить строку, просто оставьте её пустой и нажмите "Сохранить изменения". Система сама удалить все лишнее.')
-    imgui.Spacing(); imgui.Separator(); imgui.Spacing()
-    imgui.Columns(2)
-    -------------------
-    for k, v in ipairs(config_keys.binder) do
-      if tEditData[k] == nil then
-        tEditData[k] = {}
-        tEditData[k].text = {}
-        tEditData[k].isEnter = {}
-      end
-      local btimeb = imgui.ImInt(v.time)
-      if imgui.HotKey("##HK" .. k, v, tLastKeys, 75) then
-        if not rkeys.isHotKeyDefined(v.v) then
-          if rkeys.isHotKeyDefined(tLastKeys.v) then
-            rkeys.unRegisterHotKey(tLastKeys.v)
-          end
-          rkeys.registerHotKey(v.v, true, onHotKey)
-        end
-        filesystem.save(config_keys, 'keys.json')
-      end
-      imgui.SameLine(100)
-      imgui.Text(u8'Задержка')
-      imgui.SameLine()
-      imgui.PushItemWidth(50)
-      if imgui.InputInt(u8'##time'..k, btimeb, 0) then v.time = btimeb.v end
-      imgui.PopItemWidth()
-      imgui.SameLine()
-      if imgui.Button(u8'Добавить строку##addstr'..k) then
-        v.text[#v.text + 1] = ""
-      end
-      --------
-      for i = 1, #v.text do
-        if v.text[i] ~= nil then
-          if tEditData[k].text[i] == nil then
-            tEditData[k].text[i] = imgui.ImBuffer(256)
-            local sText = v.text[i]:gsub("%[enter%]$", "")
-            tEditData[k].text[i].v = u8:encode(sText)
-            tEditData[k].isEnter[i] = imgui.ImBool(false)
-            tEditData[k].isEnter[i].v = string.match(v.text[i], "(.)%[enter%]$") ~= nil
-          end
-          imgui.PushItemWidth(imgui.GetWindowSize().x - 390)
-          if imgui.InputText("##Edit"..k..i, tEditData[k].text[i]) then
-            v.text[i] = u8:decode(tEditData[k].text[i].v .. (tEditData[k].isEnter[i].v and "[enter]" or ""))
-            tEditData[k].text[i] = nil
-          end
-          imgui.SameLine()
-          if imgui.Checkbox(u8("Ввод").."##editCH"..k..i, tEditData[k].isEnter[i]) then
-            v.text[i] = u8:decode(tEditData[k].text[i].v .. (tEditData[k].isEnter[i].v and "[enter]" or ""))
-          end
-          imgui.PopItemWidth()
-        end
-      end
-      imgui.NewLine()
-    end
-    if imgui.Button(u8"Добавить бинд") then
-      config_keys.binder[#config_keys.binder + 1] = {text = {""}, v = {}, time = 0}
-    end
-    imgui.NextColumn()
-    imgui.SetColumnOffset(-1, imgui.GetWindowSize().x - 300)
-    imgui.Text(u8:encode("Список специальных вставок:\n"..str))
-    imgui.NextColumn()
-
-  elseif data.imgui.bind == 2 then
+  if data.imgui.menu == 21 then
+    local dstr = "[enter] - Отправить сообщение в чат\n\n"
+    str = dstr..str
+    imgui.Text(u8:encode(str)) 
+  elseif data.imgui.menu == 22 then
     local dstr = "{param} - Первый аргумент в команде\n{pNickByID} - Ник по ID в параметре\n{pFullNameByID} - РП ник по ID в параметре\n{pNameByID} - Имя по ID в параметре\n"
     dstr = dstr .. "{pSurnameByID} - Фамилия по ID в параметре\n{param2} - Второй аргумент\n{param3} - Третий аргумент\n"
     str = dstr..str
-    imgui.Text(u8'После изменения названия команды необходимо нажать "Сохранить изменения", иначе команда не зарегистрируется в системе.')
-    imgui.Text(u8'Вы можете придумать любую команду на свой вкус и для ваших потребностей с помощью специальных "вставок".')
-    imgui.Text(u8'Чтобы удалить команду или строку, просто оставьте её пустой и нажмите "Сохранить изменения". Система сама удалить все лишнее.')
-    imgui.Spacing(); imgui.Separator(); imgui.Spacing()
-    imgui.Columns(2)
-    -------------------
-    for k, v in ipairs(config_keys.cmd_binder) do
-      local btimeb = imgui.ImInt(1100) 
-      if v.wait ~= nil then btimeb.v = v.wait end
-      imgui.PushItemWidth(100)
-      if sCmdEdit[k] == nil then
-        sCmdEdit[k] = {}
-        sCmdEdit[k].cmd = imgui.ImBuffer(256)
-        sCmdEdit[k].cmd.v = v.cmd
-        sCmdEdit[k].text = {}
-        sCmdEdit[k].delete = {}
-      end
-      if imgui.InputText("##CMD" .. k, sCmdEdit[k].cmd) then
-        sCmdEdit[k].cmd.v = sCmdEdit[k].cmd.v:gsub("/", "")
-        if sampIsChatCommandDefined(v.cmd) then sampUnregisterChatCommand(v.cmd) end
-        v.cmd = sCmdEdit[k].cmd.v
-      end
-      imgui.SameLine(125)
-      imgui.Text(u8'Задержка')
-      imgui.SameLine()
-      imgui.PushItemWidth(50)
-      if imgui.InputInt(u8'##wait'..k, btimeb, 0) then v.wait = btimeb.v end
-      imgui.PopItemWidth()
-      imgui.SameLine()
-      if imgui.Button(u8'Добавить строку##addstr'..k) then
-        v.text[#v.text + 1] = ""
-      end
-      for i = 1, #v.text do
-        if v.text[i] ~= nil then
-          if sCmdEdit[k].text[i] == nil then
-            sCmdEdit[k].text[i] = imgui.ImBuffer(256)
-            sCmdEdit[k].text[i].v = u8:encode(v.text[i])
-          end
-          imgui.PushItemWidth(imgui.GetWindowSize().x - 320)
-          if imgui.InputText("##Edit"..k..i, sCmdEdit[k].text[i]) then
-            v.text[i] = u8:decode(sCmdEdit[k].text[i].v)
-          end
-          imgui.PopItemWidth()
-        end
-      end
-      imgui.NewLine()
-    end
-    if imgui.Button(u8"Добавить команду") then
-      config_keys.cmd_binder[#config_keys.cmd_binder + 1] = { cmd = "", text = { "" } }
-    end
-    imgui.NextColumn()
-    imgui.SetColumnOffset(-1, imgui.GetWindowSize().x - 300)
-    imgui.Text(u8:encode("Список специальных вставок:\n"..str))
-    imgui.NextColumn()
+    imgui.Text(u8:encode(str))
   end
 end
 imgui_windows.members = function()
@@ -3701,43 +4057,80 @@ imgui_windows.members = function()
 end
 
 imgui_windows.hud = function()
+  --imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.06, 0.05, 0.07, pInfo.settings.hudopacity))
+  imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.06, 0.05, 0.07, 0.50))
+  -- ImVec4(0.10, 0.09, 0.12, 1.00)
+  local sizeHud = 25.5
+  if pInfo.settings.hudset[8] then
+    sizeHud = sizeHud + 35
+    local titlename = u8:encode(string.format('%s-Helper', sInfo.fraction ~= "no" and sInfo.fraction or "SFA"))
+    imgui.SetCursorPosX((300 - imgui.CalcTextSize(titlename).x) / 2)
+    imgui.Text(titlename)
+    imgui.Separator()
+  end
   local myping = sampGetPlayerPing(sInfo.playerid)
-  local myweapon = getCurrentCharWeapon(PLAYER_PED)
-  local myweaponammo = getAmmoInCharWeapon(PLAYER_PED, myweapon)
-  local myweaponname = getweaponname(myweapon)
-  local titlename = u8:encode(string.format('%s-Helper', sInfo.fraction ~= "no" and sInfo.fraction or "SFA"))
-  imgui.SetCursorPosX((300 - imgui.CalcTextSize(titlename).x) / 2)
-  imgui.Text(titlename)
-  imgui.Separator()
-  imgui.Text(u8:encode(("Ник: %s[%d] | Пинг: %d"):format(sInfo.nick, sInfo.playerid, myping))) -- imgui.GetIO().Framerate
-  imgui.Text(u8:encode(("Оружие: %s [%d]"):format(myweaponname, myweaponammo)))
-  if isCharInAnyCar(playerPed) then
+  imgui.Text(u8:encode(("Ник: %s[%d]%s%s"):format(sInfo.nick, sInfo.playerid,
+    pInfo.settings.hudset[9] and " | Ping: "..myping or "",
+    pInfo.settings.hudset[1] and " | FPS: "..math.floor(imgui.GetIO().Framerate) or ""
+  )))
+  if pInfo.settings.hudset[11] then
+    sizeHud = sizeHud + 25.5
+    imgui.Text(u8:encode("Здоровье: "..sInfo.health.." | Бронь: "..sInfo.armour))
+  end
+  if pInfo.settings.hudset[2] then
+    sizeHud = sizeHud + 25.5
+    local myweapon = getCurrentCharWeapon(PLAYER_PED)
+    local myweaponammo = getAmmoInCharWeapon(PLAYER_PED, myweapon)
+    local myweaponname = getweaponname(myweapon)
+    imgui.Text(u8:encode(("Оружие: %s [%d]"):format(myweaponname, myweaponammo)))
+  end
+  if isCharInAnyCar(playerPed) and pInfo.settings.hudset[3] then
+    sizeHud = sizeHud + 25.5
     local vHandle = storeCarCharIsInNoSave(playerPed)
     local _, vID = sampGetVehicleIdByCarHandle(vHandle)
     local vHP = getCarHealth(vHandle)
     local speed = math.floor(getCarSpeed(vHandle)) * 2
-    local vehName = getGxtText(getNameOfVehicleModel(getCarModel(vHandle)))
+    local vehName = tCarsName[getCarModel(vHandle) - 399]
     imgui.Text(u8:encode(("Авто: %s[%d] | ХП: %s | Скорость: %s"):format(vehName, vID, vHP, speed)))
-  else
+  elseif pInfo.settings.hudset[3] then
+    sizeHud = sizeHud + 25.5
     imgui.Text(u8'Авто: Нет')
   end
-  imgui.Text(u8:encode(('Локация: %s | %s'):format(playerZone, sInfo.interior > 0 and "Интерьер: "..sInfo.interior or "Квадрат: "..kvadrat())))
-  imgui.Text(u8'Текущее время: '..os.date('%H:%M:%S'))
+  if pInfo.settings.hudset[4] or pInfo.settings.hudset[10] then
+    sizeHud = sizeHud + 25.5
+    imgui.Text(u8:encode(('%s%s'):format(
+      pInfo.settings.hudset[4] and "Локация: "..playerZone.." | " or "",
+      pInfo.settings.hudset[10] and (sInfo.interior > 0 and "Интерьер: "..sInfo.interior or "Квадрат: "..kvadrat()) or ""
+    )))
+  end
+  if pInfo.settings.hudset[5] then
+    sizeHud = sizeHud + 25.5
+    imgui.Text(u8'Текущее время: '..os.date('%H:%M:%S'))
+  end
+  if sInfo.tazer and pInfo.settings.hudset[7] then
+    sizeHud = sizeHud + 25.5
+    imgui.TextColoredRGB('Тазер: {228B22}Включен')
+  elseif pInfo.settings.hudset[7] then
+    sizeHud = sizeHud + 25.5
+    imgui.TextColoredRGB('Тазер: Выключен')
+  end
   data.imgui.hudpoint = { x = imgui.GetWindowPos().x, y = imgui.GetWindowPos().y }
-  if pInfo.settings.target == true then
+  if pInfo.settings.target == true and pInfo.settings.hudset[6] then
+    sizeHud = sizeHud + 25.5
     imgui.TextColoredRGB('Таргет-бар: {228B22}Включен')
-    -- local cx, cy, cz = getCharCoordinates(PLAYER_PED)
-    -- imgui.Text('X: '..cx..', Y: '..cy..', Z:'..cz)
-  else
+  elseif pInfo.settings.hudset[6] then
+    sizeHud = sizeHud + 25.5
     imgui.TextColoredRGB('Таргет-бар: Выключен')
   end
+  hudSizeY = sizeHud
+  imgui.PopStyleColor()
 end
 imgui_windows.target = function()
   imgui.Text(u8:encode(("Ник: %s[%d]"):format(sampGetPlayerNickname(targetMenu.playerid), targetMenu.playerid)))
   local com = false
   for i = 1, #data.members do
     if data.members[i].pid == targetMenu.playerid then
-      imgui.Text(u8:encode(("Фракция: %s | Звание: %s[%d]"):format(sInfo.fraction, rankings[sInfo.fraction][data.members[i].prank], data.members[i].prank)))
+      imgui.Text(u8:encode(("Фракция: %s | Звание: %s[%d]"):format(sInfo.fraction, pInfo.settings.ranknames[data.members[i].prank], data.members[i].prank)))
       com = true
       break
     end
@@ -3792,6 +4185,24 @@ function onHotKey(id, keys)
       end
     end
   end)
+end
+
+function localVars(category, subcategory, args)
+  local cat = localInfo[category]
+  if cat ~= nil then
+    cat = cat[subcategory]
+    if cat ~= nil then
+      local pos = pInfo.settings.sex == 1 and 2 or 3
+      local text = cat[pos]
+      if text ~= nil then
+        for k, v in pairs(args) do
+          text = text:gsub('{'..k..'}', v)
+        end
+        return text
+      end
+    end
+  end
+  return false
 end
 
 function sendGoogleMessage(type, name, param1, param2, reason, time)
@@ -4037,7 +4448,7 @@ function tags(args, param)
 	args = args:gsub("{myid}", tostring(sInfo.playerid))
 	args = args:gsub("{myhp}", tostring(getCharHealth(PLAYER_PED)))
   args = args:gsub("{myrank}", tostring(pInfo.settings.rank))
-  args = args:gsub("{myrankname}", tostring(rankings[sInfo.fraction][pInfo.settings.rank]))
+  args = args:gsub("{myrankname}", tostring(pInfo.settings.ranknames[pInfo.settings.rank]))
   args = args:gsub("{myarm}", tostring(getCharArmour(PLAYER_PED)))
   ----------
   args = args:gsub("{kvadrat}", tostring(kvadrat()))
@@ -4067,84 +4478,6 @@ function tags(args, param)
 		args = args:gsub("{msurname}", tostring(sampGetPlayerNickname(playerMarkerId):gsub(".*_", "")))
 		args = args:gsub("{mnick}", tostring(sampGetPlayerNickname(playerMarkerId)))    
   end
-  ----------
-  --[[local patt = 0
-  while true do
-    local found = args:find('$.-{.-}', patt)
-    if found then
-      local functions = {
-        ["screen"] = screen,
-        ['timeScreen'] = timeScreen,
-        ['target'] = targetPlayer,
-        ['loc'] = cmd_loc,
-        ['punishlog'] = cmd_punishlog,
-        ['stime'] = cmd_stime,
-        ['sweather'] = cmd_sweather,
-        ['ev'] = cmd_ev,
-        ['checkbl'] = cmd_checkbl,
-        ['checkrank'] = cmd_checkrank,
-        ['watch'] = cmd_watch,
-        ['blag'] = cmd_blag,
-        ['contract'] = cmd_contract,
-        ['vig'] = cmd_vig,
-        ['lecture'] = cmd_lecture,
-        ['addbl'] = cmd_addbl,
-        ['match'] = cmd_match,
-      }
-      local cmd, arg = args:match('$(.-){(.-)}', patt)
-      for k, v in pairs(functions) do
-        if cmd == k then
-          v(arg)
-        end
-      end
-      patt = found + 1
-    else break end
-  end
-  -----
-  patt = 0
-  while true do
-    local found = args:find('#.-{.-}', patt)
-    if found then
-      local functions = {
-        ["upper"] = rusUpper,
-        ['lower'] = rusLower,
-        ['getFracById'] = sampGetFraktionBySkin,
-        ['secToTime'] = _secToTime
-      }
-      local cmd, arg = args:match('#(.-){(.-)}', patt)
-      for k, v in pairs(functions) do
-        if cmd == k then
-          args = args:gsub('#'..cmd..'{'..arg..'}', v(arg), 1)
-        end
-      end
-      patt = found + 1
-    else break end
-  end
-  args = args:gsub("$.-{.-}", '')]]
-  --[[
-    #upper{string}
-    #lower{string}
-    #getFrac{playerid}
-    #secToTime{sec}
-    ------
-    $screen{}
-    $timeScreen{}
-    $target{id}
-    $loc{id/nick, secounds}
-    $punishlog{id, nick}
-    $stime{0-23}
-    $sweather{0-45}
-    $ev{0-1, mesta}
-    $checkbl{id/nick}
-    $checkrank{id/nick}
-    $watch{add/remove/list, id}
-    $blag{id, frac, type}
-    $contract{playerid, rank}
-    $vig{playerid, type, reason}
-    $lecture{start/pause/stop}
-    $addbl{playerid/nick, stepen, dok-va, reason}
-    $match{playerid/''}
-  ]]
 	return args
 end
 
@@ -4727,6 +5060,11 @@ filesystem.init = function(path)
     fa:write("[]")
     fa:close()
   end
+  if not doesFileExist(path.."/local.json") then
+    local fa = io.open(path.."/local.json", "w")
+    fa:write(encodeJson(localInfo))
+    fa:close()
+  end
   complete = true
 end
 filesystem.load = function(file)
@@ -4983,6 +5321,14 @@ function ARGBtoRGB(color)
   return rgb
 end
 
+function bassFlagsOrOperation(flags)
+  local result = 0
+  for i, v in pairs(flags) do
+    result = bit.bor(result, v)
+  end
+  return result
+end
+
 local russian_characters = {
   [168] = 'Ё', [184] = 'ё', [192] = 'А', [193] = 'Б', [194] = 'В', [195] = 'Г', [196] = 'Д', [197] = 'Е', [198] = 'Ж', [199] = 'З', [200] = 'И', [201] = 'Й', [202] = 'К', [203] = 'Л', [204] = 'М', [205] = 'Н', [206] = 'О', [207] = 'П', [208] = 'Р', [209] = 'С', [210] = 'Т', [211] = 'У', [212] = 'Ф', [213] = 'Х', [214] = 'Ц', [215] = 'Ч', [216] = 'Ш', [217] = 'Щ', [218] = 'Ъ', [219] = 'Ы', [220] = 'Ь', [221] = 'Э', [222] = 'Ю', [223] = 'Я', [224] = 'а', [225] = 'б', [226] = 'в', [227] = 'г', [228] = 'д', [229] = 'е', [230] = 'ж', [231] = 'з', [232] = 'и', [233] = 'й', [234] = 'к', [235] = 'л', [236] = 'м', [237] = 'н', [238] = 'о', [239] = 'п', [240] = 'р', [241] = 'с', [242] = 'т', [243] = 'у', [244] = 'ф', [245] = 'х', [246] = 'ц', [247] = 'ч', [248] = 'ш', [249] = 'щ', [250] = 'ъ', [251] = 'ы', [252] = 'ь', [253] = 'э', [254] = 'ю', [255] = 'я',
 }
@@ -5108,7 +5454,7 @@ function drawMembersPlayer(table)
     imgui.OpenPopup("ContextMenu")
   end
   imgui.NextColumn()
-	imgui.Text(u8:encode(("%s[%d]"):format(rankings[sInfo.fraction][table.mrank], table.mrank))); imgui.NextColumn()
+	imgui.Text(u8:encode(("%s[%d]"):format(pInfo.settings.ranknames[table.mrank], table.mrank))); imgui.NextColumn()
 	imgui.Text(u8:encode(table.mstatus and "На работе" or "Выходной")); imgui.NextColumn()
 	imgui.Text(u8:encode(table.mafk ~= nil and table.mafk.." секунд" or "")); imgui.NextColumn()
 	imgui.Text(u8:encode(distance)); imgui.NextColumn()
