@@ -7,8 +7,8 @@
     },
     "sfahelpernew":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.luac",
-        "version":"1.4030",
-		"versiontext":"1.4"
+        "version":"1.4032",
+		"versiontext":"1.4-release2"
     },
     "sfahelpertest":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.lua",
