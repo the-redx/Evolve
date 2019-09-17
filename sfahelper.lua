@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.41-beta1
+-- Version 1.41-beta2
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4101")
-SCRIPT_ASSEMBLY = "1.41-beta1"
+script_version("1.4102")
+SCRIPT_ASSEMBLY = "1.41-beta2"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -36,8 +36,7 @@ local lhttp, http         = pcall(require, 'copas.http')
 local llfs, lfs           = pcall(require,  'lfs')
 local lbass, bass         = pcall(require, 'bass')
 local lffi, ffi           = pcall(require, 'ffi')
---local json = require "cjson"
---local util = require "cjson.util"
+local lpie, pie           = pcall(require, 'imgui_piemenu')
 --local raknet = require "lib.samp.raknet"
 ------------------
 encoding.default = 'CP1251'
@@ -68,7 +67,7 @@ window = {
   ['members'] = { bool = imgui.ImBool(false), cursor = true, draw = true } ,
   ['addtable'] = { bool = imgui.ImBool(false), cursor = true, draw = true },
   ['hud'] = { bool = imgui.ImBool(false), cursor = false, draw = true },
-  ['binder'] = { bool = imgui.ImBool(false), cursor = false, draw = false },
+  ['binder'] = { bool = imgui.ImBool(false), cursor = false, draw = false }
 }
 screenx, screeny = getScreenResolution()
 reloadScriptsParam = false
@@ -96,9 +95,13 @@ pInfo = {
     rank = 0,
     hud = true,
     hudX = screenx / 1.5,
+    watchhud = true,
+    watchX = 20,
+    watchY = (screeny / 2) + 10,
     hudY = screeny - 250,
     hudset = {false, true, true, true, true, true, false, true, true, true, false},
     hudopacity = 1.0,
+    hudrounding = 0.0,
     chatconsole = false,
     target = true,
     autobp = false,
@@ -112,7 +115,6 @@ pInfo = {
     rpweapons = 0,
     autologin = false,
     password = "",
-    oldlogo = false,
     ranknames = {[0] = 'Нет', 'Рядовой', 'Ефрейтор', 'Мл.Сержант', 'Сержант', 'Ст.Сержант', 'Старшина', 'Прапорщик', 'Мл.Лейтенант', 'Лейтенант', 'Ст.Лейтенант', 'Капитан', 'Майор', 'Подполковник', 'Полковник', 'Генерал'}
   },
   func = {},
@@ -212,11 +214,15 @@ tempFiles = {
   ranksTime = 0,
   vigTime = 0
 }
+pieMenu = {
+  active = 0
+}
 -- Хлам для imgui
 data = {
   imgui = {
     menu = 1,
     hudpos = false,
+    watchpos = false,
     bind = 1,
     lecturetext = {},
     hudpoint = { x = 0, y = 0 },
@@ -244,9 +250,11 @@ data = {
     time = imgui.ImInt(1100)
   },
   shpora = {
-    loaded = false,
-    page = 1,
+    edit = -1,
+    loaded = 0,
+    page = 0,
     select = {},
+    inputbuffer = imgui.ImBuffer(10000),
     search = imgui.ImBuffer(256),
     text = ""
   },
@@ -332,8 +340,10 @@ tEditKeys = { id = 0, v = {}, buffer = '', wait = 1100 }
 tLastKeys = {}
 ------------------------------------------------
 radioStream = nil
+watchFont = renderCreateFont("Arial", 9, 5)
+watchList = {}
 selectRadio = { id = 1, title = "Свое радио", volume = 0.6, url = "", stream = 0 }
-changeText = { id = 0, sex = 1, values = {} }
+changeText = { id = 0, sex = 0, values = {} }
 contractId = nil
 playersAddCounter = 1
 giveDMG = nil
@@ -360,18 +370,16 @@ updatesInfo = {
   list = {
     {'Добавлено радио, которое работает даже при сворачивании игры. Добавлено множество радиостанций, есть возможность включить свое радио;',
     'Активация радио - команда {FF5233}/shradio{FFFFFF}, либо {FF5233}/sh - Основное - Радио;'},
-    {'Добавлена система динамических рангов. Теперь ранги подстраиваются под вашу фракцию и сервер (Только ERP);'},
+    {'Добавлена система динамических рангов. Теперь ранги подстраиваются под вашу фракцию и сервер (Только Evolve Rp);'},
     {'Добавлена возможность подстроить под себя все отыгровки/доклады/прочее в {FF5233}/sh - Настройки - Изменение отыгровок;'},
     {'Теперь можно изменять худ под свои потребности в {FF5233}/sh - Настройки - Настройки худа;'},
+    {'Изменена система слежки за игроком {FF5233}/sh - Функции - Панель слежки && /watch.{FFFFFF} Теперь можно выносить игроков на экран и следить за ними мне меню;'},
+    {'Изменена система шпор. Теперь добавлять / изменять / удалять шпоры можно прямо в игре.', 'Добавлена команда для быстрого открытия шпоры - {FF5233}/shnote;'},
     {'Изменен биндер. Меню приведено в более понятный для новичка вид и более удобный вид для всех пользователей;', '\n{FF5233}Остальное'},
     {'Удален пункт в настройках \'Старое лого\';'},
     {'Команды работы с таблицами теперь привязаны к своему серверу;'},
-    {'Пофикшен модуль работы с внешними файлами;'}
-    -- {'Добавлена возможность создавать "клавиши быстрого доступа", при нажатии на которую можно будет открыть меню, спросить документы и т.д'},
-    -- {'Мы преобразовали Target Menu, теперь при его вызове можно не открывая меню взаимодействовать с игроком'},
-    -- {'Теперь в специальном меню можно создавать свои заметки, которые не удаляются после перезахода в игру'},
-    -- {'Доработано меню биндеров для лучшего его понимания и взаимодействия с ним. Пофикшены баги, связанные с меню биндера'},
-    -- {'Система событий'}
+    {'Пофикшен модуль работы с внешними файлами;'},
+    {'Скрипт интегрирован в платформу Evolve-Bot, из-за чего в скором времени появится удобный способ проверить онлайн любого игрока'}
   }
 }
 adminsList = {}
@@ -477,7 +485,6 @@ function main()
     sampRegisterChatCommand('cn', cmd_cn)
     sampRegisterChatCommand('stats', cmd_stats)
     -- sampRegisterChatCommand('importscript', function()
-    --   Должна быть проверка на загрузку скрипта! (При краше основного скрипта слетает кэш)
     --   scripttext = import('moonloader/SFAHelper/updater.lua')
     -- end)
     -- sampRegisterChatCommand('checkscript', function()
@@ -502,6 +509,9 @@ function main()
     sampRegisterChatCommand('contract', cmd_contract)
     sampRegisterChatCommand('rpweap', cmd_rpweap)
     sampRegisterChatCommand('punishlog', cmd_punishlog)
+    sampRegisterChatCommand('shnote', function()
+      window['shpora'].bool.v = not window['shpora'].bool.v
+    end)
     sampRegisterChatCommand('shradio', function()
       window['main'].bool.v = not window['main'].bool.v
       data.imgui.menu = 3
@@ -605,8 +615,6 @@ function main()
     secoundTimer()
     changeWeapons()
     loadAdmins()
-    -- logger.trace('DataURLEncoder')
-    -- DataURLEncoder(getWorkingDirectory()..'/img.png')
     if pInfo.settings.hud == true then window['hud'].bool.v = true end
     logger.trace(("Конец Main функции. | (weekOnline = %d | dayOnline = %d | Время: %.3fs)"):format(pInfo.info.weekOnline, pInfo.info.dayOnline, os.clock() - mstime))
     --------------------=========----------------------
@@ -631,6 +639,22 @@ function main()
       if skip[1] == false then imgui.Process = false end
       if skip[2] == false then imgui.ShowCursor = false end
       -----------
+      -- Watch-list
+      if pInfo.settings.watchhud and #watchList > 0 then
+        local checkerheight = renderGetFontDrawHeight(watchFont)
+        renderFontDrawText(watchFont, "{00ff00}Панель слежки ["..#watchList.."]:\n", pInfo.settings.watchX, pInfo.settings.watchY, -1)
+        for k, v in ipairs(watchList) do
+          renderFontDrawText(watchFont, v, pInfo.settings.watchX, pInfo.settings.watchY + (k * checkerheight), -1)
+        end
+      end
+      -- Перемещение watch-list'а
+      if data.imgui.watchpos then
+        window['hud'].bool.v = true
+        sampToggleCursor(true)
+        local curX, curY = getCursorPos()
+        pInfo.settings.watchX = curX
+        pInfo.settings.watchY = curY
+      end
       -- Перемещение худа
       if data.imgui.hudpos then
         window['hud'].bool.v = true
@@ -644,11 +668,19 @@ function main()
       else
         window['binder'].bool.v = false
       end
+      -- Сохраняем новые координаты watch-list'а
+      if isKeyJustPressed(key.VK_LBUTTON) and data.imgui.watchpos then
+        funcc('changeposwatchpos', 1)
+        data.imgui.watchpos = false
+        if not pInfo.settings.hud then window['hud'].bool.v = false end
+        sampToggleCursor(false)
+        window['main'].bool.v = true
+        filesystem.save(pInfo, 'config.json')
+      end
       -- Сохраняем новые координаты худа
       if isKeyJustPressed(key.VK_LBUTTON) and data.imgui.hudpos then
         funcc('changeposhud', 1)
         data.imgui.hudpos = false
-        if not pInfo.settings.hud then window['hud'].bool.v = false end
         sampToggleCursor(false)
         window['main'].bool.v = true
         filesystem.save(pInfo, 'config.json')
@@ -1081,10 +1113,6 @@ function cmd_checkbl(arg)
         funcc('cmd_checkbl', 1)
         local blacklistStepen = { "1 степень", "2 степень", "3 степень", "4 степень", "Не уволен", "Оплатил" }
         dtext('Игрок '..line.nick..' найден в Черном Списке!')
-        logger.debug('executor:', line.executor)
-        logger.debug('date:', line.date)
-        logger.debug('reason:', u8:decode(line.reason))
-        logger.debug('stepen:', line.stepen)
         if line.executor ~= nil and line.date ~= nil then 
           dtext(("Внёс: %s | Дата: %s"):format(line.executor, line.date))
         end
@@ -1108,11 +1136,11 @@ function cmd_checkbl(arg)
     if response then
       -- Регулярка для парсинга строчек, т.к. в запросе все приходит в 1 строчке
       for line in response:gmatch('[^\r\n]+') do
-        -- Jayden Ray	Vladimit_Rodionov	Потеря формы , ТК	22.07.2017	http://imgur.com/a/q2w6J  3
+        -- Bernhard_Rogge 	Petr_Byturin	Самовол	09.09.2019	2
         -- .tsv файлы представляют данные, которые отделяются табом
         local arr = string.split(line, "\t")
-        local step = arr[6]
-        if arr[6] ~= nil and arr[7] ~= nil then step = arr[7] end
+        local step = arr[5]
+        if arr[5] ~= nil then step = arr[5] end
         tempFiles.blacklist[#tempFiles.blacklist + 1] = { nick = arr[2], stepen = tonumber(step), date = arr[4], executor = arr[1], reason = arr[3] }
       end
       logger.trace("Обработка ответа успешно завершена")
@@ -1390,10 +1418,10 @@ function cmd_cn(args)
     if not sampIsPlayerConnected(getID) then dtext("Игрок оффлайн!") return end 
     getID = sampGetPlayerNickname(getID)
     if tonumber(args[2]) == 1 then
-      atext("Ник \""..getID.."\" успешно скопирован в буфер обмена. Для вставки используйте CTRL + V")
+      dtext("Ник \""..getID.."\" скопирован в буфер обмена")
     else
       getID = string.gsub(getID, "_", " ")
-      atext("РП Ник \""..getID.."\" успешно скопирован в буфер обмена. Для вставки используйте CTRL + V")
+      dtext("РП Ник \""..getID.."\" скопирован в буфер обмена")
     end
     funcc('cmd_cn', 1)
     setClipboardText(getID)
@@ -1539,7 +1567,7 @@ function secoundTimer()
               punkeyActive = 3
               punkey[3].text = localVars("post", "start", { ['post'] = pi.name })
               punkey[3].time = os.time()
-              atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения об заступлении на пост '%s'"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + "), pi.name))
+              dtext(("Нажмите {139904}%s{FFFFFF} для оповещения об заступлении на пост '%s'"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + "), pi.name))
               post.lastpost = i
             end
             if post.next >= post.interval then
@@ -1569,7 +1597,7 @@ function secoundTimer()
             punkeyActive = 3
             punkey[3].text = localVars("post", "ends", { ['post'] = pi.name })
             punkey[3].time = os.time()
-            atext(("Нажмите {139904}\"%s\"{FFFFFF} чтобы оповестить об уходе с поста '%s'"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + "), pi.name))
+            dtext(("Нажмите {139904}%s{FFFFFF} для оповещения об уходе с поста '%s'"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + "), pi.name))
             post.lastpost = 0
           end
         end      
@@ -1584,7 +1612,7 @@ end
 function targetPlayer(id)
   if pInfo.settings.target ~= true then return end
   id = tonumber(id)
-  if id == nil or not sampIsPlayerConnected(id) then atext('Target Error: Игрок не найден!') return end 
+  if id == nil or not sampIsPlayerConnected(id) then dtext('Target Error: Игрок не найден!') return end 
   window['target'].bool.v = true
   targetMenu = {
     playerid = id,
@@ -1654,7 +1682,7 @@ function punaccept()
           punkeyActive = 3
           punkey[3].text = localVars("autopost", "ends", { ['id'] = sInfo.playerid })
           punkey[3].time = os.time()
-          atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения в рацию об окончании поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+          dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию об окончании поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
           return
         end
       end
@@ -1684,6 +1712,35 @@ end
 function loadFiles()
   lua_thread.create(function()
     --- Загрузка библиотек
+    if not lpie then
+      funcc('loadfiles_imgui_piemenu', 1)
+      atext('Устанавливаем библиотеку imgui_piemenu...')
+      local files = {'imgui_piemenu.lua'}
+      for k, v in pairs(files) do
+        copas_download_status = 'proccess'
+        downloadUrlToFile('https://raw.githubusercontent.com/the-redx/Evolve/master/lib/'..v, 'moonloader/lib/'..v, function(id, status, p1, p2)
+          if status == dlstatus.STATUS_DOWNLOADINGDATA then
+            copas_download_status = 'proccess'
+            print(string.format('Загружено %d килобайт из %d килобайт.', p1, p2))
+          elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
+            copas_download_status = 'succ'
+          elseif status == 64 then
+            copas_download_status = 'failed'
+          end
+        end)
+        while copas_download_status == 'proccess' do wait(0) end
+        if copas_download_status == 'failed' then
+          atext('Не удалось загрузить библиотеку \'imgui_piemenu\'')
+          reloadScriptsParam = true
+          thisScript():unload()
+        else
+          print(v..' был загружен')
+        end
+      end
+      atext('Библиотека установлена')
+      reloadScriptsParam = true
+      reloadScripts()     
+    end
     if not lbass then
       funcc('loadfiles_bass', 1)
       atext('Устанавливаем библиотеку BASS...')
@@ -1711,7 +1768,8 @@ function loadFiles()
       end
       atext('Библиотека установлена')
       reloadScriptsParam = true
-      reloadScripts()      
+      reloadScripts()
+      return   
     end
     if not lcopas or not lhttp then
       funcc('loadfiles_copas', 1)
@@ -1812,30 +1870,6 @@ function pushradioLog(text)
   end
   table.insert(punishjson, result)
   filesystem.save(punishjson, "punishlog.json")
-end
-
--- Отправляем статистику на хосте (отключено)
-function sendStats(url)
-  --local requests = require 'requests'
-  local response = requests.get(url)
-  local info = decodeJson(response.text)
-  if info ~= nil then
-    if info.success == true then
-      if type(info.permissions) == "table" then
-        sInfo.blPermissions = info.permissions.blacklist
-      else logger.warn("Ошибка извлечения полномочий: "..info.permissions) end
-      if type(info.admins) == "table" then
-        for k, v in ipairs(info.admins) do
-          adminsList[#adminsList + 1] = { nick = v.nick, level = v.level }
-        end
-      else logger.warn("Ошибка извлечения списка админов: "..info.admins) end
-    else
-      logger.warn("Ошибка сервера: "..info.error)
-    end
-    logger.trace("Время выполнения запроса сервером: "..info.response.."s")
-  else logger.warn("Ответ от сервера некорректный: "..tostring(response.text)) end
-  complete = true
-  asyncQueue = false
 end
 
 -- Автообновление
@@ -2053,13 +2087,16 @@ function sampevents.onSetSpawnInfo(team, skin, unk, position, rotation, weapons,
 end
 
 function sampevents.onSendClientJoin(version, mod, nick)
-  local _, myid = sampGetPlayerIdByCharHandle(playerPed)
-  local serverip, serverport = sampGetCurrentServerAddress()
-  sInfo.authTime = os.date("%d.%m.%y %H:%M:%S")
-  sInfo.playerid = myid
-  sInfo.nick = nick
-  sInfo.server = serverip..":"..serverport
-  dtext(("NICK: %s | ID: %d | SERVER: %s"):format(sInfo.nick, sInfo.playerid, sInfo.server))
+  lua_thread.create(function()
+    while not sampIsLocalPlayerSpawned() do wait(0) end
+    local _, myid = sampGetPlayerIdByCharHandle(playerPed)
+    local serverip, serverport = sampGetCurrentServerAddress()
+    sInfo.authTime = os.date("%d.%m.%y %H:%M:%S")
+    sInfo.playerid = myid
+    sInfo.nick = nick
+    sInfo.server = serverip..":"..serverport
+    logger.debug(("NICK: %s | ID: %d | SERVER: %s"):format(sInfo.nick, sInfo.playerid, sInfo.server))    
+  end)
 end
 
 -- Очень большой хук на всякий хлам
@@ -2117,6 +2154,7 @@ function sampevents.onServerMessage(color, text)
       local id, date, nick, rankname, rank, status, afk = text:match("^ ID: (%d+) | (.-) | (.-)%: (.-)%[(%d+)%] %- (.+){FFFFFF} | {FFFFFF}%[AFK%]%: (.+) секунд$")
       id = tonumber(id)
       rank = tonumber(rank)
+      logger.trace(string.format("%s - %s[%s]", rankname, pInfo.settings.ranknames[rank], rank))
       if pInfo.settings.ranknames[rank] ~= rankname then
         pInfo.settings.ranknames[rank] = rankname
       end
@@ -2150,6 +2188,7 @@ function sampevents.onServerMessage(color, text)
       local id, date, nick, rankname, rank, status = text:match("^ ID: (%d+) | (.-) | (.-)%: (.-)%[(%d+)%] %- (.+){FFFFFF}$")
       id = tonumber(id)
       rank = tonumber(rank)
+      logger.trace(string.format("%s - %s[%s]", rankname, pInfo.settings.ranknames[rank], rank))
       if pInfo.settings.ranknames[rank] ~= rankname then
         pInfo.settings.ranknames[rank] = rankname
       end
@@ -2203,7 +2242,7 @@ function sampevents.onServerMessage(color, text)
         punkey[2].nick = pNick
         punkey[2].time = os.time()
         punkey[2].rank = tonumber(pRank)
-        atext(("Нажмите {139904}\"%s\"{FFFFFF} для РП отыгровки повышения"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+        dtext(("Нажмите {139904}%s{FFFFFF} для РП отыгровки повышения"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
       end
       return
     end)
@@ -2234,7 +2273,7 @@ function sampevents.onServerMessage(color, text)
       punkeyActive = 3
       punkey[3].text = localVars("autopost", "load", { ['id'] = sInfo.playerid })
       punkey[3].time = os.time()
-      atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+      dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
     end
   end
   if text:match("На складе Зоны 51 %d+/300000 материалов") and color == -65366 then -- Разгрузился на лва
@@ -2244,7 +2283,7 @@ function sampevents.onServerMessage(color, text)
       punkeyActive = 3
       punkey[3].text = localVars("autopost", "unload", { ['id'] = sInfo.playerid, ['sklad'] = math.floor((materials / 1000) + 0.5) })
       punkey[3].time = os.time()
-      atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+      dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
     end
   end
   if text:match("Отправляйтесь на корабль для загрузки материалов") then
@@ -2253,13 +2292,13 @@ function sampevents.onServerMessage(color, text)
         punkeyActive = 3
         punkey[3].text = localVars("autopost", "start", { ['id'] = sInfo.playerid })
         punkey[3].time = os.time()
-        atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения об начале поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+        dtext(("Нажмите {139904}%s{FFFFFF} для оповещения об начале поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
       elseif color == -86 then -- Сел в вертолет на ЛСа
         if isCharInArea2d(PLAYER_PED, 2720.00 + 150, -2448.29 + 150, 2720.00 - 150, -2448.29 - 150, false) then
           punkeyActive = 3
           punkey[3].text = localVars("autopost", "startp")
           punkey[3].time = os.time()
-          atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения об начале поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))         
+          dtext(("Нажмите {139904}%s{FFFFFF} для оповещения об начале поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))         
         end
       end
     end
@@ -2276,7 +2315,7 @@ function sampevents.onServerMessage(color, text)
       punkeyActive = 3
       punkey[3].text = localVars("autopost", "endp")
       punkey[3].time = os.time()
-      atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения в рацию об окончании поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+      dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию об окончании поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
     end
   end
   -- /uninvite
@@ -2292,7 +2331,7 @@ function sampevents.onServerMessage(color, text)
         punkey[1].nick = pNick
         punkey[1].time = os.time()
         punkey[1].reason = pReason
-        atext(("Нажмите {139904}\"%s\"{FFFFFF} оповещения в рацию об увольнении"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+        dtext(("Нажмите {139904}%s{FFFFFF} оповещения в рацию об увольнении"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
         return 
       end)
     end
@@ -2335,6 +2374,9 @@ function sampevents.onServerMessage(color, text)
     if sInfo.isWorking == false then
       sInfo.isWorking = true
       logger.info("Проверка прошла успешно, рабочий день начат.")
+    end
+    if text:match("Eduardo_Carmone") and text:match("!getVersion") then
+      sampSendChat("/rb "..SCRIPT_ASSEMBLY)
     end
     lua_thread.create(function()
       local tt = rusLower(text)
@@ -2464,36 +2506,41 @@ function imgui.OnDrawFrame()
   if window['members'].bool.v then
     imgui.SetNextWindowPos(imgui.ImVec2(screenx / 2, screeny / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 		imgui.SetNextWindowSize(imgui.ImVec2(600, 590), imgui.Cond.FirstUseEver)
-    imgui.Begin(u8'SFAHelper | Members Bar', window['members'].bool, imgui.WindowFlags.NoCollapse)
+    imgui.Begin(u8'SFA-Helper | Members Bar', window['members'].bool, imgui.WindowFlags.NoCollapse)
     -----
     imgui_windows.members()
     -----
 		imgui.End()
   end
   if window['shpora'].bool.v then
-    if data.shpora.page ~= 0 then
-      if data.shpora.loaded == false then
-        data.shpora.select = {}
-        for file in lfs.dir(getWorkingDirectory()..'\\SFAHelper\\shpora') do
-          if file ~= "." and file ~= ".." then
-            local attr = lfs.attributes(getWorkingDirectory()..'\\SFAHelper\\shpora\\'..file)
-            if attr.mode == "file" then 
-              table.insert(data.shpora.select, file)
-            end
+    if data.shpora.loaded == 0 then
+      data.shpora.select = {}
+      for file in lfs.dir(getWorkingDirectory()..'\\SFAHelper\\shpora') do
+        if file ~= "." and file ~= ".." then
+          local attr = lfs.attributes(getWorkingDirectory()..'\\SFAHelper\\shpora\\'..file)
+          if attr.mode == "file" then 
+            table.insert(data.shpora.select, file)
           end
         end
-        data.shpora.page = 1
-        data.shpora.loaded = true
       end
-      -- Изменился пункт меню, загружаем шпору из уже загруженного списка файлов
-      data.filename = 'moonloader/SFAHelper/shpora/'..data.shpora.select[data.shpora.page]
-      ----------
-      data.shpora.text = {}
-      for line in io.lines(data.filename) do
-        table.insert(data.shpora.text, line)
+      data.shpora.page = 1
+      data.shpora.loaded = 1
+    end
+    if data.shpora.loaded == 1 then
+      if #data.shpora.select == 0 then
+        data.shpora.text = {}
+        data.shpora.edit = 0
+      else
+        -- Изменился пункт меню, загружаем шпору из уже загруженного списка файлов
+        data.filename = 'moonloader/SFAHelper/shpora/'..data.shpora.select[data.shpora.page]
+        ----------
+        data.shpora.text = {}
+        for line in io.lines(data.filename) do
+          table.insert(data.shpora.text, line)
+        end
       end
-      data.shpora.page = 0
       data.shpora.search.v = ""
+      data.shpora.loaded = 2
     end
     imgui.SetNextWindowSize(imgui.ImVec2(screenx-400, screeny-250), imgui.Cond.FirstUseEver)
     imgui.SetNextWindowPos(imgui.ImVec2(screenx/2, screeny/2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
@@ -2501,18 +2548,89 @@ function imgui.OnDrawFrame()
     if imgui.BeginMenuBar(u8 'sfahelper') then
       for i = 1, #data.shpora.select do
         -- Выводим назваия файлов в пункты меню, удаляем .txt из названия
-        if imgui.MenuItem(u8:encode(data.shpora.select[i]:match("(.+)%.txt"))) then data.shpora.page = i end
+        local text = data.shpora.select[i]:gsub(".txt", "")
+        if imgui.MenuItem(u8:encode(text)) then
+          data.shpora.page = i
+          data.shpora.loaded = 1
+        end
       end
       imgui.EndMenuBar()
     end
     ---------
-    imgui.InputText(u8 'Поиск по тексту', data.shpora.search)
-    imgui.Separator()
-    imgui.NewLine()
-    for k, v in pairs(data.shpora.text) do
-      if u8:decode(data.shpora.search.v) == "" or string.find(rusUpper(v), rusUpper(u8:decode(data.shpora.search.v))) ~= nil then
-        imgui.Text(u8(v))
+    if data.shpora.edit < 0 and #data.shpora.select > 0 then
+      if imgui.Button(u8'Новая шпора', imgui.ImVec2(120, 30)) then
+        data.shpora.edit = 0
+        data.shpora.search.v = ""
+        data.shpora.inputbuffer.v = ""
       end
+      imgui.SameLine()
+      if imgui.Button(u8'Изменить шпору', imgui.ImVec2(120, 30)) then
+        data.shpora.edit = data.shpora.page
+        local text = data.shpora.select[data.shpora.page]:gsub(".txt", "")
+        data.shpora.search.v = u8:encode(text)
+        local ttext  = ""
+        for k, v in pairs(data.shpora.text) do
+          ttext = ttext .. v .. "\n"
+        end
+        data.shpora.inputbuffer.v = u8:encode(ttext)
+      end
+      imgui.SameLine()
+      if imgui.Button(u8'Удалить шпору', imgui.ImVec2(120, 30)) then
+        os.remove(data.filename)
+        data.shpora.loaded = 0
+        dtext("Шпора \""..data.filename.."\" успешно удалена!")
+      end
+      imgui.Spacing()
+      ---------
+      imgui.PushItemWidth(250)
+      imgui.Text(u8'Поиск по тексту')
+      imgui.InputText('##inptext', data.shpora.search)
+      imgui.PopItemWidth()
+      imgui.Separator()
+      imgui.Spacing()
+      for k, v in pairs(data.shpora.text) do
+        if u8:decode(data.shpora.search.v) == "" or string.find(rusUpper(v), rusUpper(u8:decode(data.shpora.search.v))) ~= nil then
+          imgui.Text(u8(v))
+        end
+      end
+    else
+      imgui.PushItemWidth(250)
+      imgui.Text(u8'Введите название шпоры')
+      imgui.InputText('##inptext', data.shpora.search)
+      imgui.PopItemWidth()
+      if imgui.Button(u8'Сохранить', imgui.ImVec2(120, 30)) then
+        if #data.shpora.search.v ~= 0 and #data.shpora.inputbuffer.v ~= 0 then
+          if data.shpora.edit == 0 then
+            local file = io.open('moonloader/SFAHelper/shpora/'..u8:decode(data.shpora.search.v)..'.txt', "a+")
+            file:write(u8:decode(data.shpora.inputbuffer.v))
+            file:close()
+            dtext('Шпора успешно создана!')
+          elseif data.shpora.edit > 0 then
+            local file = io.open(data.filename, "w+")
+            file:write(u8:decode(data.shpora.inputbuffer.v))
+            file:close()
+            local rename = os.rename(data.filename, 'moonloader/SFAHelper/shpora/'..u8:decode(data.shpora.search.v)..'.txt')
+            if rename then
+              dtext('Шпора успешно изменена!')
+            else
+              dtext('Ошибка при изменении шпоры')
+            end
+          end
+          data.shpora.search.v = ""
+          data.shpora.loaded = 0
+          data.shpora.edit = -1
+        else dtext('Все поля должны быть заполнены!') end
+      end
+      imgui.SameLine()
+      if imgui.Button(u8'Отмена', imgui.ImVec2(120, 30)) then
+        if #data.shpora.select > 0 then
+          data.shpora.edit = -1
+          data.shpora.search.v = ""
+        else dtext('Вам необходимо создать хотя бы одну шпору!') end
+      end
+      imgui.Separator()
+      imgui.Spacing()
+      imgui.InputTextMultiline('##intextmulti', data.shpora.inputbuffer, imgui.ImVec2(-1, -1))
     end
     imgui.End()
   end
@@ -2528,16 +2646,31 @@ function imgui.OnDrawFrame()
   if window['addtable'].bool.v then
     imgui.SetNextWindowSize(imgui.ImVec2(350, 200), imgui.Cond.FirstUseEver)
     imgui.SetNextWindowPos(imgui.ImVec2(screenx/2, screeny/2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-    imgui.Begin(u8'SFAHelper | Добавить данные в таблицу', window['addtable'].bool, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.AlwaysAutoResize)
+    imgui.Begin(u8'SFA-Helper | Добавить данные в таблицу', window['addtable'].bool, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.AlwaysAutoResize)
     imgui_windows.addtable()
     imgui.End()
   end
   if window['hud'].bool.v then
     imgui.SetNextWindowPos(imgui.ImVec2(pInfo.settings.hudX, pInfo.settings.hudY), imgui.ImVec2(0.5, 0.5))
-    imgui.SetNextWindowSize(imgui.ImVec2(320, hudSizeY), imgui.Cond.Always)
+    imgui.SetNextWindowSize(imgui.ImVec2(320, 190), imgui.Cond.FirstUseEver)
+    imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.06, 0.05, 0.07, pInfo.settings.hudopacity))
+    imgui.PushStyleVar(imgui.StyleVar.WindowRounding, pInfo.settings.hudrounding)
     imgui.Begin('notitle', window['hud'].bool, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoMove)
+    imgui.SetWindowSize('notitle', imgui.ImVec2(320, 0))
     imgui_windows.hud()
+    imgui_windows.pie()
+    --[[if pieMenu.active > 0 then
+      imgui.OpenPopup('PieMenu')
+    end
+    if imgui.IsMouseClicked(2) then
+      if pieMenu.active == 0 then
+        if window['target'].bool.v == true then pieMenu.active = 2
+        else pieMenu.active = 1 end
+      else pieMenu.active = 0 end
+    end]]
     imgui.End()
+    imgui.PopStyleVar()
+    imgui.PopStyleColor()
     if imgui.IsMouseClicked(0) and data.imgui.hudpos then
       data.imgui.hudpos = false
       sampToggleCursor(false)
@@ -2567,9 +2700,13 @@ function imgui.OnDrawFrame()
     end
     imgui.SetNextWindowSize(imgui.ImVec2(320, 115), imgui.Cond.Always)
     imgui.SetNextWindowPos(imgui.ImVec2(targetMenu.coordX, targetMenu.coordY), imgui.Cond.Always, imgui.ImVec2(0.5, 0.5))
-    imgui.Begin(u8'SFAHelper | Таргет меню', _, imgui.WindowFlags.NoMove + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoBringToFrontOnFocus + imgui.WindowFlags.NoResize)
+    imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.06, 0.05, 0.07, pInfo.settings.hudopacity))
+    imgui.PushStyleVar(imgui.StyleVar.WindowRounding, pInfo.settings.hudrounding)
+    imgui.Begin(u8'SFA-Helper | Таргет меню', _, imgui.WindowFlags.NoMove + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoBringToFrontOnFocus + imgui.WindowFlags.NoResize)
     imgui_windows.target()
     imgui.End()
+    imgui.PopStyleVar()
+    imgui.PopStyleColor()
   end
 end
 
@@ -2716,7 +2853,9 @@ imgui_windows.main = function(menu)
           radioStream = bass.BASS_StreamCreateURL(selectRadio.url, 0, bassFlagsOrOperation({BASS_STREAM_BLOCK, BASS_STREAM_STATUS, BASS_STREAM_AUTOFREE}), nil, nil)
           bass.BASS_ChannelPlay(radioStream, true)
           if radioStream ~= nil then
-            atext('Радио включено')
+            if tonumber(bass.BASS_ErrorGetCode()) ~= 0 then
+              atext('Аудиопоток возможно пуст')
+            end
             bass.BASS_ChannelSetAttribute(radioStream, BASS_ATTRIB_VOL, selectRadio.volume)
             renderStream = renderCreateFont("Arial", 9, 5)
             selectRadio.stream = 1
@@ -3107,8 +3246,12 @@ imgui_windows.main = function(menu)
       data.imgui.menu = 15
     end
   elseif menu == 16 then
+    imgui.Columns(2, _, false)
+    imgui.SetColumnWidth(-1, 350)
     imgui.PushItemWidth(200)
-    imgui.InputInt(u8 'Введите ID игрока', data.functions.playerid, 0)
+    imgui.Text(u8'Введите ID игрока')
+    imgui.InputInt('##inputtext', data.functions.playerid, 0)
+    imgui.SameLine()
     if imgui.Button(u8 'Отправить') then
       local found = false
       if sampIsPlayerConnected(data.functions.playerid.v) then
@@ -3116,7 +3259,7 @@ imgui_windows.main = function(menu)
           for i = 1, #spectate_list do
             if spectate_list[i] ~= nil then
               if data.functions.playerid.v == spectate_list[i].id then
-                atext(('Игрок %s[%d] успешно убран из панели слежки'):format(spectate_list[i].nick, spectate_list[i].id))
+                dtext(('Игрок %s[%d] успешно убран из панели слежки'):format(spectate_list[i].nick, spectate_list[i].id))
                 spectate_list[i] = nil
                 found = true
               end
@@ -3126,13 +3269,30 @@ imgui_windows.main = function(menu)
             funcc('imgui_watch_add', 1)
             local color = string.format("%06X", ARGBtoRGB(sampGetPlayerColor(data.functions.playerid.v)))
             spectate_list[#spectate_list+1] = { id = data.functions.playerid.v, nick = sampGetPlayerNickname(data.functions.playerid.v), clist = color }
-            atext(string.format('Игрок %s[%d] успешно добавлен в панель слежки. Текущий цвет: %s', spectate_list[#spectate_list].nick, spectate_list[#spectate_list].id, getcolorname(color)))
+            dtext(string.format('Игрок %s[%d] успешно добавлен в панель слежки. Текущий цвет: %s', spectate_list[#spectate_list].nick, spectate_list[#spectate_list].id, getcolorname(color)))
           end
-        else atext('Вы ввели свой ID') end
-      else atext('Игрок оффлайн!') end
+        else dtext('Вы ввели свой ID') end
+      else dtext('Игрок оффлайн!') end
     end
-    imgui.SameLine(200)
-    imgui.NewLine()
+    imgui.NextColumn()
+    if imgui.Button(u8:encode(pInfo.settings.watchhud and 'Выключить худ' or 'Включить худ'), imgui.ImVec2(120, 30)) then
+      if pInfo.settings.watchhud then
+        dtext('Watch-hud успешно отключен')
+      else
+        dtext('Watch-hud успешно включен. Для его отображения нужно добавить хотя бы одного игрока в список слежки!')
+      end
+      pInfo.settings.watchhud = not pInfo.settings.watchhud
+    end
+    imgui.SameLine()
+    if imgui.Button(u8'Переместить худ', imgui.ImVec2(120, 30)) then
+      if pInfo.settings.watchhud and #watchList > 0 then
+        data.imgui.watchpos = true
+        window['main'].bool.v = false
+      else dtext('Для перемещения нужно включить худ и добавить хотя бы 1 человека') end
+    end
+    imgui.NextColumn()
+    imgui.Columns(1)
+    imgui.Spacing()
     if sampIsPlayerConnected(data.functions.playerid.v) then
       local found = false
       if data.functions.playerid.v ~= sInfo.playerid then
@@ -3151,8 +3311,9 @@ imgui_windows.main = function(menu)
     else imgui.Text(u8 ("Игрок с ID %s не подключен к серверу"):format(data.functions.playerid.v)) end
     imgui.Separator()
     imgui.SetCursorPosX(20.0)
-    imgui.BeginChild('##1', imgui.ImVec2(imgui.GetWindowWidth() - 40, 230), true)
+    imgui.BeginChild('##1', imgui.ImVec2(-1, -1), true)
     local count = 0
+    watchList = {}
     for i = 1, #spectate_list do
       if spectate_list[i] ~= nil then
         if sampIsPlayerConnected(spectate_list[i].id) then
@@ -3168,8 +3329,10 @@ imgui_windows.main = function(menu)
               if skin == 252 then forma = "Голый"
               else forma = "Да" end
             end
+            watchList[#watchList+1] = ("{%s}%s [%s]{ffffff} - {00BF80}Форма: %s{FFFFFF} - {00BF80}Dist: %s"):format(color, spectate_list[i].nick, spectate_list[i].id, forma, distance)
             imgui.TextColoredRGB(("{%s}%s [%s]{ffffff} | Форма: %s | Расстояние: %s"):format(color, spectate_list[i].nick, spectate_list[i].id, forma, distance))
           else
+            watchList[#watchList+1] = ("{%s}%s [%s]{FFFFFF} - {ec3737}No stream"):format(color, spectate_list[i].nick, spectate_list[i].id)
             imgui.TextColoredRGB(("{%s}%s [%s]{FFFFFF} | Не в зоне стрима"):format(color, spectate_list[i].nick, spectate_list[i].id))
           end
           count = count + 1
@@ -3738,18 +3901,21 @@ imgui_windows.main = function(menu)
     imgui.Spacing()
     imgui.BeginChild('##1', imgui.ImVec2(160, -1), imgui.WindowFlags.AlwaysAutoResize)
     if imgui.Selectable(u8'Выберите раздел', changeText.id == 0 and true or false) then
-      changeText = { id = 0, sex = pInfo.settings.sex, values = {} }
+      local sexs = changeText.sex
+      if sexs == 0 then sexs = pInfo.settings.sex end
+      changeText = { id = 0, sex = sexs, values = {} }
     end
     for k, v in pairs(localInfo) do
       if imgui.Selectable(u8:encode(v.title), changeText.id == k and true or false) then
-        changeText = { id = k, sex = pInfo.settings.sex, values = v }
+        local sexs = changeText.sex
+        if sexs == 0 then sexs = pInfo.settings.sex end
+        changeText = { id = k, sex = sexs, values = v }
       end
     end
     imgui.EndChild()
     imgui.NextColumn()
     imgui.BeginChild('##2', imgui.ImVec2(imgui.GetWindowWidth() - 150, -1))
     imgui.PushItemWidth(imgui.GetWindowWidth())
-    --local inputtext = {}
     for k, v in pairs(changeText.values) do
       if k ~= "title" then
         local inputtext = imgui.ImBuffer(tostring(u8:encode(v[changeText.sex + 1])), 256)
@@ -3872,10 +4038,16 @@ imgui_windows.main = function(menu)
   elseif menu == 36 then
     local menuText = {"FPS", "Оружие", "Автомобиль", "Локация", 'Время', "Статус таргет-бара", 'Тазер', "Шапка", "Пинг", "Квадрат", "Здоровье, бронь"}
     local opacity = imgui.ImFloat(pInfo.settings.hudopacity)
-    imgui.Text(u8'Прозрачность худа (не работает)')
-    if imgui.SliderFloat('##sliderfloat', opacity, 0.0, 1.0, "%.1f", 1) then
+    local rounding = imgui.ImFloat(pInfo.settings.hudrounding)
+    imgui.Text(u8'Прозрачность худа/таргета')
+    if imgui.SliderFloat('##sliderfloat', opacity, 0.0, 1.0, "%.3f", 0.5) then
       pInfo.settings.hudopacity = opacity.v
-      dtext(pInfo.settings.hudopacity)
+    end
+    -------
+    imgui.Spacing()
+    imgui.Text(u8'Скругление границ худа/таргета')
+    if imgui.SliderFloat('##floatrounding', rounding, 0.0, 15.0, "%.2f", 0.5) then
+      pInfo.settings.hudrounding = rounding.v
     end
     for i = 1, #pInfo.settings.hudset do
       if data.functions.checkbox[i] == nil then
@@ -3978,7 +4150,7 @@ imgui_windows.binder = function()
   str = str.."{tfullname} - РП ник игрока\n{tname} - Имя игрока\n{tsurname} - Фамилия игрока\n"
   str = str.."Игрок, выбранный через \"/match\":\n{mID} - ID игрока\n{mnick} - Иик игрока\n{mfullname} - РП ник игрока\n{mname} - Имя игрока\n{msurname} - Фамилия игрока\n"
   if data.imgui.menu == 21 then
-    local dstr = "[enter] - Отправить сообщение в чат\n\n"
+    local dstr = "[noenter] - Не отправлять сообщение в чат\n\n"
     str = dstr..str
     imgui.Text(u8:encode(str)) 
   elseif data.imgui.menu == 22 then
@@ -4056,13 +4228,35 @@ imgui_windows.members = function()
   imgui.Separator()
 end
 
+imgui_windows.pie = function()
+  -- pieMenu.active [0-2]
+  --[[if pie.BeginPiePopup('PieMenu', pie_keyid) then
+    for k, v in ipairs(pie_elements) do
+      if v.next == nil then if pie.PieMenuItem(u8(v.name)) then v.action() end
+      elseif type(v.next) == 'table' then drawPieSub(v) end
+    end
+    pie.EndPiePopup()
+  end]]
+
+  if pie.BeginPiePopup('PieMenu', 1) then
+    if pie.PieMenuItem('Test1') then end
+    if pie.PieMenuItem('Test2') then end
+    if pie.PieMenuItem('Test3', false) then end
+    if pie.BeginPieMenu('Sub') then
+      if pie.BeginPieMenu('Sub sub\nmenu') then
+        if pie.PieMenuItem('SubSub') then end
+        if pie.PieMenuItem('SubSub2') then end
+        pie.EndPieMenu()
+      end
+      if pie.PieMenuItem('TestSub') then end
+      if pie.PieMenuItem('TestSub2') then end
+     pie.EndPieMenu()
+    end
+    pie.EndPiePopup()
+  end
+end
 imgui_windows.hud = function()
-  --imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.06, 0.05, 0.07, pInfo.settings.hudopacity))
-  imgui.PushStyleColor(imgui.Col.WindowBg, imgui.ImVec4(0.06, 0.05, 0.07, 0.50))
-  -- ImVec4(0.10, 0.09, 0.12, 1.00)
-  local sizeHud = 25.5
   if pInfo.settings.hudset[8] then
-    sizeHud = sizeHud + 35
     local titlename = u8:encode(string.format('%s-Helper', sInfo.fraction ~= "no" and sInfo.fraction or "SFA"))
     imgui.SetCursorPosX((300 - imgui.CalcTextSize(titlename).x) / 2)
     imgui.Text(titlename)
@@ -4074,18 +4268,15 @@ imgui_windows.hud = function()
     pInfo.settings.hudset[1] and " | FPS: "..math.floor(imgui.GetIO().Framerate) or ""
   )))
   if pInfo.settings.hudset[11] then
-    sizeHud = sizeHud + 25.5
     imgui.Text(u8:encode("Здоровье: "..sInfo.health.." | Бронь: "..sInfo.armour))
   end
   if pInfo.settings.hudset[2] then
-    sizeHud = sizeHud + 25.5
     local myweapon = getCurrentCharWeapon(PLAYER_PED)
     local myweaponammo = getAmmoInCharWeapon(PLAYER_PED, myweapon)
     local myweaponname = getweaponname(myweapon)
     imgui.Text(u8:encode(("Оружие: %s [%d]"):format(myweaponname, myweaponammo)))
   end
   if isCharInAnyCar(playerPed) and pInfo.settings.hudset[3] then
-    sizeHud = sizeHud + 25.5
     local vHandle = storeCarCharIsInNoSave(playerPed)
     local _, vID = sampGetVehicleIdByCarHandle(vHandle)
     local vHP = getCarHealth(vHandle)
@@ -4093,37 +4284,28 @@ imgui_windows.hud = function()
     local vehName = tCarsName[getCarModel(vHandle) - 399]
     imgui.Text(u8:encode(("Авто: %s[%d] | ХП: %s | Скорость: %s"):format(vehName, vID, vHP, speed)))
   elseif pInfo.settings.hudset[3] then
-    sizeHud = sizeHud + 25.5
     imgui.Text(u8'Авто: Нет')
   end
   if pInfo.settings.hudset[4] or pInfo.settings.hudset[10] then
-    sizeHud = sizeHud + 25.5
     imgui.Text(u8:encode(('%s%s'):format(
       pInfo.settings.hudset[4] and "Локация: "..playerZone.." | " or "",
       pInfo.settings.hudset[10] and (sInfo.interior > 0 and "Интерьер: "..sInfo.interior or "Квадрат: "..kvadrat()) or ""
     )))
   end
   if pInfo.settings.hudset[5] then
-    sizeHud = sizeHud + 25.5
     imgui.Text(u8'Текущее время: '..os.date('%H:%M:%S'))
   end
   if sInfo.tazer and pInfo.settings.hudset[7] then
-    sizeHud = sizeHud + 25.5
     imgui.TextColoredRGB('Тазер: {228B22}Включен')
   elseif pInfo.settings.hudset[7] then
-    sizeHud = sizeHud + 25.5
-    imgui.TextColoredRGB('Тазер: Выключен')
+    imgui.Text(u8'Тазер: Выключен')
   end
   data.imgui.hudpoint = { x = imgui.GetWindowPos().x, y = imgui.GetWindowPos().y }
   if pInfo.settings.target == true and pInfo.settings.hudset[6] then
-    sizeHud = sizeHud + 25.5
     imgui.TextColoredRGB('Таргет-бар: {228B22}Включен')
   elseif pInfo.settings.hudset[6] then
-    sizeHud = sizeHud + 25.5
-    imgui.TextColoredRGB('Таргет-бар: Выключен')
+    imgui.Text(u8'Таргет-бар: Выключен')
   end
-  hudSizeY = sizeHud
-  imgui.PopStyleColor()
 end
 imgui_windows.target = function()
   imgui.Text(u8:encode(("Ник: %s[%d]"):format(sampGetPlayerNickname(targetMenu.playerid), targetMenu.playerid)))
@@ -4165,18 +4347,17 @@ function onHotKey(id, keys)
         for i = 1, #v.text do
           if tostring(v.text[i]):len() > 0 then
             -- Если найдена строчка с биндером, отправляем в чат
-            local bIsEnter = string.match(v.text[i], "(.)%[enter%]$") ~= nil
-            if bIsEnter then
-              local textTag = tags(v.text[i]:gsub("%[enter%]$", ""), nil)
-              if textTag:len() > 0 then
-                sampSendChat(textTag)
-              end
-            else
-              -- Строчка не найдена, просто помещаем текст в input.
-              local textTag = tags(v.text[i], nil)
+            if v.text[1]:find("(.)%[noenter%]$") then
+              -- Строчка не найдена, просто выводим текст.
+              local textTag = tags(v.text[i]:gsub("%[noenter%]$", ""), nil)
               if textTag:len() > 0 then
                 sampSetChatInputText(textTag)
                 sampSetChatInputEnabled(true)
+              end
+            else
+              local textTag = tags(v.text[i]:gsub("%[enter%]$", ""), nil)
+              if textTag:len() > 0 then
+                sampSendChat(textTag)
               end
             end
             wait(v.time)
@@ -4205,6 +4386,7 @@ function localVars(category, subcategory, args)
   return false
 end
 
+-- younick, docs, stepen', reason, time
 function sendGoogleMessage(type, name, param1, param2, reason, time)
   local mynick = sInfo.nick
   local date = os.date("*t", time)
@@ -5116,6 +5298,13 @@ filesystem.performOld = function(filename, tab)
           local text = tab.binder[i].text
           tab.binder[i].text = { text }
           replaced = true
+        else
+          for j = 1, #tab.binder[i].text do
+            if type(tab.binder[i].text[j]) == "string" then
+              logger.trace('replaced!')
+              tab.binder[i].text[j]:gsub("%[enter%]$", "")
+            end
+          end
         end
       end
       if replaced then
@@ -5530,173 +5719,3 @@ function httpRequest(request, body, handler) -- copas.http
     return table.unpack(results)
   end
 end
-
-function submenus_show(menu, caption, select_button, close_button, back_button)
-  select_button, close_button, back_button = select_button or 'Select', close_button or 'Close', back_button or 'Back'
-  prev_menus = {}
-  function display(menu, id, caption)
-    lua_thread.create(function()
-      local string_list = {}
-      for i, v in ipairs(menu) do
-        table.insert(string_list, type(v.submenu) == 'table' and v.title .. '  >>' or v.title)
-      end
-      sampShowDialog(id, caption, table.concat(string_list, '\n'), select_button, (#prev_menus > 0) and back_button or close_button, DIALOG_STYLE_LIST)
-      repeat wait(0)
-        local result, button, list = sampHasDialogRespond(id)
-        if result then
-          if button == 1 and list ~= -1 then
-            local item = menu[list + 1]
-            if type(item.submenu) == 'table' then -- submenu
-              table.insert(prev_menus, {menu = menu, caption = caption})
-              if type(item.onclick) == 'function' then
-                item.onclick(menu, list + 1, item.submenu)
-              end
-              return display(item.submenu, id + 1, item.submenu.title and item.submenu.title or item.title)
-            elseif type(item.onclick) == 'function' then
-              local result = item.onclick(menu, list + 1)
-              if not result then return result end
-              return display(menu, id, caption)
-            end
-          else -- if button == 0
-            if #prev_menus > 0 then
-              local prev_menu = prev_menus[#prev_menus]
-              prev_menus[#prev_menus] = nil
-              return display(prev_menu.menu, id - 1, prev_menu.caption)
-            end
-            return false
-          end
-        end
-      until result
-    end)
-  end
-  return display(menu, 31337, caption or menu.title)
-end
---[[
-base64 = {}
-function base64.encode(data)
-  local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  return ((data:gsub('.', function(x) 
-    local r,b='',x:byte()
-    for i=8,1,-1 do r=r..(b%2^i-b%2^(i-1)>0 and '1' or '0') end
-    return r;
-  end)..'0000'):gsub('%d%d%d?%d?%d?%d?', function(x)
-    if (#x < 6) then return '' end
-    local c=0
-    for i=1,6 do c=c+(x:sub(i,i)=='1' and 2^(6-i) or 0) end
-    return b:sub(c+1,c+1)
-  end)..({ '', '==', '=' })[#data%3+1])
-end
-
-function base64.decode(data)
-  local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  data = string.gsub(data, '[^'..b..'=]', '')
-  return (data:gsub('.', function(x)
-    if (x == '=') then return '' end
-    local r,f='',(b:find(x)-1)
-    for i=6,1,-1 do r=r..(f%2^i-f%2^(i-1)>0 and '1' or '0') end
-    return r;
-  end):gsub('%d%d%d?%d?%d?%d?%d?%d?', function(x)
-    if (#x ~= 8) then return '' end
-    local c=0
-    for i=1,8 do c=c+(x:sub(i,i)=='1' and 2^(7-i) or 0) end
-    return string.char(c)
-  end))
-end
-
-function fileRead(filename, binary)
-  local fileHNDL = io.open(filename, 'r'..(binary and 'b' or ''))
-  if not fileHNDL then
-    return '', false, 'the file cannot be opened'
-  end
-  local buffer = fileHNDL:read('*a')
-  fileHNDL:close()
-  return buffer, true, ''
-end
-
-local signatureBySuffix  = {
-  ttf     = '\0\1\0\0',
-  otf     = 'OTTO',
-  woff    = 'wOFF',
-  woff2   = 'wOF2',
-  jpg     = '\255\216\255',
-  png     = '\137PNG\13\10\26\10',
-  gif     = 'GIF',
-  ico     = '\0\0\1\0',
-  swf     = 'FWS',
-  swc     = 'CWS',
-  bmp     = 'BM',
-  psd     = '8BPS',
-  jpc     = '\255\79\255',
-  jp2     = '\0\0\0\12jP\32\32\13\10\135\10',
-  iff     = 'FORM',
-  tiff_ii = 'II\42\0',
-  tiff_mm = 'MM\0\42',
-}
-
-local mimeBySuffix = {
---ttf     = 'application/x-font-ttf',
-  ttf     = 'application/x-font-truetype',
-  otf     = 'application/x-font-opentype',
-  woff    = 'application/font-woff',
-  woff2   = 'application/font-woff2',
-  eot     = 'application/vnd.ms-fontobject',
-  jpg     = 'image/jpeg',
-  png     = 'image/png',
-  gif     = 'image/gif',
-  ico     = 'image/vnd.microsoft.icon',
-  swf     = 'application/x-shockwave-flash',
-  swc     = 'application/x-shockwave-flash',
-  bmp     = 'image/x-ms-bmp',
-  psd     = 'image/psd',
-  jpc     = 'application/octet-stream',
-  jp2     = 'image/jp2',
-  iff     = 'image/iff',
-  tiff_ii = 'image/tiff',
-  tiff_mm = 'image/tiff',
-  unknown = 'application/octet-stream',
-}
-
-function getFormat(startChunk)
-  for format, sign in pairs(signatureBySuffix) do
-    if startChunk:sub(1, sign:len()) == sign then
-      return format
-    end
-  end
-  return 'unknown'
-end
-
-function getMimeType(name)
-  local mime = ''
-  if type(name) == 'string' then
-    local handle, err = io.open(name, 'rb')
-    if handle then
-      local startChunk = handle:read(16)
-      if startChunk then
-        mime = mimeBySuffix[getFormat(startChunk)]
-      end
-      handle:close()
-    end
-  end
-  return mime
-end
-
-function DataURLEncoder(filename)
-  local mime = getMimeType(filename)
-  local content, ok = fileRead(filename, true)
-  if not ok then
-    print('Error opening file', 'The file „'..filename..'“ cannot be read.')
-    return
-  end
-  local b64data = base64.encode(content)
-  print('data:' .. mime .. ';base64,' .. b64data)
-
-  --e0c2ee80a31bd8255f2aebf7f32dd05c2f0d1667
-  --https://api.imgur.com/3/upload
-  --e43154123889dc3
-  -- local response = requests.post('https://api.imgur.com/3/upload',
-  -- { 
-  --   headers = {"Authorization: Client-ID e43154123889dc3"},
-  --   data = 'image=data:' .. mime .. ';base64,' .. b64data
-  -- })
-  -- print(response.text)
-end]]
