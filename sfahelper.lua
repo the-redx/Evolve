@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.41-beta3
+-- Version 1.41-beta4
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4103")
-SCRIPT_ASSEMBLY = "1.41-beta3"
+script_version("1.4104")
+SCRIPT_ASSEMBLY = "1.41-beta4"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -373,7 +373,7 @@ updatesInfo = {
     {'Добавлена система динамических рангов. Теперь ранги подстраиваются под вашу фракцию и сервер (Только Evolve Rp);'},
     {'Добавлена возможность подстроить под себя все отыгровки/доклады/прочее в {FF5233}/sh - Настройки - Изменение отыгровок;'},
     {'Теперь можно изменять худ под свои потребности в {FF5233}/sh - Настройки - Настройки худа;'},
-    {'Изменена система слежки за игроком {FF5233}/sh - Функции - Панель слежки && /watch.{FFFFFF} Теперь можно выносить игроков на экран и следить за ними мне меню;'},
+    {'Изменена система слежки за игроком {FF5233}/sh - Функции - Панель слежки && /watch.{FFFFFF} Теперь можно выносить игроков на экран;', 'Переписана структура команды, пофикшен баг с отображением игроков в оффлайне;'},
     {'Изменена система шпор. Теперь добавлять / изменять / удалять шпоры можно прямо в игре.', 'Добавлена команда для быстрого открытия шпоры - {FF5233}/shnote;'},
     {'Изменен биндер. Меню приведено в более понятный для новичка вид и более удобный вид для всех пользователей;', '\n{FF5233}Остальное'},
     {'Удален пункт в настройках \'Старое лого\';'},
@@ -640,11 +640,36 @@ function main()
       if skip[2] == false then imgui.ShowCursor = false end
       -----------
       -- Watch-list
-      if pInfo.settings.watchhud and #watchList > 0 then
+      if pInfo.settings.watchhud and #spectate_list > 0 then
         local checkerheight = renderGetFontDrawHeight(watchFont)
         renderFontDrawText(watchFont, "{00ff00}Панель слежки ["..#watchList.."]:\n", pInfo.settings.watchX, pInfo.settings.watchY, -1)
-        for k, v in ipairs(watchList) do
-          renderFontDrawText(watchFont, v, pInfo.settings.watchX, pInfo.settings.watchY + (k * checkerheight), -1)
+        watchList = {}
+        local heigth = 1
+        for i = 1, #spectate_list do
+          if spectate_list[i] ~= nil then
+            if sampIsPlayerConnected(spectate_list[i].id) then
+              local string = ""
+              local color = ("%06X"):format(bit.band(sampGetPlayerColor(spectate_list[i].id), 0xFFFFFF))
+              local result, ped = sampGetCharHandleBySampPlayerId(spectate_list[i].id)
+              if doesCharExist(ped) then
+                local mx, my, mz = getCharCoordinates(PLAYER_PED)
+                local cx, cy, xz = getCharCoordinates(ped)
+                local distance = ("%0.2f"):format(getDistanceBetweenCoords3d(mx, my, mz,cx, cy, xz))
+                local forma = "Нет"
+                if sampGetFraktionBySkin(spectate_list[i].id) == "Army" then
+                  local skin = getCharModel(ped)
+                  if skin == 252 then forma = "Голый"
+                  else forma = "Да" end
+                end
+                string = ("{%s}%s [%s]{ffffff} - {00BF80}Форма: %s{FFFFFF} - {00BF80}Dist: %s"):format(color, spectate_list[i].nick, spectate_list[i].id, forma, distance)
+              else
+                string = ("{%s}%s [%s]{FFFFFF} - {ec3737}No stream"):format(color, spectate_list[i].nick, spectate_list[i].id)
+              end
+              watchList[#watchList + 1] = string
+              renderFontDrawText(watchFont, string, pInfo.settings.watchX, pInfo.settings.watchY + (heigth * checkerheight), -1)
+              heigth = heigth + 1
+            end
+          end
         end
       end
       -- Перемещение watch-list'а
@@ -1013,7 +1038,7 @@ function cmd_watch(args)
     funcc('cmd_watch_add', 1)
     local color = string.format("%06X", ARGBtoRGB(sampGetPlayerColor(pid)))
     spectate_list[#spectate_list+1] = { id = pid, nick = sampGetPlayerNickname(pid), clist = color }
-    atext(string.format('Игрок %s[%d] успешно добавлен в панель слежки. Текущий цвет: %s', sampGetPlayerNickname(pid), pid, getcolorname(color)))
+    dtext(string.format('Игрок %s[%d] успешно добавлен в панель слежки. Текущий цвет: %s', sampGetPlayerNickname(pid), pid, getcolorname(color)))
   elseif args[1] == "remove" then
     if args[2] == nil then dtext('Неверный ID игрока!') return end
     pid = tonumber(args[2])
@@ -1021,8 +1046,8 @@ function cmd_watch(args)
     if not sampIsPlayerConnected(pid) then dtext('Игрок оффлайн') return end
     for i = 1, #spectate_list do
       if spectate_list[i] ~= nil and pid == spectate_list[i].id then
-        spectate_list[i] = nil
-        atext('Игрок '..sampGetPlayerNickname(pid)..'['..pid..'] успешно убран из панели слежки!')
+        table.remove(spectate_list, i)
+        dtext('Игрок '..sampGetPlayerNickname(pid)..'['..pid..'] успешно убран из панели слежки!')
         return
       end
     end
@@ -1981,7 +2006,7 @@ function sampevents.onSetPlayerColor(player, color)
   for i = 1, #spectate_list do
     if spectate_list[i] ~= nil then
       if player == spectate_list[i].id  and spectate_list[i].clist ~= color then
-        atext(string.format('Игрок %s[%d] сменил цвет ника с %s на %s', spectate_list[i].nick, spectate_list[i].id, getcolorname(spectate_list[i].clist), getcolorname(color)))
+        dtext(string.format('Игрок %s[%d] сменил цвет ника с %s на %s', spectate_list[i].nick, spectate_list[i].id, getcolorname(spectate_list[i].clist), getcolorname(color)))
         spectate_list[i].clist = color
         return
       end
@@ -2418,8 +2443,8 @@ function onScriptTerminate(scr, quitGame)
     logger.debug(string.format('Завершение скрипта. Причина: ', quitGame == true and "Выход из игры" or "Принудительное завершение / Краш"))
     if not quitGame and reloadScriptsParam == false then
       showCursor(false)
-      atext("SFA-Helper завершил свою работу. Причина: Принудительное завершение / Краш")
-      atext("Для восстановния работы используйте {954F4F}Ctrl + R{FFFFFF}, либо перезайдите в игру")
+      logger.fatal("SFA-Helper завершил свою работу. Причина: Принудительное завершение / Краш")
+      logger.fatal("Для восстановния работы используйте Ctrl + R, либо перезайдите в игру")
     end
   end
 end
@@ -3260,7 +3285,7 @@ imgui_windows.main = function(menu)
             if spectate_list[i] ~= nil then
               if data.functions.playerid.v == spectate_list[i].id then
                 dtext(('Игрок %s[%d] успешно убран из панели слежки'):format(spectate_list[i].nick, spectate_list[i].id))
-                spectate_list[i] = nil
+                table.remove(spectate_list, i)
                 found = true
               end
             end
@@ -3285,7 +3310,7 @@ imgui_windows.main = function(menu)
     end
     imgui.SameLine()
     if imgui.Button(u8'Переместить худ', imgui.ImVec2(120, 30)) then
-      if pInfo.settings.watchhud and #watchList > 0 then
+      if pInfo.settings.watchhud and #spectate_list > 0 then
         data.imgui.watchpos = true
         window['main'].bool.v = false
       else dtext('Для перемещения нужно включить худ и добавить хотя бы 1 человека') end
@@ -3312,34 +3337,10 @@ imgui_windows.main = function(menu)
     imgui.Separator()
     imgui.SetCursorPosX(20.0)
     imgui.BeginChild('##1', imgui.ImVec2(-1, -1), true)
-    local count = 0
-    watchList = {}
-    for i = 1, #spectate_list do
-      if spectate_list[i] ~= nil then
-        if sampIsPlayerConnected(spectate_list[i].id) then
-          local color = ("%06X"):format(bit.band(sampGetPlayerColor(spectate_list[i].id), 0xFFFFFF))
-          local result, ped = sampGetCharHandleBySampPlayerId(spectate_list[i].id)
-          if doesCharExist(ped) then
-            local mx, my, mz = getCharCoordinates(PLAYER_PED)
-            local cx, cy, xz = getCharCoordinates(ped)
-            local distance = ("%0.2f"):format(getDistanceBetweenCoords3d(mx, my, mz,cx, cy, xz))
-            local forma = "Нет"
-            if sampGetFraktionBySkin(spectate_list[i].id) == "Army" then
-              local skin = getCharModel(ped)
-              if skin == 252 then forma = "Голый"
-              else forma = "Да" end
-            end
-            watchList[#watchList+1] = ("{%s}%s [%s]{ffffff} - {00BF80}Форма: %s{FFFFFF} - {00BF80}Dist: %s"):format(color, spectate_list[i].nick, spectate_list[i].id, forma, distance)
-            imgui.TextColoredRGB(("{%s}%s [%s]{ffffff} | Форма: %s | Расстояние: %s"):format(color, spectate_list[i].nick, spectate_list[i].id, forma, distance))
-          else
-            watchList[#watchList+1] = ("{%s}%s [%s]{FFFFFF} - {ec3737}No stream"):format(color, spectate_list[i].nick, spectate_list[i].id)
-            imgui.TextColoredRGB(("{%s}%s [%s]{FFFFFF} | Не в зоне стрима"):format(color, spectate_list[i].nick, spectate_list[i].id))
-          end
-          count = count + 1
-        end
-      end
+    for i = 1, #watchList do
+      imgui.TextColoredRGB(watchList[i])
     end
-    if count == 0 then imgui.Text(u8 'Никого в списке слежки нет!') end
+    if #watchList == 0 then imgui.Text(u8 'Никого в списке слежки нет!') end
     imgui.EndChild()
   elseif menu == 20 then
     imgui.PushItemWidth(200)
@@ -4347,7 +4348,7 @@ function onHotKey(id, keys)
         for i = 1, #v.text do
           if tostring(v.text[i]):len() > 0 then
             -- Если найдена строчка с биндером, отправляем в чат
-            if v.text[1]:find("(.)%[noenter%]$") then
+            if v.text[i]:find("(.+)%[noenter%]$") then
               -- Строчка не найдена, просто выводим текст.
               local textTag = tags(v.text[i]:gsub("%[noenter%]$", ""), nil)
               if textTag:len() > 0 then
@@ -5300,9 +5301,9 @@ filesystem.performOld = function(filename, tab)
           replaced = true
         else
           for j = 1, #tab.binder[i].text do
-            if type(tab.binder[i].text[j]) == "string" then
+            if type(tab.binder[i].text[j]) == "string" and tab.binder[i].text[j]:find("%[enter%]$") then
+              tab.binder[i].text[j] = tab.binder[i].text[j]:gsub("%[enter%]$", "")
               logger.trace('replaced!')
-              tab.binder[i].text[j]:gsub("%[enter%]$", "")
             end
           end
         end
