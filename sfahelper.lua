@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.41-beta4
+-- Version 1.41-preview1
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4104")
-SCRIPT_ASSEMBLY = "1.41-beta4"
+script_version("1.4111")
+SCRIPT_ASSEMBLY = "1.41-preview1"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -366,7 +366,7 @@ complete = false
 updatesInfo = {
   version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
   type = "Релиз", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "08.09.2019",
+  date = "18.09.2019",
   list = {
     {'Добавлено радио, которое работает даже при сворачивании игры. Добавлено множество радиостанций, есть возможность включить свое радио;',
     'Активация радио - команда {FF5233}/shradio{FFFFFF}, либо {FF5233}/sh - Основное - Радио;'},
@@ -379,7 +379,7 @@ updatesInfo = {
     {'Удален пункт в настройках \'Старое лого\';'},
     {'Команды работы с таблицами теперь привязаны к своему серверу;'},
     {'Пофикшен модуль работы с внешними файлами;'},
-    {'Скрипт интегрирован в платформу Evolve-Bot, из-за чего в скором времени появится удобный способ проверить онлайн любого игрока'}
+    {'Скрипт теперь интегрирован в платформу Evolve Bot, что позволяет добавлять в будущем новые интересные фишки;'}
   }
 }
 adminsList = {}
@@ -640,11 +640,36 @@ function main()
       if skip[2] == false then imgui.ShowCursor = false end
       -----------
       -- Watch-list
-      if pInfo.settings.watchhud and #watchList > 0 then
+      if pInfo.settings.watchhud and #spectate_list > 0 then
         local checkerheight = renderGetFontDrawHeight(watchFont)
+        local count = 0
         renderFontDrawText(watchFont, "{00ff00}Панель слежки ["..#watchList.."]:\n", pInfo.settings.watchX, pInfo.settings.watchY, -1)
-        for k, v in ipairs(watchList) do
-          renderFontDrawText(watchFont, v, pInfo.settings.watchX, pInfo.settings.watchY + (k * checkerheight), -1)
+        watchList = {}
+        for i = 1, #spectate_list do
+          if spectate_list[i] ~= nil then
+            if sampIsPlayerConnected(spectate_list[i].id) then
+              local string = ""
+              local color = ("%06X"):format(bit.band(sampGetPlayerColor(spectate_list[i].id), 0xFFFFFF))
+              local result, ped = sampGetCharHandleBySampPlayerId(spectate_list[i].id)
+              if doesCharExist(ped) then
+                local mx, my, mz = getCharCoordinates(PLAYER_PED)
+                local cx, cy, xz = getCharCoordinates(ped)
+                local distance = ("%0.2f"):format(getDistanceBetweenCoords3d(mx, my, mz,cx, cy, xz))
+                local forma = "Нет"
+                if sampGetFraktionBySkin(spectate_list[i].id) == "Army" then
+                  local skin = getCharModel(ped)
+                  if skin == 252 then forma = "Голый"
+                  else forma = "Да" end
+                end
+                string = ("{%s}%s [%s]{ffffff} - {00BF80}Форма: %s{FFFFFF} - {00BF80}Dist: %s"):format(color, spectate_list[i].nick, spectate_list[i].id, forma, distance)
+              else
+                string = ("{%s}%s [%s]{FFFFFF} - {ec3737}No stream"):format(color, spectate_list[i].nick, spectate_list[i].id)
+              end
+              count = count + 1
+              renderFontDrawText(watchFont, string, pInfo.settings.watchX, pInfo.settings.watchY + (count * checkerheight), -1)
+              watchList[#watchList + 1] = string
+            end
+          end
         end
       end
       -- Перемещение watch-list'а
@@ -1013,7 +1038,7 @@ function cmd_watch(args)
     funcc('cmd_watch_add', 1)
     local color = string.format("%06X", ARGBtoRGB(sampGetPlayerColor(pid)))
     spectate_list[#spectate_list+1] = { id = pid, nick = sampGetPlayerNickname(pid), clist = color }
-    atext(string.format('Игрок %s[%d] успешно добавлен в панель слежки. Текущий цвет: %s', sampGetPlayerNickname(pid), pid, getcolorname(color)))
+    dtext(string.format('Игрок %s[%d] успешно добавлен в панель слежки. Текущий цвет: %s', sampGetPlayerNickname(pid), pid, getcolorname(color)))
   elseif args[1] == "remove" then
     if args[2] == nil then dtext('Неверный ID игрока!') return end
     pid = tonumber(args[2])
@@ -1021,8 +1046,8 @@ function cmd_watch(args)
     if not sampIsPlayerConnected(pid) then dtext('Игрок оффлайн') return end
     for i = 1, #spectate_list do
       if spectate_list[i] ~= nil and pid == spectate_list[i].id then
-        spectate_list[i] = nil
-        atext('Игрок '..sampGetPlayerNickname(pid)..'['..pid..'] успешно убран из панели слежки!')
+        table.remove(spectate_list, i)
+        dtext('Игрок '..sampGetPlayerNickname(pid)..'['..pid..'] успешно убран из панели слежки!')
         return
       end
     end
@@ -2412,14 +2437,12 @@ function sampevents.onServerMessage(color, text)
 end
 
 function onScriptTerminate(scr, quitGame)
-  logger.trace('Скрипт '..scr.name..' завершен')
   if scr == script.this then
     if radioStream ~= nil then bass.BASS_StreamFree(radioStream) end
-    logger.debug(string.format('Завершение скрипта. Причина: ', quitGame == true and "Выход из игры" or "Принудительное завершение / Краш"))
     if not quitGame and reloadScriptsParam == false then
       showCursor(false)
-      atext("SFA-Helper завершил свою работу. Причина: Принудительное завершение / Краш")
-      atext("Для восстановния работы используйте {954F4F}Ctrl + R{FFFFFF}, либо перезайдите в игру")
+      logger.fatal(string.format('Завершение скрипта. Причина: ', quitGame == true and "Выход из игры" or "Принудительное завершение / Краш"))
+      logger.fatal("Для восстановния работы используйте Ctrl + R, либо перезайдите в игру")
     end
   end
 end
@@ -2659,15 +2682,17 @@ function imgui.OnDrawFrame()
     imgui.SetWindowSize('notitle', imgui.ImVec2(320, 0))
     imgui_windows.hud()
     imgui_windows.pie()
-    --[[if pieMenu.active > 0 then
-      imgui.OpenPopup('PieMenu')
-    end
     if imgui.IsMouseClicked(2) then
-      if pieMenu.active == 0 then
-        if window['target'].bool.v == true then pieMenu.active = 2
-        else pieMenu.active = 1 end
-      else pieMenu.active = 0 end
-    end]]
+      imgui.OpenPopup('PieMenu')
+      if window['target'].bool.v == true then pieMenu.active = 2
+      else pieMenu.active = 1 end
+    end
+    if imgui.IsPopupOpen('PieMenu') then
+      sampToggleCursor(true)
+    elseif pieMenu.active > 0 then
+      sampToggleCursor(false)
+      pieMenu.active = 0
+    end
     imgui.End()
     imgui.PopStyleVar()
     imgui.PopStyleColor()
@@ -3260,7 +3285,7 @@ imgui_windows.main = function(menu)
             if spectate_list[i] ~= nil then
               if data.functions.playerid.v == spectate_list[i].id then
                 dtext(('Игрок %s[%d] успешно убран из панели слежки'):format(spectate_list[i].nick, spectate_list[i].id))
-                spectate_list[i] = nil
+                table.remove(spectate_list, i)
                 found = true
               end
             end
@@ -3312,34 +3337,10 @@ imgui_windows.main = function(menu)
     imgui.Separator()
     imgui.SetCursorPosX(20.0)
     imgui.BeginChild('##1', imgui.ImVec2(-1, -1), true)
-    local count = 0
-    watchList = {}
-    for i = 1, #spectate_list do
-      if spectate_list[i] ~= nil then
-        if sampIsPlayerConnected(spectate_list[i].id) then
-          local color = ("%06X"):format(bit.band(sampGetPlayerColor(spectate_list[i].id), 0xFFFFFF))
-          local result, ped = sampGetCharHandleBySampPlayerId(spectate_list[i].id)
-          if doesCharExist(ped) then
-            local mx, my, mz = getCharCoordinates(PLAYER_PED)
-            local cx, cy, xz = getCharCoordinates(ped)
-            local distance = ("%0.2f"):format(getDistanceBetweenCoords3d(mx, my, mz,cx, cy, xz))
-            local forma = "Нет"
-            if sampGetFraktionBySkin(spectate_list[i].id) == "Army" then
-              local skin = getCharModel(ped)
-              if skin == 252 then forma = "Голый"
-              else forma = "Да" end
-            end
-            watchList[#watchList+1] = ("{%s}%s [%s]{ffffff} - {00BF80}Форма: %s{FFFFFF} - {00BF80}Dist: %s"):format(color, spectate_list[i].nick, spectate_list[i].id, forma, distance)
-            imgui.TextColoredRGB(("{%s}%s [%s]{ffffff} | Форма: %s | Расстояние: %s"):format(color, spectate_list[i].nick, spectate_list[i].id, forma, distance))
-          else
-            watchList[#watchList+1] = ("{%s}%s [%s]{FFFFFF} - {ec3737}No stream"):format(color, spectate_list[i].nick, spectate_list[i].id)
-            imgui.TextColoredRGB(("{%s}%s [%s]{FFFFFF} | Не в зоне стрима"):format(color, spectate_list[i].nick, spectate_list[i].id))
-          end
-          count = count + 1
-        end
-      end
+    for i = 1, #watchList do
+      imgui.TextColoredRGB(watchList[i])
     end
-    if count == 0 then imgui.Text(u8 'Никого в списке слежки нет!') end
+    if #watchList == 0 then imgui.Text(u8 'Никого в списке слежки нет!') end
     imgui.EndChild()
   elseif menu == 20 then
     imgui.PushItemWidth(200)
@@ -4229,27 +4230,18 @@ imgui_windows.members = function()
 end
 
 imgui_windows.pie = function()
-  -- pieMenu.active [0-2]
-  --[[if pie.BeginPiePopup('PieMenu', pie_keyid) then
-    for k, v in ipairs(pie_elements) do
-      if v.next == nil then if pie.PieMenuItem(u8(v.name)) then v.action() end
-      elseif type(v.next) == 'table' then drawPieSub(v) end
-    end
-    pie.EndPiePopup()
-  end]]
-
   if pie.BeginPiePopup('PieMenu', 1) then
-    if pie.PieMenuItem('Test1') then end
-    if pie.PieMenuItem('Test2') then end
-    if pie.PieMenuItem('Test3', false) then end
-    if pie.BeginPieMenu('Sub') then
-      if pie.BeginPieMenu('Sub sub\nmenu') then
-        if pie.PieMenuItem('SubSub') then end
-        if pie.PieMenuItem('SubSub2') then end
+    if pie.PieMenuItem(u8'Обоссать\nкрышку\nунитаза') then end
+    if pie.PieMenuItem(u8'Послать\nразработчика\nнахуй') then end
+    if pie.PieMenuItem(u8'Пойти\nнахуй', false) then end
+    if pie.BeginPieMenu(u8'Выебать') then
+      if pie.BeginPieMenu(u8'Себя') then
+        if pie.PieMenuItem(u8'Рукой') then end
+        if pie.PieMenuItem(u8'Ногой') then end
         pie.EndPieMenu()
       end
-      if pie.PieMenuItem('TestSub') then end
-      if pie.PieMenuItem('TestSub2') then end
+      if pie.PieMenuItem(u8'Собаку') then end
+      if pie.PieMenuItem(u8'Генерала') then end
      pie.EndPieMenu()
     end
     pie.EndPiePopup()
@@ -4347,7 +4339,7 @@ function onHotKey(id, keys)
         for i = 1, #v.text do
           if tostring(v.text[i]):len() > 0 then
             -- Если найдена строчка с биндером, отправляем в чат
-            if v.text[1]:find("(.)%[noenter%]$") then
+            if v.text[1]:find("(.+)%[noenter%]$") then
               -- Строчка не найдена, просто выводим текст.
               local textTag = tags(v.text[i]:gsub("%[noenter%]$", ""), nil)
               if textTag:len() > 0 then
@@ -5300,9 +5292,9 @@ filesystem.performOld = function(filename, tab)
           replaced = true
         else
           for j = 1, #tab.binder[i].text do
-            if type(tab.binder[i].text[j]) == "string" then
+            if type(tab.binder[i].text[j]) == "string" and tab.binder[i].text[j]:find("%[enter%]$") then
+              tab.binder[i].text[j] = tab.binder[i].text[j]:gsub("%[enter%]$", "")
               logger.trace('replaced!')
-              tab.binder[i].text[j]:gsub("%[enter%]$", "")
             end
           end
         end
