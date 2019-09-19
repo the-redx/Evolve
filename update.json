@@ -12,8 +12,8 @@
     },
     "sfahelpertest":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.lua",
-        "version":"1.4111",
-		"versiontext":"1.41-preview1"
+        "version":"1.4112",
+		"versiontext":"1.41-preview2"
     },
     "admintools":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/admintools.luac",

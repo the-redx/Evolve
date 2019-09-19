@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.41-preview1
+-- Version 1.41-preview2
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4111")
-SCRIPT_ASSEMBLY = "1.41-preview1"
+script_version("1.4112")
+SCRIPT_ASSEMBLY = "1.41-preview2"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -371,7 +371,7 @@ updatesInfo = {
     {'Добавлено радио, которое работает даже при сворачивании игры. Добавлено множество радиостанций, есть возможность включить свое радио;',
     'Активация радио - команда {FF5233}/shradio{FFFFFF}, либо {FF5233}/sh - Основное - Радио;'},
     {'Добавлена система динамических рангов. Теперь ранги подстраиваются под вашу фракцию и сервер (Только Evolve Rp);'},
-    {'Добавлена возможность подстроить под себя все отыгровки/доклады/прочее в {FF5233}/sh - Настройки - Изменение отыгровок;'},
+    {'Добавлена возможность подстроить под себя все отыгровки /  доклады / прочее в {FF5233}/sh - Настройки - Изменение отыгровок;'},
     {'Теперь можно изменять худ под свои потребности в {FF5233}/sh - Настройки - Настройки худа;'},
     {'Изменена система слежки за игроком {FF5233}/sh - Функции - Панель слежки && /watch.{FFFFFF} Теперь можно выносить игроков на экран и следить за ними мне меню;'},
     {'Изменена система шпор. Теперь добавлять / изменять / удалять шпоры можно прямо в игре.', 'Добавлена команда для быстрого открытия шпоры - {FF5233}/shnote;'},
@@ -401,7 +401,7 @@ tCarsName = {"Landstalker", "Bravura", "Buffalo", "Linerunner", "Perrenial", "Se
 "PoliceCar", "PoliceRanger", "Picador", "S.W.A.T", "Alpha", "Phoenix", "GlendaleShit", "SadlerShit", "Luggage A", "Luggage B", "Stairs", "Boxville", "Tiller",
 "UtilityTrailer"}
 counterNames = {"Принято игроков", "Уволено игроков", "Повышего игроков", "Проведено лекций (/lecture)", "Проведено на посту", "Проведено на КПП", "Выдано нарядов (Меню)", "Запрошено локаций (/loc | Меню)", "Запрошено ЧСов", "Поставок на LVa", "Поставок на LSa"}
-rankings = { ["SFA"] = true, ["LVA"] = true, ["LSPD"] = true, ["SFPD"] = true, ["LVPD"] = true, ["Instructors"] = true, ["FBI"] = true, ["Medic"] = true }
+rankings = { ["SFA"] = true, ["LVA"] = true, ["LSPD"] = true, ["SFPD"] = true, ["LVPD"] = true, ["Instructors"] = true, ["FBI"] = true, ["Medic"] = true, ["Mayor"] = true }
 dayName = {"Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"}
 --------------------------------------------------------------------
 
@@ -1736,75 +1736,29 @@ end
 -- Загружаем необходимые файлы
 function loadFiles()
   lua_thread.create(function()
-    --- Загрузка библиотек
-    if not lpie then
-      funcc('loadfiles_imgui_piemenu', 1)
-      atext('Устанавливаем библиотеку imgui_piemenu...')
-      local files = {'imgui_piemenu.lua'}
-      for k, v in pairs(files) do
-        copas_download_status = 'proccess'
-        downloadUrlToFile('https://raw.githubusercontent.com/the-redx/Evolve/master/lib/'..v, 'moonloader/lib/'..v, function(id, status, p1, p2)
-          if status == dlstatus.STATUS_DOWNLOADINGDATA then
-            copas_download_status = 'proccess'
-            print(string.format('Загружено %d килобайт из %d килобайт.', p1, p2))
-          elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
-            copas_download_status = 'succ'
-          elseif status == 64 then
-            copas_download_status = 'failed'
-          end
-        end)
-        while copas_download_status == 'proccess' do wait(0) end
-        if copas_download_status == 'failed' then
-          atext('Не удалось загрузить библиотеку \'imgui_piemenu\'')
-          reloadScriptsParam = true
-          thisScript():unload()
-        else
-          print(v..' был загружен')
-        end
-      end
-      atext('Библиотека установлена')
-      reloadScriptsParam = true
-      reloadScripts()     
-    end
-    if not lbass then
-      funcc('loadfiles_bass', 1)
-      atext('Устанавливаем библиотеку BASS...')
-      local files = {'bass.lua'}
-      for k, v in pairs(files) do
-        copas_download_status = 'proccess'
-        downloadUrlToFile('https://raw.githubusercontent.com/the-redx/Evolve/master/lib/'..v, 'moonloader/lib/'..v, function(id, status, p1, p2)
-          if status == dlstatus.STATUS_DOWNLOADINGDATA then
-            copas_download_status = 'proccess'
-            print(string.format('Загружено %d килобайт из %d килобайт.', p1, p2))
-          elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
-            copas_download_status = 'succ'
-          elseif status == 64 then
-            copas_download_status = 'failed'
-          end
-        end)
-        while copas_download_status == 'proccess' do wait(0) end
-        if copas_download_status == 'failed' then
-          atext('Не удалось загрузить библиотеку \'bass\'')
-          reloadScriptsParam = true
-          thisScript():unload()
-        else
-          print(v..' был загружен')
-        end
-      end
-      atext('Библиотека установлена')
-      reloadScriptsParam = true
-      reloadScripts()
-      return   
-    end
+    local files = {}
+    local direct = {}
+    ----------
+    if not lpie then files[#files + 1] = 'imgui_piemenu.lua' end
+    if not lbass then files[#files + 1] = 'bass.lua' end
     if not lcopas or not lhttp then
-      funcc('loadfiles_copas', 1)
-      atext('Необходимые для работы библиотеки не были найдены. Скачиваем...')
-      local direct = {'copas'}
-      local files = {'copas.lua', "copas/ftp.lua", 'copas/http.lua', 'copas/limit.lua', 'copas/smtp.lua', 'requests.lua'}
+      direct[#direct + 1] = 'copas'
+      files[#files + 1] = 'copas.lua'
+      files[#files + 1] = "copas/ftp.lua"
+      files[#files + 1] = 'copas/http.lua'
+      files[#files + 1] = 'copas/limit.lua'
+      files[#files + 1] = 'copas/smtp.lua'
+      files[#files + 1] = 'requests.lua'
+    end
+    ----------------------------
+    --- Загрузка библиотек
+    ----------------------------
+    if #files > 0 or #direct > 0 then
+      dtext('Устанавливаем необходимые библиотеки...')
       for k, v in pairs(direct) do if not doesDirectoryExist("moonloader/lib/"..v) then createDirectory("moonloader/lib/"..v) end end
       for k, v in pairs(files) do
         copas_download_status = 'proccess'
-        downloadUrlToFile('https://raw.githubusercontent.com/WhackerH/kirya/master/lib/'..v, 'moonloader/lib/'..v, function(id, status, p1, p2)
+        downloadUrlToFile('https://raw.githubusercontent.com/the-redx/Evolve/master/lib/'..v, 'moonloader/lib/'..v, function(id, status, p1, p2)
           if status == dlstatus.STATUS_DOWNLOADINGDATA then
             copas_download_status = 'proccess'
             print(string.format('Загружено %d килобайт из %d килобайт.', p1, p2))
@@ -1816,17 +1770,17 @@ function loadFiles()
         end)
         while copas_download_status == 'proccess' do wait(0) end
         if copas_download_status == 'failed' then
-          atext('Не удалось загрузить библиотеку \'copas\'')
+          dtext('Не удалось загрузить библиотеку '..v)
           reloadScriptsParam = true
           thisScript():unload()
+          return
         else
           print(v..' был загружен')
         end
       end
-      atext('Все необходимые библиотеки были загружены')
-      reloadScriptsParam = true
-      reloadScripts()
+      reloadScriptsParam = true    
     end
+    ------------------------
     if not doesDirectoryExist("moonloader\\SFAHelper\\lectures") then
       createDirectory("moonloader\\SFAHelper\\lectures")
       local file = io.open('moonloader/SFAHelper/lectures/firstlecture.txt', "w+")
@@ -1842,6 +1796,11 @@ function loadFiles()
       file:flush()
       file:close()
       file = nil
+    end
+    if reloadScriptsParam then
+      dtext('Все необходимые библиотеки были загружены')
+      reloadScripts()
+      return
     end
     complete = true
     return
@@ -2681,7 +2640,7 @@ function imgui.OnDrawFrame()
     imgui.Begin('notitle', window['hud'].bool, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoMove)
     imgui.SetWindowSize('notitle', imgui.ImVec2(320, 0))
     imgui_windows.hud()
-    imgui_windows.pie()
+    --[[imgui_windows.pie()
     if imgui.IsMouseClicked(2) then
       imgui.OpenPopup('PieMenu')
       if window['target'].bool.v == true then pieMenu.active = 2
@@ -2692,7 +2651,7 @@ function imgui.OnDrawFrame()
     elseif pieMenu.active > 0 then
       sampToggleCursor(false)
       pieMenu.active = 0
-    end
+    end]]
     imgui.End()
     imgui.PopStyleVar()
     imgui.PopStyleColor()
@@ -2879,7 +2838,7 @@ imgui_windows.main = function(menu)
           bass.BASS_ChannelPlay(radioStream, true)
           if radioStream ~= nil then
             if tonumber(bass.BASS_ErrorGetCode()) ~= 0 then
-              atext('Аудиопоток возможно пуст')
+              dtext('Аудиопоток возможно пуст')
             end
             bass.BASS_ChannelSetAttribute(radioStream, BASS_ATTRIB_VOL, selectRadio.volume)
             renderStream = renderCreateFont("Arial", 9, 5)
@@ -4339,7 +4298,7 @@ function onHotKey(id, keys)
         for i = 1, #v.text do
           if tostring(v.text[i]):len() > 0 then
             -- Если найдена строчка с биндером, отправляем в чат
-            if v.text[1]:find("(.+)%[noenter%]$") then
+            if v.text[i]:find("(.+)%[noenter%]$") then
               -- Строчка не найдена, просто выводим текст.
               local textTag = tags(v.text[i]:gsub("%[noenter%]$", ""), nil)
               if textTag:len() > 0 then
@@ -5475,7 +5434,7 @@ function apply_custom_style()
 end
 
 function isGosFraction(fracname)
-  local fracs = {"SFA", "LVA", "LSPD", "SFPD", "LVPD", "Instructors", "FBI", "Medic"}
+  local fracs = {"SFA", "LVA", "LSPD", "SFPD", "LVPD", "Instructors", "FBI", "Medic", "Mayor"}
   for i = 1, #fracs do
     if fracname == fracs[i] then
       return true
