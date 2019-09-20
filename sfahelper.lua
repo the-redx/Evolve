@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.41-preview2
+-- Version 1.41-preview3
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4112")
-SCRIPT_ASSEMBLY = "1.41-preview2"
+script_version("1.4113")
+SCRIPT_ASSEMBLY = "1.41-preview3"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -114,9 +114,9 @@ pInfo = {
     tag = nil,
     rpweapons = 0,
     autologin = false,
-    password = "",
-    ranknames = {[0] = 'Нет', 'Рядовой', 'Ефрейтор', 'Мл.Сержант', 'Сержант', 'Ст.Сержант', 'Старшина', 'Прапорщик', 'Мл.Лейтенант', 'Лейтенант', 'Ст.Лейтенант', 'Капитан', 'Майор', 'Подполковник', 'Полковник', 'Генерал'}
+    password = ""
   },
+  ranknames = {'Рядовой', 'Ефрейтор', 'Мл.Сержант', 'Сержант', 'Ст.Сержант', 'Старшина', 'Прапорщик', 'Мл.Лейтенант', 'Лейтенант', 'Ст.Лейтенант', 'Капитан', 'Майор', 'Подполковник', 'Полковник', 'Генерал'},
   func = {},
   gov = govtext,
   weeks = {0,0,0,0,0,0,0},
@@ -431,7 +431,7 @@ function main()
     logger.debug(("Иницилизация настроек | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
     ------
-    autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json")
+    --[[autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json")
     while complete ~= true do wait(0) end
     logger.debug(("Проверка обновлений | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
@@ -439,7 +439,7 @@ function main()
     loadPermissions("https://docs.google.com/spreadsheets/d/1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y/export?format=tsv&id=1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y&gid=1568566199") -- remove
     while complete ~= true do wait(0) end
     logger.debug(("Загрузка прав доступа | Время: %.3fs"):format(os.clock() - mstime))
-    complete = false
+    complete = false]]
     --------------------=========----------------------
     ----- Загружаем конфиги
     local configjson = filesystem.load('config.json')
@@ -585,7 +585,7 @@ function main()
         logger.info("Началась новая неделя. Итоги предыдущей: "..secToTime(pInfo.info.weekOnline).."")
         -- Очищаем все счётчики, кроме настроек
         for key in pairs(pInfo) do
-          if key ~= "settings" and key ~= "gov" and key ~= "func" then
+          if key ~= "settings" and key ~= "gov" and key ~= "func" and key ~= 'ranknames' then
             for k in pairs(pInfo[key]) do
               pInfo[key][k] = 0
             end
@@ -645,30 +645,28 @@ function main()
         local count = 0
         renderFontDrawText(watchFont, "{00ff00}Панель слежки ["..#watchList.."]:\n", pInfo.settings.watchX, pInfo.settings.watchY, -1)
         watchList = {}
-        for i = 1, #spectate_list do
-          if spectate_list[i] ~= nil then
-            if sampIsPlayerConnected(spectate_list[i].id) then
-              local string = ""
-              local color = ("%06X"):format(bit.band(sampGetPlayerColor(spectate_list[i].id), 0xFFFFFF))
-              local result, ped = sampGetCharHandleBySampPlayerId(spectate_list[i].id)
-              if doesCharExist(ped) then
-                local mx, my, mz = getCharCoordinates(PLAYER_PED)
-                local cx, cy, xz = getCharCoordinates(ped)
-                local distance = ("%0.2f"):format(getDistanceBetweenCoords3d(mx, my, mz,cx, cy, xz))
-                local forma = "Нет"
-                if sampGetFraktionBySkin(spectate_list[i].id) == "Army" then
-                  local skin = getCharModel(ped)
-                  if skin == 252 then forma = "Голый"
-                  else forma = "Да" end
-                end
-                string = ("{%s}%s [%s]{ffffff} - {00BF80}Форма: %s{FFFFFF} - {00BF80}Dist: %s"):format(color, spectate_list[i].nick, spectate_list[i].id, forma, distance)
-              else
-                string = ("{%s}%s [%s]{FFFFFF} - {ec3737}No stream"):format(color, spectate_list[i].nick, spectate_list[i].id)
+        for k, v in ipairs(spectate_list) do
+          if v ~= nil and sampIsPlayerConnected(v.id) then
+            local string = ""
+            local color = ("%06X"):format(bit.band(sampGetPlayerColor(v.id), 0xFFFFFF))
+            local result, ped = sampGetCharHandleBySampPlayerId(v.id)
+            if doesCharExist(ped) then
+              local mx, my, mz = getCharCoordinates(PLAYER_PED)
+              local cx, cy, xz = getCharCoordinates(ped)
+              local distance = ("%0.2f"):format(getDistanceBetweenCoords3d(mx, my, mz,cx, cy, xz))
+              local forma = "Нет"
+              if sampGetFraktionBySkin(v.id) == "Army" then
+                local skin = getCharModel(ped)
+                if skin == 252 then forma = "Голый"
+                else forma = "Да" end
               end
-              count = count + 1
-              renderFontDrawText(watchFont, string, pInfo.settings.watchX, pInfo.settings.watchY + (count * checkerheight), -1)
-              watchList[#watchList + 1] = string
+              string = ("{%s}%s [%s]{ffffff} - {00BF80}Форма: %s{FFFFFF} - {00BF80}Dist: %s"):format(color, v.nick, v.id, forma, distance)
+            else
+              string = ("{%s}%s [%s]{FFFFFF} - {ec3737}No stream"):format(color, v.nick, v.id)
             end
+            count = count + 1
+            renderFontDrawText(watchFont, string, pInfo.settings.watchX, pInfo.settings.watchY + (count * checkerheight), -1)
+            watchList[#watchList + 1] = string
           end
         end
       end
@@ -966,8 +964,8 @@ function cmd_stats(args)
     logger.info(('Фракция определена: %s'):format(sInfo.fraction))
     logger.info(('Пол определен: %s'):format(pInfo.settings.sex == 1 and "Мужской" or "Женский"))
     if rankings[sInfo.fraction] ~= nil then
-      for i = 1, #pInfo.settings.ranknames do
-        if pInfo.settings.ranknames[i] == rang then
+      for i = 1, #pInfo.ranknames do
+        if pInfo.ranknames[i] == rang then
           pInfo.settings.rank = i
           logger.info(('Ранг определен: %s[%d]'):format(rang, pInfo.settings.rank))
           break
@@ -976,7 +974,7 @@ function cmd_stats(args)
           logger.warn('Ранга нет в статистике')
           break
         end
-        if i == #pInfo.settings.ranknames then
+        if i == #pInfo.ranknames then
           logger.warn('Ранг не определен')
         end
       end
@@ -1037,7 +1035,7 @@ function cmd_watch(args)
     if not sampIsPlayerConnected(pid) then dtext('Игрок оффлайн') return end
     funcc('cmd_watch_add', 1)
     local color = string.format("%06X", ARGBtoRGB(sampGetPlayerColor(pid)))
-    spectate_list[#spectate_list+1] = { id = pid, nick = sampGetPlayerNickname(pid), clist = color }
+    table.insert(spectate_list, { id = pid, nick = sampGetPlayerNickname(pid), clist = color })
     dtext(string.format('Игрок %s[%d] успешно добавлен в панель слежки. Текущий цвет: %s', sampGetPlayerNickname(pid), pid, getcolorname(color)))
   elseif args[1] == "remove" then
     if args[2] == nil then dtext('Неверный ID игрока!') return end
@@ -1633,6 +1631,8 @@ function secoundTimer()
   end)
 end
 
+-- imgui.ImVec2(320, 190)
+-- 320x115
 -- Вызов таргет меню
 function targetPlayer(id)
   if pInfo.settings.target ~= true then return end
@@ -1644,12 +1644,13 @@ function targetPlayer(id)
     time = os.time(),
     show = true,
     cursor = false,
-    coordX = data.imgui.hudpoint.x+160,
-    coordY = data.imgui.hudpoint.y+95
+    coordX = pInfo.settings.hudX + 160,
+    coordY = pInfo.settings.hudY + (data.imgui.hudpoint.y / 2)
   }
+  -- hudpoint
   -- Вызов меню вниз, если места не хватает, вызываем вверх.
   targetMenu.slide = "bottom"
-  if screeny < data.imgui.hudpoint.y + 190 + 10 + 115 then targetMenu.slide = "top" end
+  if screeny < pInfo.settings.hudY + data.imgui.hudpoint.y + 10 + 115 then targetMenu.slide = "top" end
   lua_thread.create(function()
     while true do
       wait(150)
@@ -1691,7 +1692,7 @@ function punaccept()
         funcc('punkey_giverank', 1)
         sampSendChat(localVars("rp", "giverank", {
           ['type'] = punkey[2].rank > 6 and "погоны" or "лычки",
-          ['rankname'] = pInfo.settings.ranknames[punkey[2].rank]
+          ['rankname'] = pInfo.ranknames[punkey[2].rank]
         }))
       end
       punkey[2].nick, punkey[2].rank, punkey[2].time = nil, nil, nil
@@ -2138,9 +2139,8 @@ function sampevents.onServerMessage(color, text)
       local id, date, nick, rankname, rank, status, afk = text:match("^ ID: (%d+) | (.-) | (.-)%: (.-)%[(%d+)%] %- (.+){FFFFFF} | {FFFFFF}%[AFK%]%: (.+) секунд$")
       id = tonumber(id)
       rank = tonumber(rank)
-      logger.trace(string.format("%s - %s[%s]", rankname, pInfo.settings.ranknames[rank], rank))
-      if pInfo.settings.ranknames[rank] ~= rankname then
-        pInfo.settings.ranknames[rank] = rankname
+      if pInfo.ranknames[rank] ~= rankname then
+        pInfo.ranknames[rank] = rankname
       end
       if status == "{008000}На работе" then 
         status = true
@@ -2159,7 +2159,7 @@ function sampevents.onServerMessage(color, text)
         streamed, _ = sampGetCharHandleBySampPlayerId(id)
         -- Убираем даты инвайта
         if pInfo.settings.membersdate == true then
-          text = ("ID: %d | %s: %s[%d] - %s{FFFFFF} | [AFK]: %s секунд"):format(id, sampGetPlayerNickname(id), pInfo.settings.ranknames[rank], rank, status and "{008000}На работе" or "{ae433d}Выходной", afk)
+          text = ("ID: %d | %s: %s[%d] - %s{FFFFFF} | [AFK]: %s секунд"):format(id, sampGetPlayerNickname(id), pInfo.ranknames[rank], rank, status and "{008000}На работе" or "{ae433d}Выходной", afk)
         end
         if id == sInfo.playerid then sampAddChatMessage(text, sampGetPlayerColor(id))
         else sampAddChatMessage(string.format("%s - %s", text, streamed and "{00BF80}in stream" or "{ec3737}not in stream"), sampGetPlayerColor(id)) end
@@ -2172,9 +2172,8 @@ function sampevents.onServerMessage(color, text)
       local id, date, nick, rankname, rank, status = text:match("^ ID: (%d+) | (.-) | (.-)%: (.-)%[(%d+)%] %- (.+){FFFFFF}$")
       id = tonumber(id)
       rank = tonumber(rank)
-      logger.trace(string.format("%s - %s[%s]", rankname, pInfo.settings.ranknames[rank], rank))
-      if pInfo.settings.ranknames[rank] ~= rankname then
-        pInfo.settings.ranknames[rank] = rankname
+      if pInfo.ranknames[rank] ~= rankname then
+        pInfo.ranknames[rank] = rankname
       end
       if status == "{008000}На работе" then 
         status = true
@@ -2191,7 +2190,7 @@ function sampevents.onServerMessage(color, text)
       if membersInfo.mode == 1 then
         streamed, _ = sampGetCharHandleBySampPlayerId(id)
         if pInfo.settings.membersdate == true then
-          text = ("ID: %d | %s: %s[%d] - %s{FFFFFF}"):format(id, sampGetPlayerNickname(id), pInfo.settings.ranknames[rank], rank, status and "{008000}На работе" or "{ae433d}Выходной")
+          text = ("ID: %d | %s: %s[%d] - %s{FFFFFF}"):format(id, sampGetPlayerNickname(id), pInfo.ranknames[rank], rank, status and "{008000}На работе" or "{ae433d}Выходной")
         end
         if id == sInfo.playerid then sampAddChatMessage(text, sampGetPlayerColor(id))
         else sampAddChatMessage(string.format("%s - %s", text, streamed and "{00BF80}in stream" or "{ec3737}not in stream"), sampGetPlayerColor(id)) end
@@ -2583,7 +2582,7 @@ function imgui.OnDrawFrame()
       if imgui.Button(u8'Сохранить', imgui.ImVec2(120, 30)) then
         if #data.shpora.search.v ~= 0 and #data.shpora.inputbuffer.v ~= 0 then
           if data.shpora.edit == 0 then
-            local file = io.open('moonloader/SFAHelper/shpora/'..u8:decode(data.shpora.search.v)..'.txt', "a+")
+            local file = io.open('moonloader\\SFAHelper\\shpora\\'..u8:decode(data.shpora.search.v)..'.txt', "a+")
             file:write(u8:decode(data.shpora.inputbuffer.v))
             file:close()
             dtext('Шпора успешно создана!')
@@ -2591,7 +2590,7 @@ function imgui.OnDrawFrame()
             local file = io.open(data.filename, "w+")
             file:write(u8:decode(data.shpora.inputbuffer.v))
             file:close()
-            local rename = os.rename(data.filename, 'moonloader/SFAHelper/shpora/'..u8:decode(data.shpora.search.v)..'.txt')
+            local rename = os.rename(data.filename, 'moonloader\\SFAHelper\\shpora\\'..u8:decode(data.shpora.search.v)..'.txt')
             if rename then
               dtext('Шпора успешно изменена!')
             else
@@ -2668,18 +2667,18 @@ function imgui.OnDrawFrame()
     if targetMenu.show == true then
       if targetMenu.slide == "top" then
         targetMenu.coordY = targetMenu.coordY - 25
-        if targetMenu.coordY < data.imgui.hudpoint.y-10-60 then targetMenu.coordY = data.imgui.hudpoint.y-10-60 end
+        if targetMenu.coordY < pInfo.settings.hudY-10-57.5 then targetMenu.coordY = pInfo.settings.hudY-10-57.5 end
       elseif targetMenu.slide == "bottom" then
         targetMenu.coordY = targetMenu.coordY + 25
-        if targetMenu.coordY > data.imgui.hudpoint.y+190+10+115 then targetMenu.coordY = data.imgui.hudpoint.y+190+10+115 end
+        if targetMenu.coordY > pInfo.settings.hudY+10+57.5+data.imgui.hudpoint.y then targetMenu.coordY = pInfo.settings.hudY+10+57.5+data.imgui.hudpoint.y end
       end
     else
       if targetMenu.slide == "top" then
         targetMenu.coordY = targetMenu.coordY + 25
-        if targetMenu.coordY > data.imgui.hudpoint.y + 95 then targetMenu.coordY = data.imgui.hudpoint.y + 95 end
+        if targetMenu.coordY > (data.imgui.hudpoint.y / 2) + pInfo.settings.hudY then targetMenu.coordY = (data.imgui.hudpoint.y / 2) + pInfo.settings.hudY end
       elseif targetMenu.slide == "bottom" then
         targetMenu.coordY = targetMenu.coordY - 25
-        if targetMenu.coordY < data.imgui.hudpoint.y + 95 then targetMenu.coordY = data.imgui.hudpoint.y + 95 end
+        if targetMenu.coordY < pInfo.settings.hudY + (data.imgui.hudpoint.y / 2) then targetMenu.coordY = pInfo.settings.hudY + (data.imgui.hudpoint.y / 2) end
       end
     end
     imgui.SetNextWindowSize(imgui.ImVec2(320, 115), imgui.Cond.Always)
@@ -2701,7 +2700,7 @@ imgui_windows.main = function(menu)
     imgui.Text(u8"Ник:"); imgui.SameLine(225.0); imgui.Text(('%s[%d]'):format(sInfo.nick, sInfo.playerid))
     imgui.Text(u8"Рабочий день:"); imgui.SameLine(225.0); imgui.TextColoredRGB(string.format('%s', sInfo.isWorking == true and "{00bf80}Начат" or "{ec3737}Окончен"))
     if sInfo.isWorking == true and pInfo.settings.rank > 0 then
-      imgui.Text(u8"Звание:"); imgui.SameLine(225.0); imgui.Text(('%s[%d]'):format(u8:encode(pInfo.settings.ranknames[pInfo.settings.rank]), pInfo.settings.rank))
+      imgui.Text(u8"Звание:"); imgui.SameLine(225.0); imgui.Text(('%s[%d]'):format(u8:encode(pInfo.ranknames[pInfo.settings.rank]), pInfo.settings.rank))
     end
     imgui.Text(u8"Время авторизации:"); imgui.SameLine(225.0); imgui.Text(('%s'):format(sInfo.authTime))
     imgui.Separator()
@@ -3252,7 +3251,7 @@ imgui_windows.main = function(menu)
           if found == false then
             funcc('imgui_watch_add', 1)
             local color = string.format("%06X", ARGBtoRGB(sampGetPlayerColor(data.functions.playerid.v)))
-            spectate_list[#spectate_list+1] = { id = data.functions.playerid.v, nick = sampGetPlayerNickname(data.functions.playerid.v), clist = color }
+            table.insert(spectate_list, { id = data.functions.playerid.v, nick = sampGetPlayerNickname(data.functions.playerid.v), clist = color })
             dtext(string.format('Игрок %s[%d] успешно добавлен в панель слежки. Текущий цвет: %s', spectate_list[#spectate_list].nick, spectate_list[#spectate_list].id, getcolorname(color)))
           end
         else dtext('Вы ввели свой ID') end
@@ -4251,8 +4250,9 @@ imgui_windows.hud = function()
   elseif pInfo.settings.hudset[7] then
     imgui.Text(u8'Тазер: Выключен')
   end
-  data.imgui.hudpoint = { x = imgui.GetWindowPos().x, y = imgui.GetWindowPos().y }
+  data.imgui.hudpoint = { x = imgui.GetWindowSize().x, y = imgui.GetWindowSize().y }
   if pInfo.settings.target == true and pInfo.settings.hudset[6] then
+    imgui.Text('Hudpoint | X:'..data.imgui.hudpoint.x..' | Y: '..data.imgui.hudpoint.y)
     imgui.TextColoredRGB('Таргет-бар: {228B22}Включен')
   elseif pInfo.settings.hudset[6] then
     imgui.Text(u8'Таргет-бар: Выключен')
@@ -4263,7 +4263,7 @@ imgui_windows.target = function()
   local com = false
   for i = 1, #data.members do
     if data.members[i].pid == targetMenu.playerid then
-      imgui.Text(u8:encode(("Фракция: %s | Звание: %s[%d]"):format(sInfo.fraction, pInfo.settings.ranknames[data.members[i].prank], data.members[i].prank)))
+      imgui.Text(u8:encode(("Фракция: %s | Звание: %s[%d]"):format(sInfo.fraction, pInfo.ranknames[data.members[i].prank], data.members[i].prank)))
       com = true
       break
     end
@@ -4581,7 +4581,7 @@ function tags(args, param)
 	args = args:gsub("{myid}", tostring(sInfo.playerid))
 	args = args:gsub("{myhp}", tostring(getCharHealth(PLAYER_PED)))
   args = args:gsub("{myrank}", tostring(pInfo.settings.rank))
-  args = args:gsub("{myrankname}", tostring(pInfo.settings.ranknames[pInfo.settings.rank]))
+  args = args:gsub("{myrankname}", tostring(pInfo.ranknames[pInfo.settings.rank]))
   args = args:gsub("{myarm}", tostring(getCharArmour(PLAYER_PED)))
   ----------
   args = args:gsub("{kvadrat}", tostring(kvadrat()))
