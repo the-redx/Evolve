@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.41-preview3
+-- Version 1.41-preview4
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4113")
-SCRIPT_ASSEMBLY = "1.41-preview3"
+script_version("1.4114")
+SCRIPT_ASSEMBLY = "1.41-preview4"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -365,15 +365,15 @@ lectureStatus = 0
 complete = false
 updatesInfo = {
   version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
-  type = "Релиз", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "18.09.2019",
+  type = "Плановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
+  date = "22.09.2019",
   list = {
     {'Добавлено радио, которое работает даже при сворачивании игры. Добавлено множество радиостанций, есть возможность включить свое радио;',
     'Активация радио - команда {FF5233}/shradio{FFFFFF}, либо {FF5233}/sh - Основное - Радио;'},
     {'Добавлена система динамических рангов. Теперь ранги подстраиваются под вашу фракцию и сервер (Только Evolve Rp);'},
     {'Добавлена возможность подстроить под себя все отыгровки /  доклады / прочее в {FF5233}/sh - Настройки - Изменение отыгровок;'},
     {'Теперь можно изменять худ под свои потребности в {FF5233}/sh - Настройки - Настройки худа;'},
-    {'Изменена система слежки за игроком {FF5233}/sh - Функции - Панель слежки && /watch.{FFFFFF} Теперь можно выносить игроков на экран и следить за ними мне меню;'},
+    {'Изменена система слежки за игроком {FF5233}/sh - Функции - Панель слежки && /watch.{FFFFFF} Теперь можно выносить игроков на экран и следить за ними вне меню;'},
     {'Изменена система шпор. Теперь добавлять / изменять / удалять шпоры можно прямо в игре.', 'Добавлена команда для быстрого открытия шпоры - {FF5233}/shnote;'},
     {'Изменен биндер. Меню приведено в более понятный для новичка вид и более удобный вид для всех пользователей;', '\n{FF5233}Остальное'},
     {'Удален пункт в настройках \'Старое лого\';'},
@@ -431,7 +431,7 @@ function main()
     logger.debug(("Иницилизация настроек | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
     ------
-    --[[autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json")
+    autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json")
     while complete ~= true do wait(0) end
     logger.debug(("Проверка обновлений | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
@@ -439,7 +439,7 @@ function main()
     loadPermissions("https://docs.google.com/spreadsheets/d/1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y/export?format=tsv&id=1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y&gid=1568566199") -- remove
     while complete ~= true do wait(0) end
     logger.debug(("Загрузка прав доступа | Время: %.3fs"):format(os.clock() - mstime))
-    complete = false]]
+    complete = false
     --------------------=========----------------------
     ----- Загружаем конфиги
     local configjson = filesystem.load('config.json')
@@ -4252,7 +4252,7 @@ imgui_windows.hud = function()
   end
   data.imgui.hudpoint = { x = imgui.GetWindowSize().x, y = imgui.GetWindowSize().y }
   if pInfo.settings.target == true and pInfo.settings.hudset[6] then
-    imgui.Text('Hudpoint | X:'..data.imgui.hudpoint.x..' | Y: '..data.imgui.hudpoint.y)
+    --imgui.Text('Hudpoint | X:'..data.imgui.hudpoint.x..' | Y: '..data.imgui.hudpoint.y)
     imgui.TextColoredRGB('Таргет-бар: {228B22}Включен')
   elseif pInfo.settings.hudset[6] then
     imgui.Text(u8'Таргет-бар: Выключен')
