@@ -5598,7 +5598,7 @@ function drawMembersPlayer(table)
     imgui.OpenPopup("ContextMenu")
   end
   imgui.NextColumn()
-	imgui.Text(u8:encode(("%s[%d]"):format(pInfo.settings.ranknames[table.mrank], table.mrank))); imgui.NextColumn()
+	imgui.Text(u8:encode(("%s[%d]"):format(pInfo.ranknames[table.mrank], table.mrank))); imgui.NextColumn()
 	imgui.Text(u8:encode(table.mstatus and "На работе" or "Выходной")); imgui.NextColumn()
 	imgui.Text(u8:encode(table.mafk ~= nil and table.mafk.." секунд" or "")); imgui.NextColumn()
 	imgui.Text(u8:encode(distance)); imgui.NextColumn()
