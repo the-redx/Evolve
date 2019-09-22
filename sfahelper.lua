@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.41-preview4
+-- Version 1.41-release1
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4114")
-SCRIPT_ASSEMBLY = "1.41-preview4"
+script_version("1.4131")
+SCRIPT_ASSEMBLY = "1.41-release1"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -193,7 +193,7 @@ config_keys = {
   targetplayer = {v = {key.VK_R}},
   weaponkey = {v = {key.VK_Z}},
   binder = {
-    { text = {""}, v = {}, time = 0 },
+    { text = {"Привет, мир![noenter]"}, v = {18,89}, time = 1100 },
   },
   cmd_binder = {
     { cmd = "pass", wait = 1100, text = { "Здравия желаю! Я {myrankname}, {myfullname}. Предъявите ваши документы." } },
@@ -1985,9 +1985,9 @@ function sampevents.onPlayerQuit(playerid, reason)
   for i = 1, #spectate_list do
     if spectate_list[i] ~= nil then
       if playerid == spectate_list[i].id then
-        atext(string.format('Игрок %s[%d] вышел из игры. Последний клист: %s', spectate_list[i].nick, playerid, getcolorname(spectate_list[i].clist)))
-        spectate_list[i] = nil
-        return
+        dtext(string.format('Игрок %s[%d] вышел из игры. Последний клист: %s', spectate_list[i].nick, playerid, getcolorname(spectate_list[i].clist)))
+        table.remove(spectate_list, i)
+        break
       end
     end
   end
