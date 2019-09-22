@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.41-release1
+-- Version 1.41-release2
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4131")
-SCRIPT_ASSEMBLY = "1.41-release1"
+script_version("1.4132")
+SCRIPT_ASSEMBLY = "1.41-release2"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -1868,14 +1868,18 @@ function autoupdate(json_url)
   httpRequest(json_url, nil, function(response, code, headers, status)
     if response then
       local info = decodeJson(response)
+      updatelink = info.sfahelpernew.url
+      updateversion = info.sfahelpernew.version
+      updateversiontext = info.sfahelpernew.versiontext
       if DEBUG_MODE then
-        updatelink = info.sfahelpertest.url
-        updateversion = info.sfahelpertest.version
-        updateversiontext = info.sfahelpertest.versiontext
-      else
-        updatelink = info.sfahelpernew.url
-        updateversion = info.sfahelpernew.version
-        updateversiontext = info.sfahelpernew.versiontext     
+        for k, v in ipairs(info.sfahelpertest.testers) do
+          if v == sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(playerPed))) then
+            updatelink = info.sfahelpertest.url
+            updateversion = info.sfahelpertest.version
+            updateversiontext = info.sfahelpertest.versiontext
+            break
+          end
+        end
       end
       logger.debug('Версия на сервере: '..tostring(updateversion))
       if updateversion > thisScript().version then
@@ -2905,6 +2909,7 @@ imgui_windows.main = function(menu)
     imgui.TextColoredRGB('{FFFFFF}/sweather [погода 0 - 45]'); imgui.SameLine(spacing); imgui.Text(u8'Изменить погоду на указанную')
     imgui.TextColoredRGB('{FFFFFF}/stime [время 0 - 23]'); imgui.SameLine(spacing); imgui.Text(u8'Изменить время на указанное')
     imgui.TextColoredRGB('{FFFFFF}/shradio'); imgui.SameLine(spacing); imgui.Text(u8'Открыть меню радио')
+    imgui.TextColoredRGB('{FFFFFF}/shnote'); imgui.SameLine(spacing); imgui.Text(u8'Открыть меню шпаргалок')
   elseif menu == 11 then
     imgui.PushItemWidth(150)
     if data.lecture.string == "" then
