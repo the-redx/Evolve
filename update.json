@@ -13,7 +13,8 @@
     "sfahelpertest":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.lua",
         "version":"1.4131",
-		"versiontext":"1.41-release1"
+		"versiontext":"1.41-release1",
+		"testers":["Edward_Franklin", "Eduardo_Carmone", "Jonathan_Belin"]
     },
     "admintools":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/admintools.luac",
