@@ -5,16 +5,16 @@
         "version":"1.38",
 		"testversion":"1.3923"
     },
-    "sfahelpernew":{
-        "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.luac",
-        "version":"1.4131",
-		"versiontext":"1.41"
-    },
-    "sfahelpertest":{
+	"sfahelpertest":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.lua",
         "version":"1.4132",
 		"versiontext":"1.41-release2",
 		"testers":["Edward_Franklin", "Eduardo_Carmone", "Jonathan_Belin", "William_French", "Anthony_Raphael", "Henrich_Rogge"]
+    },
+    "sfahelpernew":{
+        "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.luac",
+        "version":"1.4131",
+		"versiontext":"1.41"
     },
     "admintools":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/admintools.luac",
