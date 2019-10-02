@@ -1,7 +1,6 @@
 -- This file is a SFA-Helper project
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
--- https://github.com/the-redx/Evolve
 -- Version 1.41-release2
 
 script_name("SFA-Helper")

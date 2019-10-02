@@ -1,7 +1,7 @@
 script_name("Activity") 
 script_authors({ 'Edward_Franklin', 'Thomas_Lawson' })
-script_version("1.5") -- Final version
-script_version_number(14536)
+script_version("1.71") -- Final version
+script_version_number(17125)
 --------------------------------------------------------------------
 require "lib.moonloader"
 local inicfg              = require 'inicfg'
@@ -40,9 +40,6 @@ local pInfo = inicfg.load({
   	banip = 0,
   	rmute = 0,
   	jail = 0
-  },
-  others = {
-    houseplata = 0
   }
 }, "activity-checker")
 local sInfo = {
@@ -61,22 +58,12 @@ function main()
     apply_custom_style()
     if not isSampfuncsLoaded() or not isSampLoaded() then return end
     while not isSampAvailable() do wait(100) end
-    autoupdate("https://raw.githubusercontent.com/WhackerH/EvolveRP/master/update.json", '[Activity Helper]', "https://evolve-rp.su/viewtopic.php?f=21&t=151439")
+    autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json", '[Activity Helper]', "https://evolve-rp.su/viewtopic.php?f=21&t=151439")
     sampRegisterChatCommand('activitydebug', function()
       DEBUG_MODE = not DEBUG_MODE
       atext(("Debug mode %s"):format(DEBUG_MODE and "включен" or "отключен"))
     end)
     sampRegisterChatCommand('activity', function() mainwindow.v = not mainwindow.v end)
-    --[[sampRegisterChatCommand('blacklist_start', function()
-      local ips = {"93.85.137.241", "92.63.110.250", "194.1.237.67", "81.162.233.192", "194.28.172.176", "46.167.79.56", "82.202.167.203"}
-      lua_thread.create(function()
-        local count = #ips
-        for i = count, 1, -1 do
-          sampSendChat("/pgetip "..ips[i])
-          wait(1150)
-        end
-      end)
-    end)]]
     --------------------=========----------------------
     if not doesDirectoryExist("moonloader\\config") then
       createDirectory("moonloader\\config")
@@ -106,9 +93,6 @@ function main()
       pInfo.info.dayPM = 0
       pInfo.info.dayOnline = 0
       pInfo.info.dayAFK = 0
-    end
-    if os.time(os.date("!*t")) > pInfo.others.houseplata - (3600 * 24 * 3) and pInfo.others.houseplata > 0 then -- Unix Timestamp
-      atext("Внимание! На домашнем счёту осталось слишком мало денег. Успейте пополнить счёт")
     end
     if sampGetGamestate() == 3 then
       sampSendChat("/a")
@@ -212,10 +196,11 @@ function sendStat(bool)
       }
     }
     if bool then zaprosTable[1].params.alogin = true end
-    --url = ("https://redx-dev.web.app/api.html?dayAFK=%s&dayOnline=%s&dayPM=%s&level=%s&nick=%s&weekOnline=%s&weekPM=%s"):format(pInfo.info.dayAFK, pInfo.info.dayOnline, pInfo.info.dayPM, pInfo.info.admLvl, sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))), pInfo.info.weekOnline,pInfo.info.weekPM)
-    httpRequest("https://redx-dev.web.app/api?data="..encodeJson(zaprosTable), nil, function(response) end)
-    --downloadUrlToFile(url, os.getenv('TEMP') .. '\\activity')
-    --print("https://redx-dev.web.app/api?data="..encodeJson(zaprosTable))
+    httpRequest("https://redx-dev.web.app/api?data="..encodeJson(zaprosTable), nil, function(response, code, headers, status)
+      if not response then
+        print(url, code)
+      end
+    end)
   end)
 end
 
@@ -505,14 +490,8 @@ function sampevents.onServerMessage(color, text)
     sInfo.sessionStart = os.time()
     return false
   end
-  --[[if text:match("%[Заявка на смену ника%] .+%[.+%] просит сменить ник на%: .+") then
-    local playernick, playerid, nextname = text:match("%[Заявка на смену ника%] (.+)%[(.+)%] просит сменить ник на%: (.+)")
-    local string = string.format("[Заявка на смену ника] %s[%s] [lvl: %d] просит сменить ник на: %s", playernick, playerid, sampGetPlayerScore(tonumber(playerid)), nextname)
-    return {string, color}
-  end]]
   if text:match("Новый баланс на домашнем счету: $.+") then
     local balance = tonumber(text:match("Новый баланс на домашнем счету%: $(.+)"))
-    atext("balance = "..balance)
   end
   if text:match("Nik %[.+%]  R%-IP %[.+%]  L%-IP %[.+%]  IP %[(.+)%]") and color == -10270806 then
     local nick, rip, ip = text:match("Nik %[(.+)%]  R%-IP %[(.+)%]  L%-IP %[.+%]  IP %[(.+)%]")
@@ -524,13 +503,6 @@ function sampevents.onServerMessage(color, text)
     if not checkIntable(pgetips, rip) then pgetips[#pgetips+1] = rip end
     if not checkIntable(pgetips, ip) then pgetips[#pgetips+1] = ip end
   end
-  --[[
-    [20:31:41]  Положили на домашний счет: $100
-    [20:31:41]  Новый баланс на домашнем счету: $33600
-    [20:31:41]  Новый баланс на счету: $2185475
-  if os.time(os.date("!*t")) > pInfo.others.houseplata - (3600 * 24 * 3) and pInfo.others.houseplata > 0 then -- Unix Timestamp
-    atext("Внимание! На домашнем счёту осталось слишком мало денег. Успейте пополнить счёт")
-  end]]
   if text:match("Время online за текущий день") then
     --sampAddChatMessage(("%06X"):format(bit.rshift(color, 8)), -1)
     sampAddChatMessage(string.format(" Время online за неделю - %s (Без учета АФК) | Ответов: %d", secToTime(pInfo.info.weekOnline), pInfo.info.weekPM), 0xBFC0C2)
