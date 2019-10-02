@@ -312,4 +312,5 @@ end
 
 local defaultPieMenu = New()
 defaultPieMenu.New = New
+defaultPieMenu._VERSION = 1
 return defaultPieMenu
