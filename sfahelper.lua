@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.42-preview1
+-- Version 1.42-preview2
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4221")
-SCRIPT_ASSEMBLY = "1.42-preview1"
+script_version("1.4222")
+SCRIPT_ASSEMBLY = "1.42-preview2"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -202,6 +202,7 @@ localInfo = {
   },
   others = {
     title = "Остальное",
+    udost = {'Отыгровка удостоверения', 'Удостоверение - Организация: {fraction} | Должность: {rankname}', 'Удостоверение - Организация: {fraction} | Должность: {rankname}'},
     dep = {"Занять гос волну", '/d OG, Занимаю волну гос новостей на {time}. Возражения на п.{id}', '/d OG, Занимаю волну гос новостей на {time}. Возражения на п.{id}'},
     dept = {"Напомнить о гос волне", "/d OG, Напоминаю, волна гос новостей на {time} за SFA.", "/d OG, Напоминаю, волна гос новостей на {time} за SFA."},
     mon = {"Мониторинг (SFA)", 'Состояние склада Армии LV - {sklad} тонн', 'Состояние склада Армии LV - {sklad} тонн'},
@@ -215,9 +216,7 @@ config_keys = {
   pundeny = {v = {key.VK_N}},
   targetplayer = {v = {key.VK_R}},
   weaponkey = {v = {key.VK_Z}},
-  binder = {
-    { text = {"Привет, мир![noenter]"}, v = {18,89}, time = 1100 },
-  },
+  binder = {},
   cmd_binder = {
     { cmd = "pass", wait = 1100, text = { "Здравия желаю! Я {myrankname}, {myfullname}. Предъявите ваши документы." } },
     { cmd = "uinv", wait = 1100, text = { "/uninvite {param} {param2}" } },
@@ -411,7 +410,8 @@ updatesInfo = {
     {'Добавлена возможность добавлять игроков в группы, устанавливать им ранги, просматривать онлайн группы;', 'Данная функция ``локальная``, с другими игроками никакого взаимодействия не происходит;'},
     {'Добавлена команда ``/setkv [квадрат]``. Ставит метку в указанном квадрате. Если не указывать квадрат, поставит метку на последнем упомяннутом в чате квадрате;'},
     {'Добавлен авто-доклад для лодок'},
-    {'', '``Остальное:``'},
+    {'Добавлена возможность изменять координаты уже созданых постов в ``/sh - Функции - Автодоклад с постов``;'},
+    {'Теперь при создании поста можно указывать радиус. Новый синтаксис - ``/createpost [радиус] [название поста]``;', '``Остальное:``'},
     {'Небольшое изменение некоторых элементов дизайна;'},
     {'Пофикшен баг с выводом текста в рацию через /mon 1;'},
     {'Теперь чат можно открывать на ``T (русская Е)``;'},
@@ -490,7 +490,7 @@ function main()
     if keysjson ~= nil then
       keysjson = filesystem.performOld('keys.json', keysjson)
       logger.trace("Start additionArray to 'config_keys'")
-      config_keys = additionArray(keysjson, config_keys) 
+      config_keys = additionArray(keysjson, config_keys)
     end 
     filesystem.save(config_keys, 'keys.json')
     ----------
@@ -1073,9 +1073,13 @@ end
 -- Создаем пост для автодокладов
 function cmd_createpost(args)
   if #args == 0 then
-    dtext('Введите: /createpost [название поста]')
+    dtext('Введите: /createpost [радиус] [название поста]')
     return
   end
+  local split = string.split(args, ' ', 2)
+  local radius = split[1]
+  args = split[2]
+  if tonumber(radius) == nil then dtext('Неверное название поста!') return end
   local cx, cy, cz = getCharCoordinates(PLAYER_PED)
   for i = 1, #postInfo do
     local pi = postInfo[i]
@@ -1083,14 +1087,14 @@ function cmd_createpost(args)
       dtext('Данное имя поста уже занято!')
       return
     end
-    if cx >= pi.coordX - (pi.radius+15) and cx <= pi.coordX + (pi.radius+15) and cy >= pi.coordY - (pi.radius+15) and cy <= pi.coordY + (pi.radius+15) and cz >= pi.coordZ - (pi.radius+15) and cz <= pi.coordZ + (pi.radius+15) then
+    if cx >= pi.coordX - (pi.radius+radius) and cx <= pi.coordX + (pi.radius+radius) and cy >= pi.coordY - (pi.radius+radius) and cy <= pi.coordY + (pi.radius+radius) and cz >= pi.coordZ - (pi.radius+radius) and cz <= pi.coordZ + (pi.radius+radius) then
       dtext(("Пост не может быть создан, т.к. он граничит с постом '%s'"):format(pi.name))
       return
     end
   end
   funcc('cmd_createpost', 1)
   logger.info("Создан новый пост '"..args.."'")
-  postInfo[#postInfo+1] = { name = args, coordX = cx, coordY = cy, coordZ = cz, radius = 15.0 }
+  postInfo[#postInfo+1] = { name = args, coordX = cx, coordY = cy, coordZ = cz, radius = radius }
   filesystem.save(postInfo, 'posts.json')
   atext(("Пост '%s' успешно создан. Для настройки перейдите в меню (/sh - Функции - Автодоклад с постов)"):format(args))
 end
@@ -1805,7 +1809,7 @@ function punaccept()
       if punkey[3].time > os.time() - 1 then dtext("Не флуди!") return end
       if punkey[3].time > os.time() - 15 then
         funcc('punkey_autopostavki', 1)
-        dtext(punkey[3].text)
+        cmd_r(punkey[3].text)
         --------
         if punkey[3].text:match("Состояние %- 300%/300") then
           punkeyActive = 3
@@ -3051,7 +3055,7 @@ imgui_windows.main = function(menu)
     imgui.TextColoredRGB('{FFFFFF}/cchat'); imgui.SameLine(spacing); imgui.Text(u8'Очистить чат')
     imgui.TextColoredRGB('{FFFFFF}/adm'); imgui.SameLine(spacing); imgui.Text(u8'Альтернатива команде /admins')
     imgui.TextColoredRGB('{FFFFFF}(/lec)ture [start/pause/stop]'); imgui.SameLine(spacing); imgui.Text(u8'Вывести подготовленную лекцию в чат')
-    imgui.TextColoredRGB('{FFFFFF}/createpost [название]'); imgui.SameLine(spacing); imgui.Text(u8'Создать пост, для автодокладов')
+    imgui.TextColoredRGB('{FFFFFF}/createpost [радиус] [название поста]'); imgui.SameLine(spacing); imgui.Text(u8'Создать пост, для автодокладов')
     imgui.TextColoredRGB('{FFFFFF}/addbl'); imgui.SameLine(spacing); imgui.TextColoredRGB('Добавить игрока в Черный Список {954F4F}(Доступно по привязке)')
     imgui.TextColoredRGB('{FFFFFF}/addtable'); imgui.SameLine(spacing); imgui.TextColoredRGB('Добавить игрока в таблицу {954F4F}(Доступно SFA 12+)')
     imgui.TextColoredRGB('{FFFFFF}/vig [id] [тип] [причина]'); imgui.SameLine(spacing); imgui.Text(u8'Выдать игроку выговор')
@@ -3176,7 +3180,7 @@ imgui_windows.main = function(menu)
       imgui.Text(u8:encode(data.lecture.text[i]))
     end
   elseif menu == 12 then
-    imgui.PushItemWidth(200)
+    imgui.PushItemWidth(150)
     local togglepost = imgui.ImBool(post.active)
     local interval = imgui.ImInt(post.interval)
     if imgui.ToggleButton(u8 'post##1', togglepost) then
@@ -3184,32 +3188,58 @@ imgui_windows.main = function(menu)
       post.active = togglepost.v;
     end
     imgui.SameLine(); imgui.Text(u8 'Включить автодоклад')
-    if imgui.InputInt(u8 'Интервал между докладами (в секундах)', interval) then
+    imgui.Text(u8'Интервал между докладами (в секундах):')
+    if imgui.InputInt('##inputint', interval) then
       if interval.v < 60 then interval.v = 60 end
       if interval.v > 3600 then interval.v = 3600 end
       post.interval = interval.v
     end
+    imgui.Spacing()
     imgui.Separator()
-    imgui.Text(u8 'Изменение постов')
+    imgui.Spacing()
+    imgui.Text(u8'Выберите пост для изменения:')
     local pstr = ""
     for i = 1, #postInfo do
       pstr = pstr..postInfo[i].name.."\0"
     end
-    imgui.Combo(u8 'Выберите пост для изменения', data.combo.post, u8:encode("Не выбрано\0"..pstr.."\0"))
-    imgui.NewLine()
+    imgui.Combo('##combo', data.combo.post, u8:encode("Не выбрано\0"..pstr.."\0"))
+    imgui.Spacing()
     if data.combo.post.v > 0 then
-      imgui.Text(u8("Координаты поста: %f %f %f"):format(postInfo[data.combo.post.v].coordX, postInfo[data.combo.post.v].coordY, postInfo[data.combo.post.v].coordZ))
-      imgui.InputInt(u8("Радиус поста: %f"):format(postInfo[data.combo.post.v].radius), data.functions.radius, 0)
-      if imgui.Button(u8 'Изменить пост') then
+      imgui.Text(u8("Координаты поста: %f, %f, %f"):format(postInfo[data.combo.post.v].coordX, postInfo[data.combo.post.v].coordY, postInfo[data.combo.post.v].coordZ))
+      --imgui.InputInt('##inputint2', data.functions.radius, 0)
+      --imgui.SameLine()
+      if imgui.Button(u8 'Изменить##1') then
+        local cx, cy, cz = getCharCoordinates(PLAYER_PED)
+        local radius = postInfo[data.combo.post.v].radius
+        for i = 1, #postInfo do
+          local pi = postInfo[i]
+          if cx >= pi.coordX - (pi.radius+radius) and cx <= pi.coordX + (pi.radius+radius) and cy >= pi.coordY - (pi.radius+radius) and cy <= pi.coordY + (pi.radius+radius) and cz >= pi.coordZ - (pi.radius+radius) and cz <= pi.coordZ + (pi.radius+radius) then
+            dtext(("Координаты не могут быть изменены, т.к. они граничат с постом '%s'"):format(pi.name))
+            return
+          end
+        end
+        dtext('Координаты поста успешно изменены!')
+        postInfo[data.combo.post.v].coordX = cx
+        postInfo[data.combo.post.v].coordY = cy
+        postInfo[data.combo.post.v].coordZ = cz
+        filesystem.save(postInfo, 'posts.json')
+      end
+      imgui.SameLine(); imgui.TextDisabled(u8'(Необходимо находится на новых координатах)');
+      imgui.Text(u8("Радиус поста: %f"):format(postInfo[data.combo.post.v].radius))
+      imgui.InputInt('##inputint2', data.functions.radius, 0)
+      imgui.SameLine()
+      if imgui.Button(u8 'Изменить##2') then
         if data.functions.radius.v ~= tonumber(postInfo[data.combo.post.v].radius) then
-          atext('Пост успешно изменен!')
+          dtext('Радиус поста успешно изменен!')
           postInfo[data.combo.post.v].radius = data.functions.radius.v
           filesystem.save(postInfo, 'posts.json')
         end
       end
-      if imgui.Button(u8 'Удалить пост') then
+      imgui.NewLine()
+      if imgui.Button(u8 'Удалить пост', imgui.ImVec2(120, 30)) then
         table.remove(postInfo, data.combo.post.v)
-        atext('Пост успешно удален!')
+        data.combo.post.v = 0
+        dtext('Пост успешно удален!')
         filesystem.save(postInfo, 'posts.json') 
       end
     end
@@ -4378,7 +4408,16 @@ imgui_windows.pie = function()
         if targetID ~= nil then sampSendChat("/showlicenses "..targetID) end
       end
       if pie.PieMenuItem(u8'Удост.') then
-        if targetID ~= nil then sampSendChat("/showudost "..targetID) end
+        if targetID ~= nil then
+          lua_thread.create(function()
+            sampSendChat(('/me показал удостоверение %s'):format(sampGetPlayerNickname(targetID):gsub("_", " ")))
+            wait(1100)
+            sampSendChat('/do '..localVars("others", "udost", {
+              ['fraction'] = sInfo.fraction == "no" and "Нет" or sInfo.fraction,
+              ['rankname'] = sInfo.fraction == "no" and "Нет" or pInfo.ranknames[pInfo.settings.rank]
+            }))
+          end)
+        end
       end
       pie.EndPieMenu()
     end
@@ -4402,7 +4441,11 @@ imgui_windows.pie = function()
           dialogPopup = { title = "Выдать выговор игроку", str = 'Тип и причину выговора для игрока '..sampGetPlayerNickname(targetID)..'\nПример: строгий|Нарушение устава', action = "vig", show = 1 }
         end
       end
-      if pie.PieMenuItem(u8'Берет') then end
+      if pie.PieMenuItem(u8'Берет') then
+        if targetID ~= nil then
+          dialogPopup = { title = "Выдать берет игроку", str = 'Название берета для игрока '..sampGetPlayerNickname(targetID)..'\nПример: краповый берет', action = "beret", show = 1 }
+        end
+      end
      pie.EndPieMenu()
     end
     if pie.BeginPieMenu(u8'Другое') then
@@ -4426,9 +4469,9 @@ imgui_windows.pie = function()
     pie.EndPiePopup()
   end
   --[[
-	          ImVec2 size = ImGui::GetItemRectSize();
-            const float values[5] = { 0.5f, 0.20f, 0.80f, 0.60f, 0.25f };
-						ImGui::PlotHistogram("##values", values, IM_ARRAYSIZE(values), 0, NULL, 0.0f, 1.0f, size);
+	  ImVec2 size = ImGui::GetItemRectSize();
+    const float values[5] = { 0.5f, 0.20f, 0.80f, 0.60f, 0.25f };
+		ImGui::PlotHistogram("##values", values, IM_ARRAYSIZE(values), 0, NULL, 0.0f, 1.0f, size);
   ]]
   if imgui.BeginPopupModal(u8'Введите параметры', nil, imgui.WindowFlags.AlwaysAutoResize) then
     imgui.Text(u8:encode(dialogPopup.str))
@@ -4462,6 +4505,9 @@ imgui_windows.pie = function()
           ['count'] = spl[1],
           ['reason'] = spl[2]
         }))
+      elseif dialogPopup.action == "beret" then
+        if input == "" or targetID == nil then data.imgui.inputmodal.v = "" end
+        sampSendChat(('/me передал %s бойцу %s'):format(input, sampGetPlayerNickname(targetID):gsub("_", " ")))
       end
       dialogPopup.show = 0
       imgui.CloseCurrentPopup()
@@ -5830,6 +5876,7 @@ end
 
 -- Дополняет таблицу 'to' таблицей 'table'.
 -- Максимальная глубина вхождения = 5 (table.one.two.three.four)
+-- logger.debug(table.concat(keysjson.binder[1].v, ' + '))
 function additionArray(table, to)
   if table == nil then return to end
   for k, v in pairs(table) do
