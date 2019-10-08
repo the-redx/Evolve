@@ -4480,7 +4480,7 @@ imgui_windows.pie = function()
     imgui.Spacing()
     imgui.Separator()
     imgui.Spacing()
-    if imgui.Button(u8'Выполнить', imgui.ImVec2(120,0)) then
+    if imgui.Button(u8'Выполнить', imgui.ImVec2(120, 30)) then
       local input = u8:decode(data.imgui.inputmodal.v)
       if dialogPopup.action == "giverank" then
         if input == "" or targetID == nil then data.imgui.inputmodal.v = "" end
@@ -4513,7 +4513,7 @@ imgui_windows.pie = function()
       imgui.CloseCurrentPopup()
     end
     imgui.SameLine()
-    if imgui.Button(u8'Закрыть', imgui.ImVec2(120,0)) then
+    if imgui.Button(u8'Закрыть', imgui.ImVec2(120, 30)) then
       dialogPopup.show = 0
       imgui.CloseCurrentPopup()
     end
@@ -5793,7 +5793,7 @@ function apply_custom_style()
   colors[clr.PlotHistogram] = ImVec4(0.40, 0.39, 0.38, 0.63)
   colors[clr.PlotHistogramHovered] = ImVec4(0.25, 1.00, 0.00, 1.00)
   colors[clr.TextSelectedBg] = ImVec4(0.25, 1.00, 0.00, 0.43)
-  colors[clr.ModalWindowDarkening] = ImVec4(1.00, 0.98, 0.95, 0.73)
+  colors[clr.ModalWindowDarkening] = ImVec4(0.24, 0.23, 0.29, 0.65)
 end
 
 function isGosFraction(fracname)
