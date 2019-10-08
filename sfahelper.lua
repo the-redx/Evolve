@@ -1,12 +1,13 @@
 -- This file is a SFA-Helper project
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
--- Version 1.41-release2
+-- https://github.com/the-redx/Evolve
+-- Version 1.42-preview1
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4132")
-SCRIPT_ASSEMBLY = "1.41-release2"
+script_version("1.4221")
+SCRIPT_ASSEMBLY = "1.42-preview1"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -37,12 +38,25 @@ local lbass, bass         = pcall(require, 'bass')
 local lffi, ffi           = pcall(require, 'ffi')
 local lpie, pie           = pcall(require, 'imgui_piemenu')
 --local raknet = require "lib.samp.raknet"
+
 ------------------
 encoding.default = 'CP1251'
 local u8 = encoding.UTF8
 dlstatus = require('moonloader').download_status
 imgui.ToggleButton = imadd.ToggleButton
 imgui.HotKey = imadd.HotKey
+
+if lffi then
+  ---- InputHelper
+  ffi.cdef[[
+	  short GetKeyState(int nVirtKey);
+	  bool GetKeyboardLayoutNameA(char* pwszKLID);
+	  int GetLocaleInfoA(int Locale, int LCType, char* lpLCData, int cchData);
+  ]]
+  BuffSize = 32
+  KeyboardLayoutName = ffi.new("char[?]", BuffSize)
+  inputInfo = ffi.new("char[?]", BuffSize)
+end
 --------------------------------------------------------------------
 -- Логгирование
 logger = {
@@ -107,6 +121,7 @@ pInfo = {
     autobpguns = {2,2,0,2,2,1,0},
     autodoklad = false,
     group = 0,
+    inputhelper = false,
     clist = nil,
     sex = nil,
     membersdate = false,
@@ -130,7 +145,12 @@ localInfo = {
     start = {'Начал поставки', "На связи борт - {id}. Начал поставку боеприпасов на ГС Army LV.", "На связи борт - {id}. Начала поставку боеприпасов на ГС Army LV."},
     ends = {'Закончил поставки', "На связи борт - {id}. Завершил поставки на ГС Army LV, беру курс на часть.", "На связи борт - {id}. Завершила поставки на ГС Army LV, беру курс на часть."},
     startp = {'Начал поставки в порту', "10-15", "10-15"},
-    endp = {'Закончил поставки в порту', "10-16", "10-16"}
+    endp = {'Закончил поставки в порту', "10-16", "10-16"},
+    load_boat = {'Загрузил материалы в СФА (лодка)', 'На связи борт - {id}. Загрузился на сухогрузе. Беру курс на ГС Армии СФ.', 'На связи борт - {id}. Загрузилась на сухогрузе. Беру курс на ГС Армии СФ.'},
+    unload_boat = {'Разгрузил материалы в СФА (лодка)', 'На связи борт - {id}. Разгрузился на ГС Армии СФ. Состояние - {sklad}/200', 'На связи борт - {id}. Разгрузилась на ГС Армии СФ. Состояние - {sklad}/200'},
+    start_boat = {'Начал поставки (лодка)', 'На связи борт - {id}. Начал поставки на ГС Армии СФ.', 'На связи борт - {id}. Начала поставки на ГС Армии СФ.'},
+    unload_boat_lsa = {'Разгрузил материалы в порту (лодка)', 'На связи борт - {id}. Разгрузился на ГС Порта ЛС. Состояние - {sklad}/200', 'На связи борт - {id}. Разгрузилась на ГС Порта ЛС. Состояние - {sklad}/200'},
+    ends_boat = {'Закончил поставки (лодка)', "На связи борт - {id}. Завершил поставки, беру курс на часть.", "На связи борт - {id}. Завершила поставки, беру курс на часть."},
   },
   post = {
     title = "Авто-доклад",
@@ -217,6 +237,14 @@ tempFiles = {
   ranksTime = 0,
   vigTime = 0
 }
+dialogPopup = {
+  title = "",
+  show = 0,
+  str = "",
+  style = DIALOG_STYLE_TABLIST_HEADERS,
+  action = "",
+  dialogid = nil
+}
 pieMenu = {
   active = 0
 }
@@ -229,6 +257,7 @@ data = {
     bind = 1,
     lecturetext = {},
     hudpoint = { x = 0, y = 0 },
+    inputmodal = imgui.ImBuffer(128),
     lecturetime = imgui.ImInt(3),
   },
   functions = {
@@ -289,7 +318,10 @@ postInfo = {
   { name = "Трап", coordX = -1334.59, coordY = 477.46, coordZ = 9.06, radius = 11.0 },
   { name = "Балкон", coordX = -1367.36, coordY = 517.50, coordZ = 11.20, radius = 10.0 },
   { name = "Склад 1", coordX = -1299.44, coordY = 498.90, coordZ = 11.20, radius = 12.0 },
-  { name = "Склад 2", coordX = -1410.75, coordY = 502.03, coordZ = 11.20, radius = 14.0 }
+  { name = "Склад 2", coordX = -1410.75, coordY = 502.03, coordZ = 11.20, radius = 14.0 },
+  { name = "Доки 1", coordX = -1457.57, coordY = 355.17, coordZ = 7.18, radius = 13.0 },
+  { name = "Доки 2", coordX = -1457.55, coordY = 390.83, coordZ = 7.18, radius = 13.0 },
+  { name = "Доки 3", coordX = -1457.19, coordY = 426.95, coordZ = 7.18, radius = 13.0 }
 }
 post = {
   interval = 180,
@@ -321,6 +353,7 @@ membersInfo = {
   imgui = imgui.ImBuffer(256),
   players = {}
 }
+kvCoord = { x = nil, y = nil, ny = "", nx = "" }
 monitoring = {nil, nil, nil, nil, nil, nil}
 -- Клавиши действия
 punkeyActive = 0
@@ -344,6 +377,7 @@ tLastKeys = {}
 ------------------------------------------------
 radioStream = nil
 watchFont = renderCreateFont("Arial", 9, 5)
+inputFont = renderCreateFont("Segoe UI", 11, 13)
 watchList = {}
 selectRadio = { id = 1, title = "Свое радио", volume = 0.6, url = "", stream = 0 }
 changeText = { id = 0, sex = 0, values = {} }
@@ -369,20 +403,19 @@ complete = false
 updatesInfo = {
   version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
   type = "Плановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "22.09.2019",
+  date = "13.10.2019",
   list = {
-    {'Добавлено радио, которое работает даже при сворачивании игры. Добавлено множество радиостанций, есть возможность включить свое радио;',
-    'Активация радио - команда {FF5233}/shradio{FFFFFF}, либо {FF5233}/sh - Основное - Радио;'},
-    {'Добавлена система динамических рангов. Теперь ранги подстраиваются под вашу фракцию и сервер (Только Evolve Rp);'},
-    {'Добавлена возможность подстроить под себя все отыгровки /  доклады / прочее в {FF5233}/sh - Настройки - Изменение отыгровок;'},
-    {'Теперь можно изменять худ под свои потребности в {FF5233}/sh - Настройки - Настройки худа;'},
-    {'Изменена система слежки за игроком {FF5233}/sh - Функции - Панель слежки && /watch.{FFFFFF} Теперь можно выносить игроков на экран и следить за ними вне меню;'},
-    {'Изменена система шпор. Теперь добавлять / изменять / удалять шпоры можно прямо в игре.', 'Добавлена команда для быстрого открытия шпоры - {FF5233}/shnote;'},
-    {'Изменен биндер. Меню приведено в более понятный для новичка вид и более удобный вид для всех пользователей;', '\n{FF5233}Остальное'},
-    {'Удален пункт в настройках \'Старое лого\';'},
-    {'Команды работы с таблицами теперь привязаны к своему серверу;'},
-    {'Пофикшен модуль работы с внешними файлами;'},
-    {'Скрипт теперь интегрирован в платформу Evolve Bot, что позволяет добавлять в будущем новые интересные фишки;'}
+    {'В настройках добавлена возможность включать ``строку состояния``, которая будет видна под полем ввода текста в чат;'},
+    {'Добавлена система ``уведомлений пользователей`` о предостоящих мероприятиях, вывод полезной информации а также новостей в чат;'},
+    {'При наведении ``Таргета`` на игрока и зажатии клавиши ``Колёсико мыши`` будет открыто меню быстрого взаимодействия с этим игроком;'},
+    {'Добавлена возможность добавлять игроков в группы, устанавливать им ранги, просматривать онлайн группы;', 'Данная функция ``локальная``, с другими игроками никакого взаимодействия не происходит;'},
+    {'Добавлена команда ``/setkv [квадрат]``. Ставит метку в указанном квадрате. Если не указывать квадрат, поставит метку на последнем упомяннутом в чате квадрате;'},
+    {'Добавлен авто-доклад для лодок'},
+    {'', '``Остальное:``'},
+    {'Небольшое изменение некоторых элементов дизайна;'},
+    {'Пофикшен баг с выводом текста в рацию через /mon 1;'},
+    {'Теперь чат можно открывать на ``T (русская Е)``;'},
+    {'Добавлен авто-доклад для лодок;'}
   }
 }
 adminsList = {}
@@ -479,6 +512,7 @@ function main()
     logger.debug(("Локальные данные загружены | Время: %.3fs"):format(os.clock() - mstime))
     --------------------=========----------------------
     sampRegisterChatCommand('mon', cmd_mon)
+    sampRegisterChatCommand('setkv', cmd_setkv)
     sampRegisterChatCommand('stime', cmd_stime)
     sampRegisterChatCommand('sweather', cmd_sweather)
     sampRegisterChatCommand('loc', cmd_loc)
@@ -639,10 +673,52 @@ function main()
           skip[2] = true
         end
       end
+      if dialogPopup ~= nil and dialogPopup.show > 0 then imgui.ShowCursor = true
+      else
+        if skip[2] == false then imgui.ShowCursor = false end
+      end
       if skip[1] == false then imgui.Process = false end
-      if skip[2] == false then imgui.ShowCursor = false end
       -----------
-      -- Watch-list
+      ---- InputHelper
+      if sampIsChatInputActive() == true and pInfo.settings.inputhelper == true then
+        local function getStrByState(keyState)
+          if keyState == 0 then
+            return "{ff8533}OFF{ffffff}"
+          end
+          return "{85cf17}ON{ffffff}"
+        end  
+        local function getStrByPing(ping)
+          if ping < 100 then
+            return string.format("{85cf17}%d{ffffff}", ping)
+          elseif ping < 150 then
+            return string.format("{ff8533}%d{ffffff}", ping)
+          end
+          return string.format("{BF0000}%d{ffffff}", ping)
+        end
+        local in1 = sampGetInputInfoPtr()
+        in1 = getStructElement(in1, 0x8, 4)
+        local in2 = getStructElement(in1, 0x8, 4)
+        local in3 = getStructElement(in1, 0xC, 4)
+        local fib = in3 + 40
+        local fib2 = in2 + 5
+        local _, pID = sampGetPlayerIdByCharHandle(playerPed)
+        local name = sampGetPlayerNickname(pID)
+        local ping = sampGetPlayerPing(pID)
+        local score = sampGetPlayerScore(pID)
+        local color = sampGetPlayerColor(pID)
+        local capsState = ffi.C.GetKeyState(20)
+        local numState = ffi.C.GetKeyState(144)
+        local success = ffi.C.GetKeyboardLayoutNameA(KeyboardLayoutName)
+        local errorCode = ffi.C.GetLocaleInfoA(tonumber(ffi.string(KeyboardLayoutName), 16), 0x00000002, inputInfo, BuffSize)
+        local localName = ffi.string(inputInfo)
+        local text = string.format(
+        "| {bde0ff}%s {ffffff}| {%0.6x}%s[%d] {ffffff}| LvL: {ff8533}%d {ffffff}| Ping: %s | Num: %s | Caps: %s | {ffeeaa}%s{ffffff}",
+        os.date("%H:%M:%S"), bit.band(color,0xffffff), sInfo.nick, pID, score, getStrByPing(ping), getStrByState(numState), getStrByState(capsState), localName
+        )
+        renderFontDrawText(inputFont, text, fib2, fib, -1)
+      end
+
+      ---- Watch-list
       if pInfo.settings.watchhud and #spectate_list > 0 then
         local checkerheight = renderGetFontDrawHeight(watchFont)
         local count = 0
@@ -710,6 +786,9 @@ function main()
         sampToggleCursor(false)
         window['main'].bool.v = true
         filesystem.save(pInfo, 'config.json')
+      end
+      if isKeyJustPressed(VK_T) and not sampIsDialogActive() and not sampIsScoreboardOpen() and not isSampfuncsConsoleActive() then
+        sampSetChatInputEnabled(true)
       end
       if selectRadio.stream == 1 and renderStream then
         renderFontDrawText(renderStream, ("%s - %s"):format(selectRadio.streamTitle and selectRadio.streamTitle or "", selectRadio.streamUrl and selectRadio.streamUrl or ""), 150, screeny-20, -1)
@@ -1149,7 +1228,7 @@ function cmd_checkbl(arg)
         return
       end  
     end
-    atext('Игрок не найден в Черном Списке!')
+    dtext('Игрок не найден в Черном Списке!')
     return
   end
   -- Файл не загружен, или прошло более 3-х минут с момента прошлого обновления
@@ -1297,6 +1376,27 @@ function cmd_sweather(arg)
   end
 end
 
+function cmd_setkv(arg)
+  if #arg > 0 then
+    local ky, kx = arg:match("(%A)-(%d+)")
+    if ky ~= nil and getKVNumber(ky) ~= nil and kx ~= nil and tonumber(kx) < 25 and tonumber(kx) > 0 then
+      kvCoord.ny = ky
+      kvCoord.nx = kx
+      kvCoord.x = kx * 250 - 3125
+      kvCoord.y = (getKVNumber(ky) * 250 - 3125) * - 1
+    else
+      dtext('Неверное название квадрата! Пример: В-11 (на русском)')
+      return
+    end
+  end
+  if kvCoord.x == nil or kvCoord.y == nil then dtext('Не удалось найти упоминание о квадрате в чате') return end
+  local cX, cY, cZ = getCharCoordinates(playerPed)
+  cX = math.ceil(cX)
+  cY = math.ceil(cY)
+  atext('Метка установлена на квадрат '..kvCoord.ny..'-'..kvCoord.nx.. '. Дистанция: '..math.ceil(getDistanceBetweenCoords2d(kvCoord.x, kvCoord.y, cX, cY))..' м.')
+  placeWaypoint(kvCoord.x, kvCoord.y, 0)
+end
+
 function cmd_mon(arg)
   if arg == "1" and sInfo.fraction ~= "SFA" and sInfo.fraction ~= "LVA" then dtext('Доклад в рацию доступен только SFA/LVA! Чтобы вывести данные в локальный чат введите /mon без аргументов') return end
   if isCharInArea3d(PLAYER_PED, -1325-5, 492-5, 28-3, -1325+5, 492+5, 28+3, false) then
@@ -1314,7 +1414,7 @@ function cmd_mon(arg)
     end
     ----------
     if arg == "1" then
-      cmd_r(localVars('others', 'mon', {
+      cmd_r(localVars('others', 'monl', {
         ['lspd'] = math.floor(monitoring[1] / 1000),
         ['sfpd'] = math.floor(monitoring[2] / 1000),
         ['lvpd'] = math.floor(monitoring[3] / 1000),
@@ -1520,7 +1620,7 @@ function cmd_sfaupdates()
   for i = 1, #updatesInfo.list do
     str = str.."{FF5233}-{FFFFFF}"
     for j = 1, #updatesInfo.list[i] do
-      str = string.format("%s %s%s\n", str, j > 1 and " " or "", updatesInfo.list[i][j])
+      str = string.format("%s %s%s\n", str, j > 1 and " " or "", updatesInfo.list[i][j]:gsub("``(.-)``", "{FF5233}%1{FFFFFF}"))
     end
   end
   funcc('cmd_sfaupdates', 1)
@@ -1705,7 +1805,7 @@ function punaccept()
       if punkey[3].time > os.time() - 1 then dtext("Не флуди!") return end
       if punkey[3].time > os.time() - 15 then
         funcc('punkey_autopostavki', 1)
-        cmd_r(punkey[3].text)
+        dtext(punkey[3].text)
         --------
         if punkey[3].text:match("Состояние %- 300%/300") then
           punkeyActive = 3
@@ -1713,6 +1813,12 @@ function punaccept()
           punkey[3].time = os.time()
           dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию об окончании поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
           return
+        elseif punkey[3].text:match('Состояние%: 200/200') then
+          punkeyActive = 3
+          punkey[3].text = localVars("autopost", "ends_boat", { ['id'] = sInfo.playerid })
+          punkey[3].time = os.time()
+          dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию об окончании поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+          return          
         end
       end
       punkey[3].text, punkey[3].time = nil, nil
@@ -1743,7 +1849,7 @@ function loadFiles()
     local files = {}
     local direct = {}
     ----------
-    if not lpie then files[#files + 1] = 'imgui_piemenu.lua' end
+    if not lpie or (pie._VERSION == nil or pie._VERSION < 1) then files[#files + 1] = 'imgui_piemenu.lua' end
     if not lbass then files[#files + 1] = 'bass.lua' end
     if not lcopas or not lhttp then
       direct[#direct + 1] = 'copas'
@@ -1753,6 +1859,11 @@ function loadFiles()
       files[#files + 1] = 'copas/limit.lua'
       files[#files + 1] = 'copas/smtp.lua'
       files[#files + 1] = 'requests.lua'
+    end
+    local spl = string.split(imgui._VERSION, '.')
+    if tonumber(spl[1]) <= 1 and tonumber(spl[2]) <= 1 and tonumber(spl[3]) < 5 then
+      files[#files + 1] = 'imgui.lua'
+      files[#files + 1] = 'MoonImGui.dll'
     end
     ----------------------------
     --- Загрузка библиотек
@@ -1779,7 +1890,7 @@ function loadFiles()
           thisScript():unload()
           return
         else
-          print(v..' был загружен')
+          logger.info('Библиотека '..v..' была загружена')
         end
       end
       reloadScriptsParam = true    
@@ -2093,6 +2204,7 @@ end
 
 -- Очень большой хук на всякий хлам
 function sampevents.onServerMessage(color, text)
+  logger.debug(text..'|'..color)
   if pInfo.settings.chatconsole then sampfuncsLog(tostring(text)) end
   local date = os.date("%d.%m.%y %H:%M:%S")
   local file = io.open('moonloader/SFAHelper/chatlog.txt', 'a+')
@@ -2238,8 +2350,8 @@ function sampevents.onServerMessage(color, text)
     end)
   end
   -- /invite
-  if text:match(".+ передал%(%- а%) форму .+") and color == -1029514582 then
-    local kto, kogo = text:match("(.+) передал%(%- а%) форму (.+)")
+  if text:match(".+ передал%(%- а%) .- .+") and color == -1029514582 then
+    local kto, _, kogo = text:match("(.+) передал%(%- а%) (.-) (.+)")
     if kto == sInfo.nick then
       -- Если это контрактник, повышаем
       if sampGetPlayerNickname(contractId) == kogo then
@@ -2257,6 +2369,40 @@ function sampevents.onServerMessage(color, text)
       logger.debug('Вас приняли. Проверяем ранг и фракцию')
       cmd_stats("checkout")
     end  
+  end
+  if text:match("На складе Порта LS%: %d+/200000") and color == -65366 then
+    local sklad = text:match('На складе Порта LS%: (%d+)/200000')
+    if pInfo.settings.autodoklad == true and tonumber(sklad) ~= nil then
+      punkeyActive = 3
+      punkey[3].text = localVars("autopost", "unload_boat_lsa", { ['id'] = sInfo.playerid, ['sklad'] = tonumber(sklad) })
+      punkey[3].time = os.time()
+      dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+    end
+  end 
+  if text:match("На складе Армия СФ%: %d+/200000") and color == -65366 then
+    local sklad = text:match('На складе Армия СФ%: (%d+)/200000')
+    if pInfo.settings.autodoklad == true and tonumber(sklad) ~= nil then
+      punkeyActive = 3
+      punkey[3].text = localVars("autopost", "unload_boat", { ['id'] = sInfo.playerid, ['sklad'] = math.floor((tonumber(sklad) / 1000) + 0.5) })
+      punkey[3].time = os.time()
+      dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+    end
+  end
+  --[[if text:match("Материалов%: %d+/%d+") and color == 14221512 then
+    if pInfo.settings.autodoklad == true then
+      punkeyActive = 3
+      punkey[3].text = localVars("autopost", "load_boat", { ['id'] = sInfo.playerid })
+      punkey[3].time = os.time()
+      dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+    end
+  end]]
+  if text:match("Лодка загружена на %d+ из %d+ материалов%.") and color == 866792447 then
+    if pInfo.settings.autodoklad == true then
+      punkeyActive = 3
+      punkey[3].text = localVars("autopost", "start_boat", { ['id'] = sInfo.playerid })
+      punkey[3].time = os.time()
+      dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+    end
   end
   if text:match("Доставьте материалы на Зону 51") and color == -86 then -- Загрузился на корабле, лечу в лва
     if pInfo.settings.autodoklad == true then
@@ -2334,6 +2480,15 @@ function sampevents.onServerMessage(color, text)
       pInfo.info.weekPM = pInfo.info.weekPM + 1
     end
     if sInfo.isSupport == false then sInfo.isSupport = true end
+  end
+  if text:find("(%A)-[0-9][0-9]") or text:find("(%A)-[0-9]") then
+    local ky, kx = text:match("(%A)-(%d+)")
+    if getKVNumber(ky) ~= nil and kx ~= nil and ky ~= nil and tonumber(kx) < 25 and tonumber(kx) > 0 then
+      kvCoord.ny = ky
+      kvCoord.nx = kx
+      kvCoord.x = kx * 250 - 3125
+      kvCoord.y = (getKVNumber(ky) * 250 - 3125) * - 1
+    end
   end
   -- Саппортский /sduty
   if text:match('Рабочий день начат') and color == -1 then
@@ -2646,18 +2801,17 @@ function imgui.OnDrawFrame()
     imgui.Begin('notitle', window['hud'].bool, imgui.WindowFlags.NoResize + imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoMove)
     imgui.SetWindowSize('notitle', imgui.ImVec2(320, 0))
     imgui_windows.hud()
-    --[[imgui_windows.pie()
-    if imgui.IsMouseClicked(2) then
+    imgui_windows.pie()
+    if imgui.IsMouseClicked(2) and window['target'].bool.v then
       imgui.OpenPopup('PieMenu')
-      if window['target'].bool.v == true then pieMenu.active = 2
-      else pieMenu.active = 1 end
+      pieMenu.active = 1
     end
     if imgui.IsPopupOpen('PieMenu') then
       sampToggleCursor(true)
     elseif pieMenu.active > 0 then
       sampToggleCursor(false)
       pieMenu.active = 0
-    end]]
+    end
     imgui.End()
     imgui.PopStyleVar()
     imgui.PopStyleColor()
@@ -2909,6 +3063,7 @@ imgui_windows.main = function(menu)
     imgui.TextColoredRGB('{FFFFFF}/stime [время 0 - 23]'); imgui.SameLine(spacing); imgui.Text(u8'Изменить время на указанное')
     imgui.TextColoredRGB('{FFFFFF}/shradio'); imgui.SameLine(spacing); imgui.Text(u8'Открыть меню радио')
     imgui.TextColoredRGB('{FFFFFF}/shnote'); imgui.SameLine(spacing); imgui.Text(u8'Открыть меню шпаргалок')
+    imgui.TextColoredRGB('{FFFFFF}/setkv [квадрат (опционально)]'); imgui.SameLine(spacing); imgui.Text(u8'Отметить квадрат на карте')
   elseif menu == 11 then
     imgui.PushItemWidth(150)
     if data.lecture.string == "" then
@@ -3668,6 +3823,7 @@ imgui_windows.main = function(menu)
     local chatconsole = imgui.ImBool(pInfo.settings.chatconsole)
     local doklad = imgui.ImBool(pInfo.settings.autodoklad)
     local hud = imgui.ImBool(pInfo.settings.hud)
+    local inputhelper = imgui.ImBool(pInfo.settings.inputhelper)
     local tagbuffer = imgui.ImBuffer(tostring(pInfo.settings.tag), 256)
     local clistbuffer = imgui.ImBuffer(tostring(pInfo.settings.clist), 256)
     local passbuffer = imgui.ImBuffer(tostring(pInfo.settings.password), 256)
@@ -3766,6 +3922,12 @@ imgui_windows.main = function(menu)
     end
     imgui.SameLine(); imgui.Text(u8 'Отображение чата в консоле SAMPFUNCS')
     ------------
+    if imgui.ToggleButton(u8 'inputhelper##1', inputhelper) then
+      pInfo.settings.inputhelper = inputhelper.v;
+      filesystem.save(pInfo, 'config.json')
+    end
+    imgui.SameLine(); imgui.Text(u8 'Включить InputHelper под строкой ввода'); imgui.SameLine(); imgui.TextDisabled(u8'(Авторы: teekyuu, DarkP1xel)');
+    ------------
     imgui.Spacing()
     imgui.Separator()
     imgui.Spacing()
@@ -3786,9 +3948,6 @@ imgui_windows.main = function(menu)
     imgui.SameLine(); imgui.Text(u8 'Клавиша РП отыгровки оружия')
     imgui.Spacing()
     imgui.Separator()
-    imgui.Spacing()
-    if imgui.Button(u8 'Местоположение худа') then data.imgui.hudpos = true; window['main'].bool.v = false end
-    imgui.SameLine()
     if imgui.Button(u8'Обновить список админов') then
       funcc('updateadm', 1)
       atext('Запрос отправлен. Ожидание ответа от сервера...')
@@ -4026,6 +4185,9 @@ imgui_windows.main = function(menu)
         filesystem.save(pInfo, 'config.json')
       end
     end
+    imgui.Spacing()
+    imgui.Separator()
+    if imgui.Button(u8 'Местоположение худа') then data.imgui.hudpos = true; window['main'].bool.v = false end
     -- FPS, Оружие, Автомобиль, Локация, Время, Статус таргет-бара, Тазер, Шапка, 9 = ping, 10 = квадрат, 11 - здоровье, бронь
     -- pInfo.settings.hudset = {false, true, true, true, true, true, false, true}
   elseif menu == 41 then
@@ -4196,21 +4358,126 @@ imgui_windows.members = function()
 end
 
 imgui_windows.pie = function()
-  if pie.BeginPiePopup('PieMenu', 1) then
-    if pie.PieMenuItem(u8'Обоссать\nкрышку\nунитаза') then end
-    if pie.PieMenuItem(u8'Послать\nразработчика\nнахуй') then end
-    if pie.PieMenuItem(u8'Пойти\nнахуй', false) then end
-    if pie.BeginPieMenu(u8'Выебать') then
-      if pie.BeginPieMenu(u8'Себя') then
-        if pie.PieMenuItem(u8'Рукой') then end
-        if pie.PieMenuItem(u8'Ногой') then end
-        pie.EndPieMenu()
+  if pie.BeginPiePopup('PieMenu', 2) then
+    if pie.BeginPieMenu(u8'Проверить') then
+      if pie.PieMenuItem(u8'ЧС') then
+        if targetID ~= nil then cmd_checkbl(""..targetID) end
       end
-      if pie.PieMenuItem(u8'Собаку') then end
-      if pie.PieMenuItem(u8'Генерала') then end
+      if pie.PieMenuItem(u8'Выговор') then
+        if targetID ~= nil then cmd_checkvig(""..targetID) end
+      end
+      if pie.PieMenuItem(u8'Повышение') then
+        if targetID ~= nil then cmd_checkrank(""..targetID) end
+      end
+      pie.EndPieMenu()
+    end
+    if pie.BeginPieMenu(u8'Показать') then
+      if pie.PieMenuItem(u8'Паспорт') then
+        if targetID ~= nil then sampSendChat("/showpass "..targetID) end
+      end
+      if pie.PieMenuItem(u8'Лицензии') then
+        if targetID ~= nil then sampSendChat("/showlicenses "..targetID) end
+      end
+      if pie.PieMenuItem(u8'Удост.') then
+        if targetID ~= nil then sampSendChat("/showudost "..targetID) end
+      end
+      pie.EndPieMenu()
+    end
+    if pie.BeginPieMenu(u8'Запросить') then
+      if pie.PieMenuItem(u8'Локацию') then
+        if targetID ~= nil then cmd_loc(targetID.." 30") end
+      end
+      if pie.PieMenuItem(u8'Документы') then
+        if targetID ~= nil then sampSendChat("Здравия желаю! Я "..pInfo.ranknames[pInfo.settings.rank]..", "..sInfo.nick:gsub("_", " ")..". Предъявите ваши документы.") end
+      end
+      pie.EndPieMenu()
+    end
+    if pie.BeginPieMenu(u8'Выдать') then
+      if pie.PieMenuItem(u8'Наряд') then
+        if targetID ~= nil then
+          dialogPopup = { title = "Выдать наряд игроку", str = 'Кол-во кругов и причину наряда для игрока '..sampGetPlayerNickname(targetID)..'\nПример: 10|Нарушение устава', action = "naryad", show = 1 }
+        end
+      end
+      if pie.PieMenuItem(u8'Выговор') then
+        if targetID ~= nil then
+          dialogPopup = { title = "Выдать выговор игроку", str = 'Тип и причину выговора для игрока '..sampGetPlayerNickname(targetID)..'\nПример: строгий|Нарушение устава', action = "vig", show = 1 }
+        end
+      end
+      if pie.PieMenuItem(u8'Берет') then end
      pie.EndPieMenu()
     end
+    if pie.BeginPieMenu(u8'Другое') then
+      if pie.PieMenuItem(u8'Принять') then
+        if targetID ~= nil then
+          dialogPopup = { title = "Принять игрока", str = 'Введите ранг для игрока '..sampGetPlayerNickname(targetID), action = "invite", show = 1 }
+        end
+      end
+      if pie.PieMenuItem(u8'Уволить') then
+        if targetID ~= nil then
+          dialogPopup = { title = "Уволить игрока", str = 'Введите причину увольнения '..sampGetPlayerNickname(targetID), action = "uninvite", show = 1 }
+        end
+      end
+      if pie.PieMenuItem(u8'Повысить') then
+        if targetID ~= nil then
+          dialogPopup = { title = "Повысить игрока", str = 'Введите новый ранг для игрока '..sampGetPlayerNickname(targetID), action = "giverank", show = 1 }
+        end
+      end
+      pie.EndPieMenu()
+    end
     pie.EndPiePopup()
+  end
+  --[[
+	          ImVec2 size = ImGui::GetItemRectSize();
+            const float values[5] = { 0.5f, 0.20f, 0.80f, 0.60f, 0.25f };
+						ImGui::PlotHistogram("##values", values, IM_ARRAYSIZE(values), 0, NULL, 0.0f, 1.0f, size);
+  ]]
+  if imgui.BeginPopupModal(u8'Введите параметры', nil, imgui.WindowFlags.AlwaysAutoResize) then
+    imgui.Text(u8:encode(dialogPopup.str))
+    imgui.Spacing()
+    imgui.InputText('##inuttext', data.imgui.inputmodal)
+    imgui.Spacing()
+    imgui.Separator()
+    imgui.Spacing()
+    if imgui.Button(u8'Выполнить', imgui.ImVec2(120,0)) then
+      local input = u8:decode(data.imgui.inputmodal.v)
+      if dialogPopup.action == "giverank" then
+        if input == "" or targetID == nil then data.imgui.inputmodal.v = "" end
+        sampSendChat('/giverank '..targetID..' '..input)
+      elseif dialogPopup.action == "uninvite" then
+        if input == "" or targetID == nil then data.imgui.inputmodal.v = "" end
+        sampSendChat('/uninvite '..targetID..' '..input)
+      elseif dialogPopup.action == "invite" then
+        if input == "" or targetID == nil then data.imgui.inputmodal.v = "" end
+        contractId = targetID
+        contractRank = input
+        sampSendChat('/invite '..targetID)
+      elseif dialogPopup.action == "vig" then
+        local spl = string.split(input, '|', 2)
+        if #spl < 2 or targetID == nil then data.imgui.inputmodal.v = "" return end
+        cmd_vig(targetID..' '..spl[1]..' '..spl[2])
+      elseif dialogPopup.action == "naryad" then
+        local spl = string.split(input, '|', 2)
+        if #spl < 2 or targetID == nil then data.imgui.inputmodal.v = "" return end
+        cmd_r(localVars("punaccept", "naryad", {
+          ['id'] = sampGetPlayerNickname(targetID):gsub("_", " "),
+          ['count'] = spl[1],
+          ['reason'] = spl[2]
+        }))
+      end
+      dialogPopup.show = 0
+      imgui.CloseCurrentPopup()
+    end
+    imgui.SameLine()
+    if imgui.Button(u8'Закрыть', imgui.ImVec2(120,0)) then
+      dialogPopup.show = 0
+      imgui.CloseCurrentPopup()
+    end
+    imgui.EndPopup()
+  end
+  if dialogPopup.show == 1 then
+    data.imgui.inputmodal.v = ""
+    imgui.OpenPopup(u8'Введите параметры')
+    dialogPopup.show = 2
   end
 end
 imgui_windows.hud = function()
@@ -4605,6 +4872,7 @@ function tags(args, param)
   args = args:gsub("{weaponname}", tostring(getweaponname(getCurrentCharWeapon(PLAYER_PED))))
   args = args:gsub("{ammo}", tostring(getAmmoInCharWeapon(PLAYER_PED, getCurrentCharWeapon(PLAYER_PED))))
   ----------
+  -- membersInfo.players[#membersInfo.players + 1] = { mid = id, mrank = rank, mstatus = status, mafk = afk }
   if targetID ~= nil and sampIsPlayerConnected(targetID) then
     args = args:gsub("{tID}", tostring(targetID))
 		args = args:gsub("{tfullname}", tostring(sampGetPlayerNickname(targetID):gsub("_", " ")))
@@ -5056,6 +5324,36 @@ function getweaponname(weapon)
   return names[weapon]
 end
 
+function getKVNumber(param)
+  local KV = {
+    ["а"] = 1,
+    ["б"] = 2,
+    ["в"] = 3,
+    ["г"] = 4,
+    ["д"] = 5,
+    ["ж"] = 6,
+    ["з"] = 7,
+    ["и"] = 8,
+    ["к"] = 9,
+    ["л"] = 10,
+    ["м"] = 11,
+    ["н"] = 12,
+    ["о"] = 13,
+    ["п"] = 14,
+    ["р"] = 15,
+    ["с"] = 16,
+    ["т"] = 17,
+    ["у"] = 18,
+    ["ф"] = 19,
+    ["х"] = 20,
+    ["ц"] = 21,
+    ["ч"] = 22,
+    ["ш"] = 23,
+    ["я"] = 24,
+  }
+  return KV[rusLower(param)]
+end
+
 function kvadrat()
   local KV = {"А","Б","В","Г","Д","Ж","З","И","К","Л","М","Н","О","П","Р","С","Т","У","Ф","Х","Ц","Ч","Ш","Я"}
   local X, Y, Z = getCharCoordinates(playerPed)
@@ -5409,9 +5707,13 @@ function apply_custom_style()
   colors[clr.FrameBg] = ImVec4(0.10, 0.09, 0.12, 1.00)
   colors[clr.FrameBgHovered] = ImVec4(0.24, 0.23, 0.29, 1.00)
   colors[clr.FrameBgActive] = ImVec4(0.56, 0.56, 0.58, 1.00)
-  colors[clr.TitleBg] = ImVec4(0.10, 0.09, 0.12, 1.00)
-  colors[clr.TitleBgCollapsed] = ImVec4(1.00, 0.98, 0.95, 0.75)
-  colors[clr.TitleBgActive] = ImVec4(0.07, 0.07, 0.09, 1.00)
+  -- colors[clr.TitleBg] = ImVec4(0.10, 0.09, 0.12, 1.00)
+  -- colors[clr.TitleBgCollapsed] = ImVec4(1.00, 0.98, 0.95, 0.75)
+  -- colors[clr.TitleBgActive] = ImVec4(0.07, 0.07, 0.09, 1.00)
+  colors[clr.TitleBg] = ImVec4(0.68, 0.25, 0.25, 1.00)
+  colors[clr.TitleBgCollapsed] = ImVec4(0.68, 0.25, 0.25, 1.00)
+  colors[clr.TitleBgActive] = ImVec4(0.68, 0.25, 0.25, 1.00)
+
   colors[clr.MenuBarBg] = ImVec4(0.10, 0.09, 0.12, 1.00)
   colors[clr.ScrollbarBg] = ImVec4(0.10, 0.09, 0.12, 1.00)
   colors[clr.ScrollbarGrab] = ImVec4(0.80, 0.80, 0.83, 0.31)
@@ -5424,15 +5726,23 @@ function apply_custom_style()
   colors[clr.Button] = ImVec4(0.10, 0.09, 0.12, 1.00)
   colors[clr.ButtonHovered] = ImVec4(0.24, 0.23, 0.29, 1.00)
   colors[clr.ButtonActive] = ImVec4(0.56, 0.56, 0.58, 1.00)
-  colors[clr.Header] = ImVec4(0.10, 0.09, 0.12, 1.00)
-  colors[clr.HeaderHovered] = ImVec4(0.56, 0.56, 0.58, 1.00)
-  colors[clr.HeaderActive] = ImVec4(0.06, 0.05, 0.07, 1.00)
+  -- colors[clr.Header] = ImVec4(0.10, 0.09, 0.12, 1.00)
+  -- colors[clr.HeaderHovered] = ImVec4(0.56, 0.56, 0.58, 1.00)
+  -- colors[clr.HeaderActive] = ImVec4(0.06, 0.05, 0.07, 1.00)
+  colors[clr.Header] = ImVec4(0.68, 0.25, 0.25, 1.00)
+  colors[clr.HeaderHovered] = ImVec4(0.68, 0.25, 0.25, 0.75)
+  colors[clr.HeaderActive] = ImVec4(0.68, 0.25, 0.25, 1.00)
+
   colors[clr.ResizeGrip] = ImVec4(0.00, 0.00, 0.00, 0.00)
   colors[clr.ResizeGripHovered] = ImVec4(0.56, 0.56, 0.58, 1.00)
   colors[clr.ResizeGripActive] = ImVec4(0.06, 0.05, 0.07, 1.00)
-  colors[clr.CloseButton] = ImVec4(0.40, 0.39, 0.38, 0.16)
-  colors[clr.CloseButtonHovered] = ImVec4(0.40, 0.39, 0.38, 0.39)
-  colors[clr.CloseButtonActive] = ImVec4(0.40, 0.39, 0.38, 1.00)
+  -- colors[clr.CloseButton] = ImVec4(0.40, 0.39, 0.38, 0.16)
+  -- colors[clr.CloseButtonHovered] = ImVec4(0.40, 0.39, 0.38, 0.39)
+  -- colors[clr.CloseButtonActive] = ImVec4(0.40, 0.39, 0.38, 1.00)
+  colors[clr.CloseButton] = ImVec4(0.56, 0.56, 0.58, 0.75)
+  colors[clr.CloseButtonHovered] = ImVec4(0.56, 0.56, 0.58, 1.00)
+  colors[clr.CloseButtonActive] = ImVec4(0.56, 0.56, 0.58, 1.00)
+  
   colors[clr.PlotLines] = ImVec4(0.40, 0.39, 0.38, 0.63)
   colors[clr.PlotLinesHovered] = ImVec4(0.25, 1.00, 0.00, 1.00)
   colors[clr.PlotHistogram] = ImVec4(0.40, 0.39, 0.38, 0.63)
