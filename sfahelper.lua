@@ -2204,7 +2204,6 @@ end
 
 -- Очень большой хук на всякий хлам
 function sampevents.onServerMessage(color, text)
-  logger.debug(text..'|'..color)
   if pInfo.settings.chatconsole then sampfuncsLog(tostring(text)) end
   local date = os.date("%d.%m.%y %H:%M:%S")
   local file = io.open('moonloader/SFAHelper/chatlog.txt', 'a+')
