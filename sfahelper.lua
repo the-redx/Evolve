@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.42-preview2
+-- Version 1.42-preview3
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4222")
-SCRIPT_ASSEMBLY = "1.42-preview2"
+script_version("1.4223")
+SCRIPT_ASSEMBLY = "1.42-preview3"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -84,12 +84,33 @@ window = {
 }
 screenx, screeny = getScreenResolution()
 reloadScriptsParam = false
-govtext = {
-  {'Реклама призыва','[Army SF]: Уважаемые жители штата, в {time} объявлен призыв в San-Fierro Army!','[Army SF]: Требования: 3 года проживания в штате, не иметь проблем с законом не состоять в ЧС.','[Army SF]: Призывной пункт: Больница города San Fierro. Навигатор Л-2. Спасибо за внимание.'},
-  {'Начало призыва','[Army SF]: Уважаемые жители штата Evolve, призыв в San-Fierro Army начался!','[Army SF]: Требования: 3 года проживания в штате, не иметь проблем с законом не состоять в ЧС.','[Army SF]: Призывной пункт - Больница города San Fierro. Навигатор Л-2. Спасибо за внимание.'},
-  {'Продолжение призыва','[Army SF]: Уважаемые жители штата, в данный момент, в больнице SF проходит призыв в Army SF.','[Army SF]: Требования: 3 года проживания в штате, не иметь проблем с законом не состоять в ЧС.','[Army SF]: Призывной пункт - Больница города San Fierro. Навигатор Л-2. Спасибо за внимание.'},
-  {'Конец призыва','[Army SF]: Уважаемые жители штата, призыв в армию города San-Fierro окончен!','[Army SF]: Следующий призыв San-Fierro Army назначен в {time}.','[Army SF]: Берегите себя и свою семью, с уважением - руководство армии.'},
-  {'Пиар контрактов','[Army SF]: Уважаемые жители и гости штата Evolve. Прошу минуту внимания.','[Army SF]: На официальном портале армии "Авианосец" открыт прием заявлений на контрактную службу.','[Army SF]: Ждём Вас в рядах нашей армии. С уважением, руководство армии "Авианосец".'}
+defaultData = {
+  gov = {
+    {'Реклама призыва','[Army SF]: Уважаемые жители штата, в {time} объявлен призыв в San-Fierro Army!','[Army SF]: Требования: 3 года проживания в штате, не иметь проблем с законом не состоять в ЧС.','[Army SF]: Призывной пункт: Больница города San Fierro. Навигатор Л-2. Спасибо за внимание.'},
+    {'Начало призыва','[Army SF]: Уважаемые жители штата Evolve, призыв в San-Fierro Army начался!','[Army SF]: Требования: 3 года проживания в штате, не иметь проблем с законом не состоять в ЧС.','[Army SF]: Призывной пункт - Больница города San Fierro. Навигатор Л-2. Спасибо за внимание.'},
+    {'Продолжение призыва','[Army SF]: Уважаемые жители штата, в данный момент, в больнице SF проходит призыв в Army SF.','[Army SF]: Требования: 3 года проживания в штате, не иметь проблем с законом не состоять в ЧС.','[Army SF]: Призывной пункт - Больница города San Fierro. Навигатор Л-2. Спасибо за внимание.'},
+    {'Конец призыва','[Army SF]: Уважаемые жители штата, призыв в армию города San-Fierro окончен!','[Army SF]: Следующий призыв San-Fierro Army назначен в {time}.','[Army SF]: Берегите себя и свою семью, с уважением - руководство армии.'},
+    {'Пиар контрактов','[Army SF]: Уважаемые жители и гости штата Evolve. Прошу минуту внимания.','[Army SF]: На официальном портале армии "Авианосец" открыт прием заявлений на контрактную службу.','[Army SF]: Ждём Вас в рядах нашей армии. С уважением, руководство армии "Авианосец".'}
+  },
+  cmd_binder = {
+    { cmd = "pass", wait = 1100, text = { "Здравия желаю! Я {myrankname}, {myfullname}. Предъявите ваши документы." } },
+    { cmd = "uinv", wait = 1100, text = { "/uninvite {param} {param2}" } },
+    { cmd = "gr", wait = 1100, text = { "/giverank {param} {param2}" } },
+    { cmd = "inv", wait = 1100, text = { "/invite {param}" } },
+    { cmd = "cl", wait = 1100, text = { "/clist {param}" } },
+    { cmd = "rpmask", wait = 1100, text = { "/me достал маску из кармана и надел на лицо", "/clist 32", "/do На лице маска, на форме нет опознавательных знаков. Личность не опознать" } }
+  },
+  binder = {},
+  post = {
+    { name = "КПП", coordX = -1530.65, coordY = 480.05, coordZ = 7.19, radius = 16.0 },
+    { name = "Трап", coordX = -1334.59, coordY = 477.46, coordZ = 9.06, radius = 11.0 },
+    { name = "Балкон", coordX = -1367.36, coordY = 517.50, coordZ = 11.20, radius = 10.0 },
+    { name = "Склад 1", coordX = -1299.44, coordY = 498.90, coordZ = 11.20, radius = 12.0 },
+    { name = "Склад 2", coordX = -1410.75, coordY = 502.03, coordZ = 11.20, radius = 14.0 },
+    { name = "Доки 1", coordX = -1457.57, coordY = 355.17, coordZ = 7.18, radius = 13.0 },
+    { name = "Доки 2", coordX = -1457.55, coordY = 390.83, coordZ = 7.18, radius = 13.0 },
+    { name = "Доки 3", coordX = -1457.19, coordY = 426.95, coordZ = 7.18, radius = 13.0 }
+  }
 }
 -- Главная таблица с настройками
 pInfo = {
@@ -105,6 +126,7 @@ pInfo = {
     dayWorkOnline = 0
   },
   settings = {
+    newsload = 0,
     rank = 0,
     hud = true,
     hudX = screenx / 1.5,
@@ -132,7 +154,7 @@ pInfo = {
   },
   ranknames = {'Рядовой', 'Ефрейтор', 'Мл.Сержант', 'Сержант', 'Ст.Сержант', 'Старшина', 'Прапорщик', 'Мл.Лейтенант', 'Лейтенант', 'Ст.Лейтенант', 'Капитан', 'Майор', 'Подполковник', 'Полковник', 'Генерал'},
   func = {},
-  gov = govtext,
+  gov = {},
   weeks = {0,0,0,0,0,0,0},
   counter = {0,0,0,0,0,0,0,0,0,0,0,0}
 }
@@ -146,11 +168,13 @@ localInfo = {
     ends = {'Закончил поставки', "На связи борт - {id}. Завершил поставки на ГС Army LV, беру курс на часть.", "На связи борт - {id}. Завершила поставки на ГС Army LV, беру курс на часть."},
     startp = {'Начал поставки в порту', "10-15", "10-15"},
     endp = {'Закончил поставки в порту', "10-16", "10-16"},
-    load_boat = {'Загрузил материалы в СФА (лодка)', 'На связи борт - {id}. Загрузился на сухогрузе. Беру курс на ГС Армии СФ.', 'На связи борт - {id}. Загрузилась на сухогрузе. Беру курс на ГС Армии СФ.'},
+    load_boat = {'Загрузил материалы, плыву в СФА (лодка)', 'На связи борт - {id}. Загрузился на сухогрузе. Беру курс на ГС Армии СФ.', 'На связи борт - {id}. Загрузилась на сухогрузе. Беру курс на ГС Армии СФ.'},
+    load_boat_lsa = {'Загрузил материалы, плыву в Порт ЛС (лодка)', 'На связи борт - {id}. Загрузился на сухогрузе. Беру курс на ГС Порта ЛС.', 'На связи борт - {id}. Загрузилась на сухогрузе. Беру курс на ГС Порта ЛС.'},
     unload_boat = {'Разгрузил материалы в СФА (лодка)', 'На связи борт - {id}. Разгрузился на ГС Армии СФ. Состояние - {sklad}/200', 'На связи борт - {id}. Разгрузилась на ГС Армии СФ. Состояние - {sklad}/200'},
-    start_boat = {'Начал поставки (лодка)', 'На связи борт - {id}. Начал поставки на ГС Армии СФ.', 'На связи борт - {id}. Начала поставки на ГС Армии СФ.'},
-    unload_boat_lsa = {'Разгрузил материалы в порту (лодка)', 'На связи борт - {id}. Разгрузился на ГС Порта ЛС. Состояние - {sklad}/200', 'На связи борт - {id}. Разгрузилась на ГС Порта ЛС. Состояние - {sklad}/200'},
-    ends_boat = {'Закончил поставки (лодка)', "На связи борт - {id}. Завершил поставки, беру курс на часть.", "На связи борт - {id}. Завершила поставки, беру курс на часть."},
+    start_boat = {'Начал поставки в СФА (лодка)', 'На связи борт - {id}. Начал поставки на ГС Армии СФ.', 'На связи борт - {id}. Начала поставки на ГС Армии СФ.'},
+    start_boat_lsa = {'Начал поставки в порт (лодка)', 'На связи борт - {id}. Начал поставки в Порт ЛС.', 'На связи борт - {id}. Начала поставки в Порт ЛС.'},
+    unload_boat_lsa = {'Разгрузил материалы в порту (лодка)', 'На связи борт - {id}. Разгрузился в Порту ЛС. Состояние - {sklad}/200', 'На связи борт - {id}. Разгрузилась в Порту ЛС. Состояние - {sklad}/200'},
+    ends_boat = {'Закончил поставки (лодка)', "На связи борт - {id}. Завершил поставки, беру курс на часть.", "На связи борт - {id}. Завершила поставки, беру курс на часть."}
   },
   post = {
     title = "Авто-доклад",
@@ -217,14 +241,7 @@ config_keys = {
   targetplayer = {v = {key.VK_R}},
   weaponkey = {v = {key.VK_Z}},
   binder = {},
-  cmd_binder = {
-    { cmd = "pass", wait = 1100, text = { "Здравия желаю! Я {myrankname}, {myfullname}. Предъявите ваши документы." } },
-    { cmd = "uinv", wait = 1100, text = { "/uninvite {param} {param2}" } },
-    { cmd = "gr", wait = 1100, text = { "/giverank {param} {param2}" } },
-    { cmd = "inv", wait = 1100, text = { "/invite {param}" } },
-    { cmd = "cl", wait = 1100, text = { "/clist {param}" } },
-    { cmd = "rpmask", wait = 1100, text = { "/me достал маску из кармана и надел на лицо", "/clist 32", "/do На лице маска, на форме нет опознавательных знаков. Личность не опознать" } }
-  }
+  cmd_binder = {}
 }
 
 -- Для /checkbl, /checkrank
@@ -296,6 +313,7 @@ data = {
     reason = imgui.ImBuffer(256),
   },
   combo = {
+    dialog = imgui.ImInt(0),
     export = imgui.ImInt(0),
     functions = imgui.ImInt(0),
     gov = imgui.ImInt(0),
@@ -312,16 +330,7 @@ data = {
   members = {}
 }
 -- Таблица для хранения постов
-postInfo = {
-  { name = "КПП", coordX = -1530.65, coordY = 480.05, coordZ = 7.19, radius = 16.0 },
-  { name = "Трап", coordX = -1334.59, coordY = 477.46, coordZ = 9.06, radius = 11.0 },
-  { name = "Балкон", coordX = -1367.36, coordY = 517.50, coordZ = 11.20, radius = 10.0 },
-  { name = "Склад 1", coordX = -1299.44, coordY = 498.90, coordZ = 11.20, radius = 12.0 },
-  { name = "Склад 2", coordX = -1410.75, coordY = 502.03, coordZ = 11.20, radius = 14.0 },
-  { name = "Доки 1", coordX = -1457.57, coordY = 355.17, coordZ = 7.18, radius = 13.0 },
-  { name = "Доки 2", coordX = -1457.55, coordY = 390.83, coordZ = 7.18, radius = 13.0 },
-  { name = "Доки 3", coordX = -1457.19, coordY = 426.95, coordZ = 7.18, radius = 13.0 }
-}
+postInfo = {}
 post = {
   interval = 180,
   lastpost = 0,
@@ -359,7 +368,8 @@ punkeyActive = 0
 punkey = {
   { nick = nil, time = nil, reason = nil },
   { nick = nil, time = nil, rank = nil },
-  { text = nil, time = nil }
+  { text = nil, time = nil },
+  { text = nil }
 }
 -- Настройки таргета
 targetMenu = {
@@ -378,9 +388,12 @@ radioStream = nil
 watchFont = renderCreateFont("Arial", 9, 5)
 inputFont = renderCreateFont("Segoe UI", 11, 13)
 watchList = {}
-selectRadio = { id = 1, title = "Свое радио", volume = 0.6, url = "", stream = 0 }
+selectRadio = { id = 0, title = "", volume = 0.6, url = "", stream = 0 }
 changeText = { id = 0, sex = 0, values = {} }
 contractId = nil
+newsTimer = -1
+warehouseDialog = 0
+dialogCursor = false
 playersAddCounter = 1
 giveDMG = nil
 playerMarker = nil
@@ -399,6 +412,7 @@ searchlight = nil
 spectate_list = {}
 lectureStatus = 0
 complete = false
+newsInfo = {}
 updatesInfo = {
   version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
   type = "Плановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
@@ -407,7 +421,7 @@ updatesInfo = {
     {'В настройках добавлена возможность включать ``строку состояния``, которая будет видна под полем ввода текста в чат;'},
     {'Добавлена система ``уведомлений пользователей`` о предостоящих мероприятиях, вывод полезной информации а также новостей в чат;'},
     {'При наведении ``Таргета`` на игрока и зажатии клавиши ``Колёсико мыши`` будет открыто меню быстрого взаимодействия с этим игроком;'},
-    {'Добавлена возможность добавлять игроков в группы, устанавливать им ранги, просматривать онлайн группы;', 'Данная функция ``локальная``, с другими игроками никакого взаимодействия не происходит;'},
+    --{'Добавлена возможность добавлять игроков в группы, устанавливать им ранги, просматривать онлайн группы;', 'Данная функция ``локальная``, с другими игроками никакого взаимодействия не происходит;'},
     {'Добавлена команда ``/setkv [квадрат]``. Ставит метку в указанном квадрате. Если не указывать квадрат, поставит метку на последнем упомяннутом в чате квадрате;'},
     {'Добавлен авто-доклад для лодок'},
     {'Добавлена возможность изменять координаты уже созданых постов в ``/sh - Функции - Автодоклад с постов``;'},
@@ -415,6 +429,7 @@ updatesInfo = {
     {'Небольшое изменение некоторых элементов дизайна;'},
     {'Пофикшен баг с выводом текста в рацию через /mon 1;'},
     {'Теперь чат можно открывать на ``T (русская Е)``;'},
+    {'Изменен интерфейс радио'},
     {'Добавлен авто-доклад для лодок;'}
   }
 }
@@ -482,7 +497,7 @@ function main()
     if configjson ~= nil then
       configjson = filesystem.performOld('config.json', configjson)
       logger.trace("Start additionArray to 'pInfo'")
-      pInfo = additionArray(configjson, pInfo)
+      pInfo = additionArray(configjson, pInfo, {"gov"})
     end 
     filesystem.save(pInfo, 'config.json')
     ----------
@@ -490,7 +505,7 @@ function main()
     if keysjson ~= nil then
       keysjson = filesystem.performOld('keys.json', keysjson)
       logger.trace("Start additionArray to 'config_keys'")
-      config_keys = additionArray(keysjson, config_keys)
+      config_keys = additionArray(keysjson, config_keys, {"cmd_binder", "binder"})
     end 
     filesystem.save(config_keys, 'keys.json')
     ----------
@@ -498,7 +513,7 @@ function main()
     if localjson ~= nil then
       localjson = filesystem.performOld('local.json', localjson)
       logger.trace("Start additionArray to 'localInfo'")
-      localInfo = additionArray(localjson, localInfo) 
+      localInfo = additionArray(localjson, localInfo, {}) 
     end 
     filesystem.save(localInfo, 'local.json')
     ----------
@@ -506,7 +521,7 @@ function main()
     if postsjson ~= nil then
       postsjson = filesystem.performOld('posts.json', postsjson)
       logger.trace("Start additionArray to 'postInfo'")
-      postInfo = additionArray(postsjson, postInfo) 
+      postInfo = additionArray(postsjson, postInfo, {""}) 
     end
     filesystem.save(postInfo, 'posts.json')
     logger.debug(("Локальные данные загружены | Время: %.3fs"):format(os.clock() - mstime))
@@ -546,6 +561,10 @@ function main()
     sampRegisterChatCommand('contract', cmd_contract)
     sampRegisterChatCommand('rpweap', cmd_rpweap)
     sampRegisterChatCommand('punishlog', cmd_punishlog)
+    sampRegisterChatCommand('shnews', function()
+      window['main'].bool.v = true
+      data.imgui.menu = 44
+    end)
     sampRegisterChatCommand('shnote', function()
       window['shpora'].bool.v = not window['shpora'].bool.v
     end)
@@ -638,6 +657,8 @@ function main()
       pInfo.info.dayWorkOnline = 0
     end
     logger.debug(("Онлайн успешно обновлен | Время: %.3fs"):format(os.clock() - mstime))
+    loadNews("https://redx-dev.web.app/sfahelper?data={%22function%22:%22news%22}")
+    --------------------=========----------------------
     while not sampIsLocalPlayerSpawned() do wait(0) end
     local _, myid = sampGetPlayerIdByCharHandle(playerPed)
     local serverip, serverport = sampGetCurrentServerAddress()
@@ -673,7 +694,7 @@ function main()
           skip[2] = true
         end
       end
-      if dialogPopup ~= nil and dialogPopup.show > 0 then imgui.ShowCursor = true
+      if dialogCursor == true then imgui.ShowCursor = true
       else
         if skip[2] == false then imgui.ShowCursor = false end
       end
@@ -1684,6 +1705,20 @@ function secoundTimer()
       if updatecount >= 10 then filesystem.save(pInfo, 'config.json') updatecount = 0 end
       updatecount = updatecount + 1
       sInfo.updateAFK = os.time()
+      -- Таймер новостей
+      if newsTimer <= 0 then
+        if newsTimer == 0 and #newsInfo > 0 then
+          local adversites = {}
+          for k, v in ipairs(newsInfo) do
+            if v.rep == true and v.endtime > os.time() then table.insert(adversites, v) end
+          end
+          local rand = math.random(1, #adversites)
+          dtext(("%s."):format(adversites[rand].message))
+          --dtext(("Author: %s%s"):format(adversites[rand].author, adversites[rand].verified and " {228B22}(Подтвержден){FFFFFF}" or ""))
+        end
+        newsTimer = math.random(900, 1200) -- раз в 15-20 минут
+      end
+      newsTimer = newsTimer - 1
       ----------==============----------
       -- Автдоклады
       if post.active == true and sInfo.isWorking == true then
@@ -1827,6 +1862,9 @@ function punaccept()
       end
       punkey[3].text, punkey[3].time = nil, nil
     end
+  elseif punkeyActive == 4 then
+    warehouseDialog = 0
+    openPopup = u8"Выберите склад"
   end
   punkeyActive = 0
 end
@@ -1973,6 +2011,38 @@ function pushradioLog(text)
   end
   table.insert(punishjson, result)
   filesystem.save(punishjson, "punishlog.json")
+end
+
+-- Загрузка новостей
+function loadNews(url)
+  logger.debug("Загружаем свежие новости. Очередь: "..tostring(asyncQueue))
+  asyncQueue = true
+  httpRequest(url, nil, function(response, code, headers, status)
+    if response then
+      local info = decodeJson(response)
+      if info.success then
+        local unread = 0
+        for k, v in ipairs(info.message) do
+          local unr = false
+          if v.rep == false and pInfo.settings.newsload < tonumber(v.id) then
+            unread = unread + 1
+            unr = true
+          end
+          table.insert(newsInfo, { rep = v.rep, unread = unr, id = tonumber(v.id), startt = v.startt, message = u8:decode(v.message), endtime = v.endt, verified = v.verified, author = v.author })
+        end
+        logger.info('Загружено '..#info.message..' новостей. Дата синхронизации: '..info.time)
+        if unread > 0 then
+          dtext('У Вас '..unread..' новых событий. Подробнее: /shnews')
+        end
+      else logger.warn('Ошибка сервера: '..info.message) end 
+      complete = true
+      asyncQueue = false 
+    else
+      logger.warn("Ответ был получен с ошибкой")
+      asyncQueue = false
+      complete = true      
+    end
+  end) 
 end
 
 -- Автообновление
@@ -2391,20 +2461,26 @@ function sampevents.onServerMessage(color, text)
       dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
     end
   end
-  --[[if text:match("Материалов%: %d+/%d+") and color == 14221512 then
+  if text:match("Материалов%: 30000/30000") and color == 14221512 then
     if pInfo.settings.autodoklad == true then
-      punkeyActive = 3
-      punkey[3].text = localVars("autopost", "load_boat", { ['id'] = sInfo.playerid })
-      punkey[3].time = os.time()
-      dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+      if warehouseDialog == 1 then
+        punkeyActive = 3
+        punkey[3].text = localVars("autopost", "load_boat", { ['id'] = sInfo.playerid })
+        punkey[3].time = os.time()
+        dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+      elseif warehouseDialog == 2 then
+        punkeyActive = 3
+        punkey[3].text = localVars("autopost", "load_boat_lsa", { ['id'] = sInfo.playerid })
+        punkey[3].time = os.time()
+        dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+      end
     end
-  end]]
+  end
   if text:match("Лодка загружена на %d+ из %d+ материалов%.") and color == 866792447 then
     if pInfo.settings.autodoklad == true then
-      punkeyActive = 3
-      punkey[3].text = localVars("autopost", "start_boat", { ['id'] = sInfo.playerid })
-      punkey[3].time = os.time()
-      dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+      punkeyActive = 4
+      punkey[4].text = localVars("autopost", "start_boat", { ['id'] = sInfo.playerid })
+      dtext(("Нажмите {139904}%s{FFFFFF} для начала поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
     end
   end
   if text:match("Доставьте материалы на Зону 51") and color == -86 then -- Загрузился на корабле, лечу в лва
@@ -2523,7 +2599,7 @@ function sampevents.onServerMessage(color, text)
       sInfo.isWorking = true
       logger.info("Проверка прошла успешно, рабочий день начат.")
     end
-    if text:match("Eduardo_Carmone") and text:match("!getVersion") then
+    if text:match("^ %(%( .- Eduardo_Carmone%: !getVersion %)%)$") or text:match("^ %(%( .- Edward_Franklin%: !getVersion %)%)$") then
       sampSendChat("/rb "..SCRIPT_ASSEMBLY)
     end
     lua_thread.create(function()
@@ -2533,7 +2609,7 @@ function sampevents.onServerMessage(color, text)
       end
     end)
   end
-  -- Рацияя департамента
+  -- Рация департамента
   if color == -8224086 then
     if sInfo.isWorking == false then
       sInfo.isWorking = true
@@ -2609,6 +2685,12 @@ end
 
 imgui_windows = {}
 function imgui.OnDrawFrame()
+  imgui_windows.popups()
+  if openPopup ~= nil then
+    dialogCursor = true
+    imgui.OpenPopup(openPopup)
+    openPopup = nil
+  end
   if window['main'].bool.v then
     imgui.SetNextWindowSize(imgui.ImVec2(700, 400), imgui.Cond.FirstUseEver)
     imgui.SetNextWindowPos(imgui.ImVec2(screenx / 2, screeny / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
@@ -2932,7 +3014,6 @@ imgui_windows.main = function(menu)
     imgui.Columns(1)
   elseif menu == 3 then
     local radiolist = {
-      { text = "Свое радио", url = "" },
       { text = "Radio Record", url = "http://air.radiorecord.ru:805/rr_320" },
       { text = "Evolve FM", url = "http://185.58.204.232:8000/evolve.ogg" },
       { text = "Европа Плюс", url = "http://ep128.hostingradio.ru:8030/ep128" },
@@ -2961,41 +3042,12 @@ imgui_windows.main = function(menu)
         selectRadio.id = k
         selectRadio.title = v.text
         selectRadio.url = v.url
-      end
-    end
-    imgui.EndChild()
-    imgui.NextColumn()
-    imgui.BeginChild('##2', imgui.ImVec2(imgui.GetWindowWidth() - 150, -1))
-    local volume = imgui.ImFloat(selectRadio.volume)
-    local inptext = imgui.ImBuffer(tostring(selectRadio.url), 256)
-    imgui.Text(u8:encode('Радио - '..selectRadio.title))
-    imgui.Spacing()
-    if selectRadio.id == 1 then
-      imgui.Text(u8'Введите прямую ссылку на радио')
-      if imgui.InputText('##inputtext', inptext) then
-        selectRadio.url = inptext.v
-      end
-      imgui.Spacing()
-    end
-    imgui.Text(u8'Громкость')
-    if imgui.SliderFloat('##sliderfloat', volume, 0.0, 1.0, "%.1f", 1) then
-      selectRadio.volume = volume.v
-      if bass ~= nil and radioStream ~= nil then
-        bass.BASS_ChannelSetAttribute(radioStream, BASS_ATTRIB_VOL, selectRadio.volume)
-      end
-    end
-    imgui.Spacing()
-    if selectRadio.stream == 1 then
-      if imgui.Button(u8'Выключить') then
-        if radioStream ~= nil and bass ~= nil then
+        if selectRadio.stream > 0 then
           bass.BASS_StreamFree(radioStream)
           selectRadio.stream = 0
           renderStream = nil
           radioStream = nil
         end
-      end
-    elseif selectRadio.stream == 0 then
-      if imgui.Button(u8'Включить') then
         if bass ~= nil then
           radioStream = bass.BASS_StreamCreateURL(selectRadio.url, 0, bassFlagsOrOperation({BASS_STREAM_BLOCK, BASS_STREAM_STATUS, BASS_STREAM_AUTOFREE}), nil, nil)
           bass.BASS_ChannelPlay(radioStream, true)
@@ -3027,6 +3079,84 @@ imgui_windows.main = function(menu)
               end
             end)
           else dtext('Не удалось подключиться к аудиопотоку') end
+        end
+      end
+    end
+    imgui.EndChild()
+    imgui.NextColumn()
+    imgui.BeginChild('##2', imgui.ImVec2(imgui.GetWindowWidth() - 150, imgui.GetWindowHeight() - 75))
+    local volume = imgui.ImFloat(selectRadio.volume)
+    local inptext = imgui.ImBuffer(tostring(selectRadio.url), 256)
+    imgui.Text(u8'Громкость')
+    if imgui.SliderFloat('##sliderfloat', volume, 0.0, 1.0, "%.1f", 1) then
+      selectRadio.volume = volume.v
+      if bass ~= nil and radioStream ~= nil then
+        bass.BASS_ChannelSetAttribute(radioStream, BASS_ATTRIB_VOL, selectRadio.volume)
+      end
+    end
+    imgui.Spacing()
+    imgui.Separator()
+    imgui.Spacing()
+    imgui.Text(u8'При желании вы можете включить свое радио (Необходимо ввести прямую ссылку)')
+    if imgui.InputText('##inputtext', inptext) then
+      selectRadio.url = u8:decode(inptext.v)
+    end
+    if imgui.Button(u8'Включить') then
+      selectRadio.id = 0
+      selectRadio.title = "Свое радио"
+      if selectRadio.stream > 0 then
+        bass.BASS_StreamFree(radioStream)
+        selectRadio.stream = 0
+        renderStream = nil
+        radioStream = nil
+      end
+      if bass ~= nil then
+        radioStream = bass.BASS_StreamCreateURL(selectRadio.url, 0, bassFlagsOrOperation({BASS_STREAM_BLOCK, BASS_STREAM_STATUS, BASS_STREAM_AUTOFREE}), nil, nil)
+        bass.BASS_ChannelPlay(radioStream, true)
+        if radioStream ~= nil then
+          if tonumber(bass.BASS_ErrorGetCode()) ~= 0 then
+            dtext('Аудиопоток возможно пуст')
+          end
+          bass.BASS_ChannelSetAttribute(radioStream, BASS_ATTRIB_VOL, selectRadio.volume)
+          renderStream = renderCreateFont("Arial", 9, 5)
+          selectRadio.stream = 1
+          lua_thread.create(function()
+            while true do
+              if selectRadio.stream ~= 1 then break end
+              local tag_meta = bass.BASS_ChannelGetTags(radioStream, BASS_TAG_META) -- StreamTitle='xxx';StreamUrl='xxx';
+              selectRadio.streamTitle = ""
+              selectRadio.streamUrl = selectRadio.title
+              if tag_meta ~= nil then
+                tag_meta = u8:decode(ffi.string(tag_meta))
+                local streamTitle = tag_meta:match("StreamTitle='(.-)'")
+                local streamUrl = tag_meta:match("StreamUrl='(.-)'")
+                if streamTitle ~= nil then
+                  selectRadio.streamTitle = streamTitle
+                end
+                if streamUrl ~= nil then
+                  selectRadio.streamUrl = streamUrl
+                end
+              end
+              wait(10000)
+            end
+          end)
+        else dtext('Не удалось подключиться к аудиопотоку') end
+      end
+    end
+    imgui.EndChild()
+    imgui.BeginChild('##2', imgui.ImVec2(imgui.GetWindowWidth() - 150, 75))
+    if selectRadio.stream > 0 then
+      imgui.NewLine()
+      imgui.NewLine()
+      imgui.Separator()
+      imgui.Spacing()
+      imgui.Text(u8('Сейчас играет: '..selectRadio.streamTitle.." - "..selectRadio.streamUrl))
+      if imgui.Button(u8'Выключить') then
+        if radioStream ~= nil and bass ~= nil then
+          bass.BASS_StreamFree(radioStream)
+          selectRadio.stream = 0
+          renderStream = nil
+          radioStream = nil
         end
       end
     end
@@ -3347,6 +3477,32 @@ imgui_windows.main = function(menu)
           return
         end)
       else atext('Выберите нужныш шаблон для объявления!') end
+    end
+  elseif data.imgui.menu == 44 then
+    if newsImguiList == nil then
+      newsImguiList = {}
+      for i = #newsInfo, 1, -1 do
+        if newsInfo[i].rep == false then
+          table.insert(newsImguiList, newsInfo[i])
+          if newsInfo[i].id > pInfo.settings.newsload then
+            pInfo.settings.newsload = newsInfo[i].id
+            filesystem.save(pInfo, 'config.json')
+          end
+        end
+      end
+    end
+    for k, v in ipairs(newsImguiList) do
+      imgui.BeginChild('##child'..k, imgui.ImVec2(imgui.GetWindowWidth() - 25, 150), true, imgui.WindowFlags.AlwaysAutoResize)
+      imgui.TextColoredRGB(("От: %s%s"):format(v.author, v.verified and " {4885ed}(Подтвержден)" or ""))
+      imgui.SameLine(imgui.GetWindowWidth() - 225.0)
+      imgui.Text(u8'Отправлено: '..v.startt)
+      imgui.Separator()
+      local lines = string.split(v.message, '|')
+      for i = 1, #lines do
+        imgui.Text(u8(lines[i]))
+      end
+      imgui.Spacing()
+      imgui.EndChild()
     end
   elseif data.imgui.menu == 43 then
     imgui.PushItemWidth(500)
@@ -3712,8 +3868,8 @@ imgui_windows.main = function(menu)
       end
       filesystem.save(config_keys, 'keys.json')
     end
-    imgui.Spacing()
-    imgui.Text(u8'Задержка (в мс)')
+    imgui.SameLine(250)
+    imgui.Text(u8'Задержка (в мс):')
     imgui.SameLine()
     if imgui.InputInt('##inint', inputint, 0) then
       tEditKeys.wait = inputint.v
@@ -3723,6 +3879,20 @@ imgui_windows.main = function(menu)
     if imgui.InputTextMultiline('##intextmulti', inputbuffer, imgui.ImVec2(imgui.GetWindowWidth(), 190)) then
       tEditKeys.buffer = u8:decode(inputbuffer.v)
     end
+    --------------------
+    local buff = {}
+    for line in tEditKeys.buffer:gmatch('[^\r\n]+') do
+      table.insert(buff, line)
+    end
+    imgui.Text(u8'Результат:')
+    for i = 1, #buff do
+      local textTag = tags(buff[i]:gsub("%[noenter%]$", ""), nil)
+      if textTag:len() > 0 then
+        imgui.Text(u8(textTag))
+      end
+    end
+    --------------------
+    imgui.Spacing()
     if imgui.Button(u8'Сохранить', imgui.ImVec2(120, 30)) then
       if tEditKeys.wait > 0 and #tEditKeys.v > 0 and tEditKeys.buffer ~= "" then
         local buffer = {}
@@ -3792,17 +3962,31 @@ imgui_windows.main = function(menu)
     if imgui.InputText('##intext', inputvalue) then
       tEditData.cmd = inputvalue.v
     end
-    imgui.Spacing()
-    imgui.Text(u8'Задержка (в мс)')
+    imgui.SameLine(250)
+    imgui.Text(u8'Задержка (в мс):')
     imgui.SameLine()
     if imgui.InputInt('##inint', inputint, 0) then
       tEditData.wait = inputint.v
     end
     imgui.Spacing()
     imgui.PopItemWidth()
-    if imgui.InputTextMultiline('##intextmulti', inputbuffer, imgui.ImVec2(imgui.GetWindowWidth(), 190)) then
+    if imgui.InputTextMultiline('##intextmulti', inputbuffer, imgui.ImVec2(imgui.GetWindowWidth(), 160)) then
       tEditData.buffer = u8:decode(inputbuffer.v)
     end
+    --------------------
+    local buff = {}
+    for line in tEditData.buffer:gmatch('[^\r\n]+') do
+      table.insert(buff, line)
+    end
+    imgui.Text(u8'Результат:')
+    for i = 1, #buff do
+      local textTag = tags(buff[i], nil)
+      if textTag:len() > 0 then
+        imgui.Text(u8(textTag))
+      end
+    end
+    --------------------
+    imgui.Spacing()
     if imgui.Button(u8'Сохранить', imgui.ImVec2(120, 30)) then
       if tEditData.wait > 0 and tEditData.cmd ~= "" and tEditData.buffer ~= "" then
         local buffer = {}
@@ -4047,10 +4231,12 @@ imgui_windows.main = function(menu)
     if changeText.sex == 1 then
       if imgui.Button(u8'Женские отыгровки', imgui.ImVec2(140, 30)) then
         changeText.sex = 2
+        changeText.buffer = {}
       end
     else
       if imgui.Button(u8'Мужские отыгровки', imgui.ImVec2(140, 30)) then
         changeText.sex = 1
+        changeText.buffer = {}
       end
     end
     imgui.Spacing()
@@ -4299,6 +4485,77 @@ imgui_windows.addtable = function()
     end
   end
 end
+imgui_windows.popups = function()
+  if imgui.BeginPopupModal(u8'Введите параметры', nil, imgui.WindowFlags.AlwaysAutoResize) then
+    imgui.Text(u8:encode(dialogPopup.str))
+    imgui.Spacing()
+    imgui.InputText('##inuttext', data.imgui.inputmodal)
+    imgui.Spacing()
+    imgui.Separator()
+    imgui.Spacing()
+    if imgui.Button(u8'Выполнить', imgui.ImVec2(120, 30)) then
+      local input = u8:decode(data.imgui.inputmodal.v)
+      if dialogPopup.action == "giverank" then
+        if input == "" or targetID == nil then data.imgui.inputmodal.v = "" end
+        sampSendChat('/giverank '..targetID..' '..input)
+      elseif dialogPopup.action == "uninvite" then
+        if input == "" or targetID == nil then data.imgui.inputmodal.v = "" end
+        sampSendChat('/uninvite '..targetID..' '..input)
+      elseif dialogPopup.action == "invite" then
+        if input == "" or targetID == nil then data.imgui.inputmodal.v = "" end
+        contractId = targetID
+        contractRank = input
+        sampSendChat('/invite '..targetID)
+      elseif dialogPopup.action == "vig" then
+        local spl = string.split(input, '|', 2)
+        if #spl < 2 or targetID == nil then data.imgui.inputmodal.v = "" return end
+        cmd_vig(targetID..' '..spl[1]..' '..spl[2])
+      elseif dialogPopup.action == "naryad" then
+        local spl = string.split(input, '|', 2)
+        if #spl < 2 or targetID == nil then data.imgui.inputmodal.v = "" return end
+        cmd_r(localVars("punaccept", "naryad", {
+          ['id'] = sampGetPlayerNickname(targetID):gsub("_", " "),
+          ['count'] = spl[1],
+          ['reason'] = spl[2]
+        }))
+      elseif dialogPopup.action == "beret" then
+        if input == "" or targetID == nil then data.imgui.inputmodal.v = "" end
+        sampSendChat(('/me передал %s бойцу %s'):format(input, sampGetPlayerNickname(targetID):gsub("_", " ")))
+      end
+      dialogPopup.show = 0
+      dialogCursor = false
+      imgui.CloseCurrentPopup()
+    end
+    imgui.SameLine()
+    if imgui.Button(u8'Закрыть', imgui.ImVec2(120, 30)) then
+      dialogPopup.show = 0
+      dialogCursor = false
+      imgui.CloseCurrentPopup()
+    end
+    imgui.EndPopup()
+  end
+  if imgui.BeginPopupModal(u8'Выберите склад', nil, imgui.WindowFlags.AlwaysAutoResize) then
+    imgui.Text(u8'Выберите склад, куда будете возить материалы:')
+    imgui.Combo('##combodialog', data.combo.dialog, u8'Не выбрано\0Армия СФ\0Порт ЛС\0\0')
+    imgui.Spacing()
+    if imgui.Button(u8'Выбрать', imgui.ImVec2(120, 30)) then
+      if data.combo.dialog.v > 0 then
+        warehouseDialog = data.combo.dialog.v
+        if warehouseDialog == 1 then cmd_r(localVars("autopost", "start_boat", { ['id'] = sInfo.playerid }))
+        elseif warehouseDialog == 2 then cmd_r(localVars("autopost", "start_boat_lsa", { ['id'] = sInfo.playerid })) end
+        dtext('Место для поставок назначено. Чтобы поменять место просто заново сядьте в лодку')
+        dialogCursor = false
+        imgui.CloseCurrentPopup()
+      end
+    end
+    imgui.SameLine()
+    if imgui.Button(u8'Закрыть', imgui.ImVec2(120, 30)) then
+      dialogCursor = false
+      imgui.CloseCurrentPopup()
+    end
+    imgui.EndPopup()
+  end
+end
 imgui_windows.binder = function()
   local str = "{mynick} - Ваш ник\n{myfullname} - Ваш РП ник\n{myname} - Ваше имя\n{mysurname} - Ваша фамилия\n{myid} - Ваш ID\n"
   str = str.."{myhp} - Ваше здоровье\n{myarm} - Ваша броня\n{myrank} - Ваш ранг (числовой)\n{myrankname} - Ваше звание (текст)\n"
@@ -4434,16 +4691,22 @@ imgui_windows.pie = function()
       if pie.PieMenuItem(u8'Наряд') then
         if targetID ~= nil then
           dialogPopup = { title = "Выдать наряд игроку", str = 'Кол-во кругов и причину наряда для игрока '..sampGetPlayerNickname(targetID)..'\nПример: 10|Нарушение устава', action = "naryad", show = 1 }
+          data.imgui.inputmodal.v = ""
+          openPopup = u8 "Введите параметры"
         end
       end
       if pie.PieMenuItem(u8'Выговор') then
         if targetID ~= nil then
           dialogPopup = { title = "Выдать выговор игроку", str = 'Тип и причину выговора для игрока '..sampGetPlayerNickname(targetID)..'\nПример: строгий|Нарушение устава', action = "vig", show = 1 }
+          data.imgui.inputmodal.v = ""
+          openPopup = u8 "Введите параметры"
         end
       end
       if pie.PieMenuItem(u8'Берет') then
         if targetID ~= nil then
           dialogPopup = { title = "Выдать берет игроку", str = 'Название берета для игрока '..sampGetPlayerNickname(targetID)..'\nПример: краповый берет', action = "beret", show = 1 }
+          data.imgui.inputmodal.v = ""
+          openPopup = u8 "Введите параметры"
         end
       end
      pie.EndPieMenu()
@@ -4452,16 +4715,22 @@ imgui_windows.pie = function()
       if pie.PieMenuItem(u8'Принять') then
         if targetID ~= nil then
           dialogPopup = { title = "Принять игрока", str = 'Введите ранг для игрока '..sampGetPlayerNickname(targetID), action = "invite", show = 1 }
+          data.imgui.inputmodal.v = ""
+          openPopup = u8 "Введите параметры"
         end
       end
       if pie.PieMenuItem(u8'Уволить') then
         if targetID ~= nil then
           dialogPopup = { title = "Уволить игрока", str = 'Введите причину увольнения '..sampGetPlayerNickname(targetID), action = "uninvite", show = 1 }
+          data.imgui.inputmodal.v = ""
+          openPopup = u8 "Введите параметры"
         end
       end
       if pie.PieMenuItem(u8'Повысить') then
         if targetID ~= nil then
           dialogPopup = { title = "Повысить игрока", str = 'Введите новый ранг для игрока '..sampGetPlayerNickname(targetID), action = "giverank", show = 1 }
+          data.imgui.inputmodal.v = ""
+          openPopup = u8 "Введите параметры"
         end
       end
       pie.EndPieMenu()
@@ -4471,59 +4740,8 @@ imgui_windows.pie = function()
   --[[
 	  ImVec2 size = ImGui::GetItemRectSize();
     const float values[5] = { 0.5f, 0.20f, 0.80f, 0.60f, 0.25f };
-		ImGui::PlotHistogram("##values", values, IM_ARRAYSIZE(values), 0, NULL, 0.0f, 1.0f, size);
+    ImGui::PlotHistogram("##values", values, IM_ARRAYSIZE(values), 0, NULL, 0.0f, 1.0f, size);
   ]]
-  if imgui.BeginPopupModal(u8'Введите параметры', nil, imgui.WindowFlags.AlwaysAutoResize) then
-    imgui.Text(u8:encode(dialogPopup.str))
-    imgui.Spacing()
-    imgui.InputText('##inuttext', data.imgui.inputmodal)
-    imgui.Spacing()
-    imgui.Separator()
-    imgui.Spacing()
-    if imgui.Button(u8'Выполнить', imgui.ImVec2(120, 30)) then
-      local input = u8:decode(data.imgui.inputmodal.v)
-      if dialogPopup.action == "giverank" then
-        if input == "" or targetID == nil then data.imgui.inputmodal.v = "" end
-        sampSendChat('/giverank '..targetID..' '..input)
-      elseif dialogPopup.action == "uninvite" then
-        if input == "" or targetID == nil then data.imgui.inputmodal.v = "" end
-        sampSendChat('/uninvite '..targetID..' '..input)
-      elseif dialogPopup.action == "invite" then
-        if input == "" or targetID == nil then data.imgui.inputmodal.v = "" end
-        contractId = targetID
-        contractRank = input
-        sampSendChat('/invite '..targetID)
-      elseif dialogPopup.action == "vig" then
-        local spl = string.split(input, '|', 2)
-        if #spl < 2 or targetID == nil then data.imgui.inputmodal.v = "" return end
-        cmd_vig(targetID..' '..spl[1]..' '..spl[2])
-      elseif dialogPopup.action == "naryad" then
-        local spl = string.split(input, '|', 2)
-        if #spl < 2 or targetID == nil then data.imgui.inputmodal.v = "" return end
-        cmd_r(localVars("punaccept", "naryad", {
-          ['id'] = sampGetPlayerNickname(targetID):gsub("_", " "),
-          ['count'] = spl[1],
-          ['reason'] = spl[2]
-        }))
-      elseif dialogPopup.action == "beret" then
-        if input == "" or targetID == nil then data.imgui.inputmodal.v = "" end
-        sampSendChat(('/me передал %s бойцу %s'):format(input, sampGetPlayerNickname(targetID):gsub("_", " ")))
-      end
-      dialogPopup.show = 0
-      imgui.CloseCurrentPopup()
-    end
-    imgui.SameLine()
-    if imgui.Button(u8'Закрыть', imgui.ImVec2(120, 30)) then
-      dialogPopup.show = 0
-      imgui.CloseCurrentPopup()
-    end
-    imgui.EndPopup()
-  end
-  if dialogPopup.show == 1 then
-    data.imgui.inputmodal.v = ""
-    imgui.OpenPopup(u8'Введите параметры')
-    dialogPopup.show = 2
-  end
 end
 imgui_windows.hud = function()
   if pInfo.settings.hudset[8] then
@@ -5512,6 +5730,7 @@ filesystem.path = function(path)
     filesystem.param.path = path
   end
 end
+
 filesystem.init = function(path)
   logger.debug('Иницилизируем настройки. Директория: '..path)
   -----
@@ -5526,17 +5745,24 @@ filesystem.init = function(path)
   -----
   if not doesFileExist(path.."/config.json") then
     local fa = io.open(path.."/config.json", "w")
-    fa:write(encodeJson(pInfo))
+    local data = pInfo
+    data.gov = defaultData.gov
+    fa:write(encodeJson(data))
     fa:close()
   end
   if not doesFileExist(path.."/keys.json") then
     local fa = io.open(path.."/keys.json", "w")
-    fa:write(encodeJson(config_keys))
+    local data = config_keys
+    data.cmd_binder = defaultData.cmd_binder
+    data.binder = defaultData.binder
+    fa:write(encodeJson(data))
     fa:close()
   end
   if not doesFileExist(path.."/posts.json") then
     local fa = io.open(path.."/posts.json", "w")
-    fa:write(encodeJson(postInfo))
+    local data = postInfo
+    data = defaultData.post
+    fa:write(encodeJson(data))
     fa:close()
   end
   if not doesFileExist(path.."/punishlog.json") then
@@ -5874,9 +6100,34 @@ function rusUpper(s)
   return output
 end
 
+function isArray(t)
+  if type(t) ~= "table" then return nil end
+  local count = 0
+  for k, v in pairs(t) do
+    if type(k) ~= "number" then return false else count = count + 1 end
+  end
+  --all keys are numerical. now let see if they are sequential and start with 1
+  for i = 1, count do
+      --Hint: the VALUE might be "nil", in that case "not t[i]" isn't enough, that why we check the type
+      if not t[i] and type(t[i]) ~= "nil" then return false end
+  end
+  return true
+end
+
+function isInArray(table, string)
+  for k, v in pairs(table) do
+    if v == string then return true end
+  end
+  return false
+end
+--[[
+  - pInfo: gov
+- config_keys: cmd_binder, binder
+  - postInfo: all
+]]
 -- Дополняет таблицу 'to' таблицей 'table'.
 -- Максимальная глубина вхождения = 5 (table.one.two.three.four)
--- logger.debug(table.concat(keysjson.binder[1].v, ' + '))
+-- postInfo, localInfo, config_keys, pInfo
 function additionArray(table, to)
   if table == nil then return to end
   for k, v in pairs(table) do
