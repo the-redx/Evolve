@@ -2,12 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.42-release1
+-- Version 1.5-preview1
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.4231")
-SCRIPT_ASSEMBLY = "1.42-release1"
+script_version("1.521")
+SCRIPT_ASSEMBLY = "1.5-preview1"
+LAST_BUILD = "November 1, 2019 20:37:15"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -33,8 +34,10 @@ local limadd, imadd       = pcall(require, 'imgui_addons')
                             assert(limadd, 'Library \'imgui_addons\' not found')
 local lcopas, copas       = pcall(require, 'copas')
 local lhttp, http         = pcall(require, 'copas.http')
-local llfs, lfs           = pcall(require,  'lfs')
+local llfs, lfs           = pcall(require, 'lfs')
 local lbass, bass         = pcall(require, 'bass')
+local lbasexx, basexx     = pcall(require, 'basexx')
+local lsha1, sha1         = pcall(require, 'sha1')
 local lffi, ffi           = pcall(require, 'ffi')
 local lpie, pie           = pcall(require, 'imgui_piemenu')
 --local raknet = require "lib.samp.raknet"
@@ -140,7 +143,7 @@ pInfo = {
     chatconsole = false,
     target = true,
     autobp = false,
-    autobpguns = {2,2,0,2,2,1,0},
+    autobpguns = {true,true,false,true,true,true,false},
     autodoklad = false,
     group = 0,
     inputhelper = false,
@@ -150,7 +153,9 @@ pInfo = {
     tag = nil,
     rpweapons = 0,
     autologin = false,
-    password = ""
+    password = "",
+    gauth = false,
+    gcode = ""
   },
   ranknames = {'Рядовой', 'Ефрейтор', 'Мл.Сержант', 'Сержант', 'Ст.Сержант', 'Старшина', 'Прапорщик', 'Мл.Лейтенант', 'Лейтенант', 'Ст.Лейтенант', 'Капитан', 'Майор', 'Подполковник', 'Полковник', 'Генерал'},
   gov = {},
@@ -225,6 +230,7 @@ localInfo = {
   },
   others = {
     title = "Остальное",
+    viezd = {'Разрешить въезд на территорию', '{frac}, рарзешаю въезд', '{frac}, рарзешаю въезд'},
     udost = {'Отыгровка удостоверения', 'Удостоверение - Организация: {fraction} | Должность: {rankname}', 'Удостоверение - Организация: {fraction} | Должность: {rankname}'},
     dep = {"Занять гос волну", '/d OG, Занимаю волну гос новостей на {time}. Возражения на п.{id}', '/d OG, Занимаю волну гос новостей на {time}. Возражения на п.{id}'},
     dept = {"Напомнить о гос волне", "/d OG, Напоминаю, волна гос новостей на {time} за SFA.", "/d OG, Напоминаю, волна гос новостей на {time} за SFA."},
@@ -251,6 +257,20 @@ tempFiles = {
   blacklistTime = 0,
   ranksTime = 0,
   vigTime = 0
+}
+request_data = {
+  members = 0,
+  membersold = 0,
+  roles = {
+    ['support'] = {
+      count = 0,
+      users = {}
+    },
+    ['leader'] = {
+      count = 0,
+      users = {}
+    }
+  }
 }
 dialogPopup = {
   title = "",
@@ -368,7 +388,8 @@ punkey = {
   { nick = nil, time = nil, reason = nil },
   { nick = nil, time = nil, rank = nil },
   { text = nil, time = nil },
-  { text = nil }
+  { text = nil },
+  { text = nil, time = nil }
 }
 -- Настройки таргета
 targetMenu = {
@@ -392,6 +413,7 @@ changeText = { id = 0, sex = 0, values = {} }
 contractId = nil
 newsTimer = -1
 warehouseDialog = 0
+selectWarehouse = -1
 dialogCursor = false
 playersAddCounter = 1
 giveDMG = nil
@@ -415,21 +437,13 @@ newsInfo = {}
 updatesInfo = {
   version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
   type = "Плановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "13.10.2019",
+  date = "10.11.2019",
   list = {
-    {'В настройках добавлена возможность включать ``строку состояния``, которая будет видна под полем ввода текста в чат;'},
-    {'Добавлена система ``уведомлений пользователей`` о предостоящих мероприятиях, вывод полезной информации а также новостей в чат;'},
-    {'При наведении ``Таргета`` на игрока и зажатии клавиши ``Колёсико мыши`` будет открыто меню быстрого взаимодействия с этим игроком;'},
-    --{'Добавлена возможность добавлять игроков в группы, устанавливать им ранги, просматривать онлайн группы;', 'Данная функция ``локальная``, с другими игроками никакого взаимодействия не происходит;'},
-    {'Добавлена команда ``/setkv [квадрат]``. Ставит метку в указанном квадрате. Если не указывать квадрат, поставит метку на последнем упомяннутом в чате квадрате;'},
-    {'Добавлен авто-доклад для лодок'},
-    {'Добавлена возможность изменять координаты уже созданых постов в ``/sh - Функции - Автодоклад с постов``;'},
-    {'Теперь при создании поста можно указывать радиус. Новый синтаксис - ``/createpost [радиус] [название поста]``;', '``Остальное:``'},
-    {'Небольшое изменение некоторых элементов дизайна;'},
-    {'Пофикшен баг с выводом текста в рацию через /mon 1;'},
-    {'Теперь чат можно открывать на ``T (русская Е)``;'},
-    {'Изменен интерфейс радио'},
-    {'Добавлен авто-доклад для лодок;'}
+    {'Добавлены новые тэги: ``{pRankByID}``, ``{trankname}``, ``{mrankname}``. Все эти тэги выводят ранг игрока в разных ситуациях.', 'Будьте осторожны, для работы тэгов необходимо ввести ``/members [0-2]``;'},
+    {'Теперь на запрос на въезд на базу ответить можно одной клавишей. Доступно 12+ рангам;'},
+    {'Добавлен авто-ввод кода ``Google Authenicator``. Для активации необходимо в ``Настройках`` ввести ключ, который пришёл вам на почту во время привязки аутентификатора;'},
+    {'Добавлен ``умный Авто-БП``. При взятии оружия будет брать то оружие, которое вам необходимо с учётом уже имеющийся оружия;'},
+    {'Изменена система иницилизации скрипта. Система вынесена в отдельный модуль ``"updaterHelper.lua"``. Теперь он отвечает за обновление скриптов, библиотек, файлов, прочего', 'Не пытайтесь удалить файл. Без него хелпер не будет работать;'}
   }
 }
 adminsList = {}
@@ -481,7 +495,7 @@ function main()
     logger.debug(("Иницилизация настроек | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
     ------
-    autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json")
+    --[[autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json")
     while complete ~= true do wait(0) end
     logger.debug(("Проверка обновлений | Время: %.3fs"):format(os.clock() - mstime))
     complete = false
@@ -489,7 +503,7 @@ function main()
     loadPermissions("https://docs.google.com/spreadsheets/d/1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y/export?format=tsv&id=1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y&gid=1568566199") -- remove
     while complete ~= true do wait(0) end
     logger.debug(("Загрузка прав доступа | Время: %.3fs"):format(os.clock() - mstime))
-    complete = false
+    complete = false]]
     --------------------=========----------------------
     ----- Загружаем конфиги
     local configjson = filesystem.load('config.json')
@@ -562,6 +576,12 @@ function main()
     -- sampRegisterChatCommand('checkscript', function()
     --   print(tostring(scripttext.mes()))
     -- end)
+    sampRegisterChatCommand('getweapon', function(arg)
+      local weapon, ammo, model = getCharWeaponInSlot(PLAYER_PED, tonumber(arg))
+      dtext(weapon)
+      dtext(ammo)
+      dtext(model)
+    end)
     sampRegisterChatCommand('shnews', function() window['main'].bool.v = true; data.imgui.menu = 44 end)
     sampRegisterChatCommand('shnote', function() window['shpora'].bool.v = not window['shpora'].bool.v end)
     sampRegisterChatCommand('shradio', function() window['main'].bool.v = true; data.imgui.menu = 3 end)
@@ -625,6 +645,7 @@ function main()
     end
     logger.debug(("Онлайн успешно обновлен | Время: %.3fs"):format(os.clock() - mstime))
     loadNews("https://redx-dev.web.app/sfahelper?data={%22function%22:%22news%22}")
+    sendDataToServer_Timer(600000) -- Задержка
     --------------------=========----------------------
     while not sampIsLocalPlayerSpawned() do wait(0) end
     local _, myid = sampGetPlayerIdByCharHandle(playerPed)
@@ -1453,7 +1474,7 @@ function cmd_punishlog(nick)
           atext('Всего: '..count..' вхождений')
           return
         else
-          atext('Ничего не найдено!')
+          dtext('Ничего не найдено!')
         end
       else dtext('Произошла ошибка') end
     end)     
@@ -1575,10 +1596,10 @@ end
 
 -- Мемберс
 function cmd_members(args)
+  membersInfo.players = {}
   if args == "1" and isGosFraction(sInfo.fraction) then
     membersInfo.mode = 1
   elseif args == "2" and isGosFraction(sInfo.fraction) then
-    membersInfo.players = {}
     membersInfo.work = 0
     membersInfo.imgui = imgui.ImBuffer(256)
     membersInfo.nowork = 0
@@ -1811,6 +1832,11 @@ function punaccept()
   elseif punkeyActive == 4 then
     warehouseDialog = 0
     openPopup = u8"Выберите склад"
+  elseif punkeyActive == 5 then
+    if punkey[5].time > os.time() - 1 then dtext("Не флуди!") return end
+    if punkey[5].time > os.time() - 20 then
+      sampSendChat('/d '..punkey[5].text)
+    end
   end
   punkeyActive = 0
 end
@@ -1839,6 +1865,8 @@ function loadFiles()
     ----------
     if not lpie or (pie._VERSION == nil or pie._VERSION < 1) then files[#files + 1] = 'imgui_piemenu.lua' end
     if not lbass then files[#files + 1] = 'bass.lua' end
+    if not lsha1 then files[#files + 1] = 'sha1.lua' end
+    if not lbasexx then files[#files + 1] = 'basexx.lua' end
     if not lcopas or not lhttp then
       direct[#direct + 1] = 'copas'
       files[#files + 1] = 'copas.lua'
@@ -1860,7 +1888,7 @@ function loadFiles()
       dtext('Устанавливаем необходимые библиотеки...')
       for k, v in pairs(direct) do if not doesDirectoryExist("moonloader/lib/"..v) then createDirectory("moonloader/lib/"..v) end end
       for k, v in pairs(files) do
-        copas_download_status = 'proccess'
+        local copas_download_status = 'proccess'
         downloadUrlToFile('https://raw.githubusercontent.com/the-redx/Evolve/master/lib/'..v, 'moonloader/lib/'..v, function(id, status, p1, p2)
           if status == dlstatus.STATUS_DOWNLOADINGDATA then
             copas_download_status = 'proccess'
@@ -1978,7 +2006,7 @@ function loadNews(url)
         end
         logger.info('Загружено '..#info.message..' новостей. Дата синхронизации: '..info.time)
         if unread > 0 then
-          dtext('У Вас '..unread..' новых событий. Подробнее: /shnews')
+          dtext('У Вас '..unread..' новых сообщений. Подробнее: /shnews')
         end
       else logger.warn('Ошибка сервера: '..info.message) end 
       complete = true
@@ -1989,6 +2017,61 @@ function loadNews(url)
       complete = true      
     end
   end) 
+end
+
+function sendDataToServer_Timer(time)
+  lua_thread.create(function()
+    while true do wait(time)
+      local requestData = {}
+      -- Members фракции
+      if request_data.members ~= request_data.membersold and sInfo.fraction ~= "no" then
+        table.insert(requestData, {
+          jsonrpc = '2.0',
+          id = os.time(),
+          method = 'set.Members',
+          params = {
+            frac = sInfo.fraction,
+            nick = sInfo.nickname,
+            online = request_data.members,
+            hash = string.lower('jd2o8i9jd8hdui2k9dhu492hu8f4jf94d1')
+          }
+        })
+        request_data.membersold = request_data.members
+      end
+      for k, v in pairs(request_data.roles) do
+        if #v.users > v.count then
+          local users = {}
+          for i = v.count, #v.users do
+            table.insert(users, v.users[i])
+          end
+          table.insert(requestData, {
+            jsonrpc = '2.0',
+            id = os.time(),
+            method = 'set.Roles',
+            params = {
+              role = k,
+              members = users,
+              -- nick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))),
+              hash = string.lower('hg278hy27hdjd9dudg3j1dy3hd803du1d1')
+            }
+          })
+          v.count = #v.users
+        end
+      end
+      if #requestData > 0 then
+        --logger.debug(encodeJson(requestData))
+        ----------
+        httpRequest("https://redx-dev.web.app/sfahelper?data="..encodeJson(requestData), nil, function(response, code, headers, status)
+          if not response then
+            logger.error("sendDataToServer: "..code)
+            logger.error('Params: '..encodeJson(requestData))
+          else
+            logger.info('Данные синхронизированы с сервером')
+          end
+        end)
+      end
+    end
+  end)
 end
 
 -- Автообновление
@@ -2133,23 +2216,67 @@ end
 
 -- Авто-БП
 function sampevents.onShowDialog(dialogid, style, title, button1, button2, text)
+  logger.trace(dialogid)
+  if dialogid == 9653 and selectWarehouse >= 0 then
+    lua_thread.create(function()
+      wait(1)
+      sampSendDialogResponse(9653, 1, selectWarehouse, "")
+      selectWarehouse = -1
+      sampCloseCurrentDialogWithButton(0)
+      return
+    end)
+  end
   if pInfo.settings.autobp == true and dialogid == 5225 then
-    if pInfo.settings.autobpguns == nil then pInfo.settings.autobpguns = {2,2,0,2,2,1,0} end
+    if pInfo.settings.autobpguns == nil then pInfo.settings.autobpguns = {true,true,false,true,true,true,false} end
+    -- deagle 21 патрон, 2 раза = 42 патрона (ID:24, Slot:2)
+    -- shotgun 30 патрон, 2 раза = 60 патрон (ID:25, Slot:3)
+    -- mp5 90 патрон, 2 раза = 180 патрон (ID:29, Slot:4)
+    -- m4a1 150 патрон, 2 раза = 300 патрон (ID:31, Slot:5)
+    -- rifle 30 патрон, 2 раза = 60 патрон (ID:33, Slot:6)
+    -- броня 100 хп (ID: 46, Slot: 11)
+    -- спец оружие - парашют
+    local guninfo = {
+      { id = 24, ammo = 21, rep = 2, slot = 3 },
+      { id = 25, ammo = 30, rep = 2, slot = 4 },
+      { id = 29, ammo = 90, rep = 2, slot = 5 },
+      { id = 31, ammo = 150, rep = 2, slot = 6 },
+      { id = 33, ammo = 30, rep = 2, slot = 7 },
+      { id = 0, ammo = 100, rep = 1, slot = 0 },
+      { id = 46, ammo = 1, rep = 1, slot = 12 }
+    }
     lua_thread.create(function()
       for i = autoBP, #pInfo.settings.autobpguns do
-        if pInfo.settings.autobpguns[i] > autoBPCounter then
-          wait(250)
-          autoBPCounter = autoBPCounter + 1
-          sampSendDialogResponse(5225, 1, i - 1, "")
-          break
-        else
+        if pInfo.settings.autobpguns[i] == nil then pInfo.settings.autobpguns[i] = false end
+        if type(pInfo.settings.autobpguns[i]) == "number" then
+          if pInfo.settings.autobpguns[i] > 0 then pInfo.settings.autobpguns[i] = true
+          else pInfo.settings.autobpguns[i] = false end
+        end
+        ----------
+        if guninfo[i].id == 0 then
           autoBP = i + 1
-          autoBPCounter = 0
+          if getCharArmour(PLAYER_PED) < 90 or getCharHealth(PLAYER_PED) < 100 then
+            wait(250)
+            sampSendDialogResponse(5225, 1, i - 1, "")
+            break
+          end
+        else
+          local weapon, ammo, model = getCharWeaponInSlot(PLAYER_PED, guninfo[i].slot)
+          -- dtext(('Ammo: %d | Guninfo: %d'):format(ammo, guninfo[i].ammo))
+          -- dtext(('Weapon: %d | Guninfo: %d'):format(weapon, guninfo[i].id))
+          if pInfo.settings.autobpguns[i] == true and autoBPCounter < 2 and (guninfo[i].id ~= weapon or ammo <= guninfo[i].ammo) then
+            wait(250)
+            autoBPCounter = autoBPCounter + 1
+            sampSendDialogResponse(5225, 1, i - 1, "")
+            break
+          else
+            autoBPCounter = 0
+            autoBP = i + 1
+          end
         end
       end
       if autoBP == #pInfo.settings.autobpguns + 1 then
         autoBP = 1
-        autoBPCounter = 0
+        wait(50)
         sampCloseCurrentDialogWithButton(0)
         if pInfo.settings.rpweapons > 0 then
           wait(250)
@@ -2161,6 +2288,13 @@ function sampevents.onShowDialog(dialogid, style, title, button1, button2, text)
   if dialogid == 1 and #tostring(pInfo.settings.password) >= 6 and pInfo.settings.autologin then
     sampSendDialogResponse(dialogid, 1, _, tostring(pInfo.settings.password))
     return false
+  end
+  -- Google Authenicator
+  if dialogid == 16 and pInfo.settings.gauth and #tostring(pInfo.settings.gcode) == 16 then
+    if lsha1 and lbasexx then
+      sampSendDialogResponse(dialogid, 1, _, genCode(tostring(pInfo.settings.gcode)))
+      return false
+    end
   end
 end
 
@@ -2223,6 +2357,7 @@ end
 
 -- Очень большой хук на всякий хлам
 function sampevents.onServerMessage(color, text)
+  --logger.trace(text..'|'..color)
   if pInfo.settings.chatconsole then sampfuncsLog(tostring(text)) end
   local date = os.date("%d.%m.%y %H:%M:%S")
   local file = io.open('moonloader/SFAHelper/chatlog.txt', 'a+')
@@ -2269,6 +2404,7 @@ function sampevents.onServerMessage(color, text)
       membersInfo.online = tonumber(text:match("^ Всего: (%d+) человек$"))
       if membersInfo.mode >= 2 then membersInfo.mode = 0 return false end
       membersInfo.mode = 0
+      request_data.members = membersInfo.online
     end
     if text:match("") and color == -1 and membersInfo.mode >= 2 then return false end
     -----------------
@@ -2291,6 +2427,7 @@ function sampevents.onServerMessage(color, text)
         pInfo.settings.rank = rank
         sInfo.isWorking = status
       end
+      membersInfo.players[#membersInfo.players + 1] = { mid = id, mrank = rank, mstatus = status, mafk = afk }
       -- colormembers
       if membersInfo.mode == 1 then
         streamed, _ = sampGetCharHandleBySampPlayerId(id)
@@ -2302,7 +2439,6 @@ function sampevents.onServerMessage(color, text)
         else sampAddChatMessage(string.format("%s - %s", text, streamed and "{00BF80}in stream" or "{ec3737}not in stream"), sampGetPlayerColor(id)) end
         return false
       elseif membersInfo.mode == 2 then
-        membersInfo.players[#membersInfo.players + 1] = { mid = id, mrank = rank, mstatus = status, mafk = afk }
         return false
       end
     elseif text:match("^ ID: %d+ | .+%[%d+%] %- {.+}.+{FFFFFF}$") then
@@ -2324,6 +2460,7 @@ function sampevents.onServerMessage(color, text)
         pInfo.settings.rank = rank
         sInfo.isWorking = status
       end
+      membersInfo.players[#membersInfo.players + 1] = { mid = id, mrank = rank, mstatus = status }
       if membersInfo.mode == 1 then
         streamed, _ = sampGetCharHandleBySampPlayerId(id)
         if pInfo.settings.membersdate == true then
@@ -2333,7 +2470,6 @@ function sampevents.onServerMessage(color, text)
         else sampAddChatMessage(string.format("%s - %s", text, streamed and "{00BF80}in stream" or "{ec3737}not in stream"), sampGetPlayerColor(id)) end
         return false
       elseif membersInfo.mode == 2 then
-        membersInfo.players[#membersInfo.players + 1] = { mid = id, mrank = rank, mstatus = status }
         return false
       end
     end
@@ -2391,33 +2527,53 @@ function sampevents.onServerMessage(color, text)
   if text:match("На складе Порта LS%: %d+/200000") and color == -65366 then
     local sklad = text:match('На складе Порта LS%: (%d+)/200000')
     if pInfo.settings.autodoklad == true and tonumber(sklad) ~= nil then
-      punkeyActive = 3
-      punkey[3].text = localVars("autopost", "unload_boat_lsa", { ['id'] = sInfo.playerid, ['sklad'] = math.floor((tonumber(sklad) / 1000) + 0.5) })
-      punkey[3].time = os.time()
-      dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+      lua_thread.create(function()
+        wait(5)
+        selectWarehouse = 0
+        sampSendChat('/carm')
+        punkeyActive = 3
+        punkey[3].text = localVars("autopost", "unload_boat_lsa", { ['id'] = sInfo.playerid, ['sklad'] = math.floor((tonumber(sklad) / 1000) + 0.5) })
+        punkey[3].time = os.time()
+        dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+      end)
     end
   end 
   if text:match("На складе Армия СФ%: %d+/200000") and color == -65366 then
     local sklad = text:match('На складе Армия СФ%: (%d+)/200000')
     if pInfo.settings.autodoklad == true and tonumber(sklad) ~= nil then
-      punkeyActive = 3
-      punkey[3].text = localVars("autopost", "unload_boat", { ['id'] = sInfo.playerid, ['sklad'] = math.floor((tonumber(sklad) / 1000) + 0.5) })
-      punkey[3].time = os.time()
-      dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+      lua_thread.create(function()
+        wait(5)
+        selectWarehouse = 0
+        sampSendChat('/carm')
+        punkeyActive = 3
+        punkey[3].text = localVars("autopost", "unload_boat", { ['id'] = sInfo.playerid, ['sklad'] = math.floor((tonumber(sklad) / 1000) + 0.5) })
+        punkey[3].time = os.time()
+        dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+      end)
     end
   end
   if text:match("Материалов%: 30000/30000") and color == 14221512 then
     if pInfo.settings.autodoklad == true then
       if warehouseDialog == 1 then
-        punkeyActive = 3
-        punkey[3].text = localVars("autopost", "load_boat", { ['id'] = sInfo.playerid })
-        punkey[3].time = os.time()
-        dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+        lua_thread.create(function()
+          wait(5)
+          selectWarehouse = 3
+          sampSendChat('/carm')
+          punkeyActive = 3
+          punkey[3].text = localVars("autopost", "load_boat", { ['id'] = sInfo.playerid })
+          punkey[3].time = os.time()
+          dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+        end)
       elseif warehouseDialog == 2 then
-        punkeyActive = 3
-        punkey[3].text = localVars("autopost", "load_boat_lsa", { ['id'] = sInfo.playerid })
-        punkey[3].time = os.time()
-        dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+        lua_thread.create(function()
+          wait(5)
+          selectWarehouse = 4
+          sampSendChat('/carm')
+          punkeyActive = 3
+          punkey[3].text = localVars("autopost", "load_boat_lsa", { ['id'] = sInfo.playerid })
+          punkey[3].time = os.time()
+          dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+        end)
       end
     end
   end
@@ -2537,6 +2693,36 @@ function sampevents.onServerMessage(color, text)
       logger.debug('Вас повысили. Ранг: '..pInfo.settings.rank)
     end
   end
+  if color == -1713456726 and text:find('^  .-%: .- %[тел%: %d+%]$') then
+    local frac, nick, _ = text:match('^  (.-)%: (.-) %[тел%: (%d+)%]$')
+    local contains = false
+    for k, v in ipairs(request_data.roles['leader'].users) do
+      if v.nick == nick then contains = true end
+    end
+    if not contains then
+      table.insert(request_data.roles['leader'].users, { nick = nick, rank = frac })
+    end
+  end
+  if color == -169954390 and text:find('^ .-%[ID%: %d+%]') then
+    local nick, _ = text:match('^ (.-)%[ID%: (%d+)%]')
+    local contains = false
+    for k, v in ipairs(request_data.roles['support'].users) do
+      if v.nick == nick then contains = true end
+    end
+    if not contains then
+      table.insert(request_data.roles['support'].users, { nick = nick, rank = 'support' })
+    end
+  end
+  if color == -169954390 and text:find('^ .- | ID%: %d+ | Level%: %d+$') then
+    local nick, id, lvl = text:match('^ (.-) | ID%: (%d+) | Level%: (%d+)$')
+    local contains = false
+    for k, v in ipairs(request_data.roles['admin'].users) do
+      if v.nick == nick then contains = true end
+    end
+    if not contains then
+      table.insert(request_data.roles['admin'].users, { nick = nick, level = lvl })
+    end
+  end
   -- Рация фракции
   if color == -1920073984 then
     if sInfo.isWorking == false then
@@ -2544,7 +2730,10 @@ function sampevents.onServerMessage(color, text)
       logger.info("Проверка прошла успешно, рабочий день начат.")
     end
     if text:match("^ %(%( .- Eduardo_Carmone%: !getVersion %)%)$") or text:match("^ %(%( .- Edward_Franklin%: !getVersion %)%)$") then
-      sampSendChat("/rb "..SCRIPT_ASSEMBLY)
+      lua_thread.create(function()
+        wait(0)
+        sampSendChat("/rb "..SCRIPT_ASSEMBLY)
+      end)
     end
     lua_thread.create(function()
       local tt = rusLower(text)
@@ -2563,7 +2752,28 @@ function sampevents.onServerMessage(color, text)
       local frac, rank, name, surname = text:match("^ %[(.+)%] (.+) (%w+)_(%w+):")
       data.players[#data.players + 1] = { nick = tostring(name.."_"..surname), rank = tostring(rank), fraction = tostring(frac) }
     end
+    if text:find("^ %[.-%] .- .-%: .-, разрешите въезд на вашу территорию, .-$") then
+      local frac, rank, nick, fracto, reason = text:match("^ %[(.-)%] (.-) (.-)%: (.-), разрешите въезд на вашу территорию, (.-)$")
+      logger.debug(frac.." | "..nick.." | "..rank.." | "..fracto.." | "..reason)
+      if (pInfo.settings.rank >= 12 or DEBUG_MODE) and rusLower(fracto) == rusLower(sInfo.fraction) then
+        punkeyActive = 5
+        punkey[5].text = localVars("others", "viezd", { ['frac'] = frac, ['rank'] = rank, ["nick"] = nick, ["reason"] = reason })
+        punkey[5].time = os.time()
+        dtext(("%s %s (%s) запрашивает въезд на территорию по причине: %s"):format(rank, nick, frac, reason))
+        dtext(("Нажмите {139904}%s{FFFFFF}, чтобы разрешить въезд"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+      end
+    end
     table.insert(data.departament, text)
+  end
+  if text:find('Посылать сообщение в %/d можно раз в 10 секунд%!') then
+    if punkey[5].text ~= nil and punkey[5].time > os.time() - 20 then
+      punkeyActive = 5
+      punkey[5].time = os.time()
+      dtext('Посылать сообщение в /d можно раз в 10 секунд. Нажмите клавишу {139904}'..table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")..'{FFFFFF} позже')
+      return false
+    else
+      punkey[5].text, punkey[5].time = nil, nil
+    end
   end
   -- Пасспорт
   if color == -169954390 then
@@ -3286,9 +3496,11 @@ imgui_windows.main = function(menu)
         local radius = postInfo[data.combo.post.v].radius
         for i = 1, #postInfo do
           local pi = postInfo[i]
-          if cx >= pi.coordX - (pi.radius+radius) and cx <= pi.coordX + (pi.radius+radius) and cy >= pi.coordY - (pi.radius+radius) and cy <= pi.coordY + (pi.radius+radius) and cz >= pi.coordZ - (pi.radius+radius) and cz <= pi.coordZ + (pi.radius+radius) then
-            dtext(("Координаты не могут быть изменены, т.к. они граничат с постом '%s'"):format(pi.name))
-            return
+          if i ~= data.combo.post.v then
+            if cx >= pi.coordX - (pi.radius+radius) and cx <= pi.coordX + (pi.radius+radius) and cy >= pi.coordY - (pi.radius+radius) and cy <= pi.coordY + (pi.radius+radius) and cz >= pi.coordZ - (pi.radius+radius) and cz <= pi.coordZ + (pi.radius+radius) then
+              dtext(("Координаты не могут быть изменены, т.к. они граничат с постом '%s'"):format(pi.name))
+              return
+            end
           end
         end
         dtext('Координаты поста успешно изменены!')
@@ -3805,7 +4017,7 @@ imgui_windows.main = function(menu)
     end
     imgui.Spacing()
     imgui.PopItemWidth()
-    if imgui.InputTextMultiline('##intextmulti', inputbuffer, imgui.ImVec2(imgui.GetWindowWidth(), 190)) then
+    if imgui.InputTextMultiline('##intextmulti', inputbuffer, imgui.ImVec2(imgui.GetWindowWidth() - 50, 190)) then
       tEditKeys.buffer = u8:decode(inputbuffer.v)
     end
     --------------------
@@ -3899,7 +4111,7 @@ imgui_windows.main = function(menu)
     end
     imgui.Spacing()
     imgui.PopItemWidth()
-    if imgui.InputTextMultiline('##intextmulti', inputbuffer, imgui.ImVec2(imgui.GetWindowWidth(), 160)) then
+    if imgui.InputTextMultiline('##intextmulti', inputbuffer, imgui.ImVec2(imgui.GetWindowWidth() - 50, 160)) then
       tEditData.buffer = u8:decode(inputbuffer.v)
     end
     --------------------
@@ -3961,12 +4173,14 @@ imgui_windows.main = function(menu)
   elseif menu == 31 then
     local membersdate = imgui.ImBool(pInfo.settings.membersdate)
     local autologin = imgui.ImBool(pInfo.settings.autologin)
+    local autogoogle = imgui.ImBool(pInfo.settings.gauth)
     local target = imgui.ImBool(pInfo.settings.target)
     local chatconsole = imgui.ImBool(pInfo.settings.chatconsole)
     local doklad = imgui.ImBool(pInfo.settings.autodoklad)
     local hud = imgui.ImBool(pInfo.settings.hud)
     local inputhelper = imgui.ImBool(pInfo.settings.inputhelper)
     local tagbuffer = imgui.ImBuffer(tostring(pInfo.settings.tag), 256)
+    local googlebuffer = imgui.ImBuffer(tostring(pInfo.settings.gcode), 256)
     local clistbuffer = imgui.ImBuffer(tostring(pInfo.settings.clist), 256)
     local passbuffer = imgui.ImBuffer(tostring(pInfo.settings.password), 256)
     ----------
@@ -3998,6 +4212,21 @@ imgui_windows.main = function(menu)
       if imgui.InputText('##pass', passbuffer, imgui.InputTextFlags.Password) then
         pInfo.settings.password = u8:decode(passbuffer.v)
       end   
+    end
+    if pInfo.settings.gauth then
+      imgui.Spacing()
+      imgui.Text(u8'Введите ключ Google Authenicator')
+      if imgui.InputText('##passgoogle', googlebuffer, imgui.InputTextFlags.Password) then
+        pInfo.settings.gcode = u8:decode(googlebuffer.v)
+      end
+      if #tostring(pInfo.settings.gcode) == 16 then
+        imgui.SameLine()
+        if imgui.Button(u8'Отобразить') then
+          dtext('Ваш Google Code: '..pInfo.settings.gcode)
+          dtext('Никому не сообщайте данный код!')
+        end
+        imgui.Text(u8('Сгенерированый код: '..genCode(tostring(pInfo.settings.gcode))))
+      end
     end
     imgui.EndChild()
     imgui.NextColumn()
@@ -4032,6 +4261,12 @@ imgui_windows.main = function(menu)
       filesystem.save(pInfo, 'config.json')   
     end
     imgui.SameLine(); imgui.Text(u8 'Автологин в игру')
+    ------------
+    if imgui.ToggleButton(u8 'autogoogle##1', autogoogle) then
+      pInfo.settings.gauth = autogoogle.v;
+      filesystem.save(pInfo, 'config.json')
+    end
+    imgui.SameLine(); imgui.Text(u8 'Автологин Google Authenicator')
     ------------
     if imgui.ToggleButton(u8 'autodoklad##1', doklad) then
       pInfo.settings.autodoklad = doklad.v;
@@ -4128,7 +4363,7 @@ imgui_windows.main = function(menu)
     imgui.PopStyleColor()
   elseif menu == 32 then
     local autobp = imgui.ImBool(pInfo.settings.autobp)
-    if pInfo.settings.autobpguns == nil then pInfo.settings.autobpguns = {2,2,0,2,2,1,0} end
+    if pInfo.settings.autobpguns == nil then pInfo.settings.autobpguns = {true,true,false,true,true,true,false} end
     if imgui.ToggleButton(u8 'autobp##1', autobp) then
       pInfo.settings.autobp = autobp.v
       filesystem.save(pInfo, 'config.json')
@@ -4138,18 +4373,18 @@ imgui_windows.main = function(menu)
     -------
     local autolist = {"Desert Eagle", "Shotgun", "MP5", "M4A1", "Rifle", "Броня", "Спец оружие"}
     for i = 1, #pInfo.settings.autobpguns do
-      if pInfo.settings.autobpguns[i] == nil then pInfo.settings.autobpguns[i] = 0 end
-      local interval = imgui.ImInt(pInfo.settings.autobpguns[i])
-      imgui.Text(u8:encode(autolist[i]))
-      imgui.SameLine()
-      imgui.SetCursorPosX(120)
+      if pInfo.settings.autobpguns[i] == nil then pInfo.settings.autobpguns[i] = false end
+      if type(pInfo.settings.autobpguns[i]) == "number" then
+        if pInfo.settings.autobpguns[i] > 0 then pInfo.settings.autobpguns[i] = true
+        else pInfo.settings.autobpguns[i] = false end
+      end
+      local interval = imgui.ImBool(pInfo.settings.autobpguns[i])
       imgui.PushItemWidth(125)
-      if imgui.InputInt('##counter'..i, interval, 1) then
-        if interval.v < 0 then interval.v = 0 end
-        if interval.v > 2 then interval.v = 2 end
+      if imgui.ToggleButton('##counter'..i, interval) then
         pInfo.settings.autobpguns[i] = interval.v
         filesystem.save(pInfo, 'config.json')
       end
+      imgui.SameLine(); imgui.Text(u8:encode(autolist[i]))
       imgui.PopItemWidth()
     end
   elseif menu == 33 then
@@ -4486,15 +4721,15 @@ imgui_windows.binder = function()
   str = str.."{kvadrat} - Ваш текущий квадрат\n{tag} - Ваш тэг\n{frac} - Ваша фракция\n{city} - Текущий город\n{zone} - Текущая локация\n{time} - Текущее время\n"
   str = str.."{date} - Текущая дата в формате DD.MM.YYYY\n{weaponid} - ID оружия в руках\n{weaponname} - Название оружия в руках\n{ammo} - Количество патронов в оружие\n"
   str = str.."Последний игрок, выделенный через таргет:\n{tID} - ID игрока\n{tnick} - Ник игрока\n"
-  str = str.."{tfullname} - РП ник игрока\n{tname} - Имя игрока\n{tsurname} - Фамилия игрока\n"
-  str = str.."Игрок, выбранный через \"/match\":\n{mID} - ID игрока\n{mnick} - Иик игрока\n{mfullname} - РП ник игрока\n{mname} - Имя игрока\n{msurname} - Фамилия игрока\n"
+  str = str.."{tfullname} - РП ник игрока\n{tname} - Имя игрока\n{tsurname} - Фамилия игрока\n{trankname} - Ранг игрока\n"
+  str = str.."Игрок, выбранный через \"/match\":\n{mID} - ID игрока\n{mnick} - Иик игрока\n{mfullname} - РП ник игрока\n{mname} - Имя игрока\n{msurname} - Фамилия игрока\n{mrankname} - Ранг игрока\n"
   if data.imgui.menu == 21 then
     local dstr = "[noenter] - Не отправлять сообщение в чат\n\n"
     str = dstr..str
     imgui.Text(u8:encode(str)) 
   elseif data.imgui.menu == 22 then
     local dstr = "{param} - Первый аргумент в команде\n{pNickByID} - Ник по ID в параметре\n{pFullNameByID} - РП ник по ID в параметре\n{pNameByID} - Имя по ID в параметре\n"
-    dstr = dstr .. "{pSurnameByID} - Фамилия по ID в параметре\n{param2} - Второй аргумент\n{param3} - Третий аргумент\n"
+    dstr = dstr .. "{pSurnameByID} - Фамилия по ID в параметре\n{pRankByID} - Ранг игрока\n{param2} - Второй аргумент\n{param3} - Третий аргумент\n"
     str = dstr..str
     imgui.Text(u8:encode(str))
   end
@@ -5025,6 +5260,16 @@ function tags(args, param)
     args = args:gsub("{pFullNameByID}", tostring(sampGetPlayerNickname(type(param) == "table" and param[1] or param):gsub("_", " ")))
     args = args:gsub("{pNameByID}", tostring(sampGetPlayerNickname(type(param) == "table" and param[1] or param):gsub("_.*", "")))
     args = args:gsub("{pSurnameByID}", tostring(sampGetPlayerNickname(type(param) == "table" and param[1] or param):gsub(".*_", "")))
+    -- Update 1.5
+    local rankname = ""
+    for i = 1, #membersInfo.players do
+      if membersInfo.players[i].mid == tonumber(type(param) == "table" and param[1] or param) then
+        rankname = pInfo.ranknames[membersInfo.players[i].mrank]
+        break
+      end
+    end
+    if rankname == nil then rankname = "" end
+    args = args:gsub("{pRankByID}", rankname)
   end
   ----------
   args = args:gsub("{mynick}", tostring(sInfo.nick))
@@ -5050,20 +5295,40 @@ function tags(args, param)
   args = args:gsub("{weaponname}", tostring(getweaponname(getCurrentCharWeapon(PLAYER_PED))))
   args = args:gsub("{ammo}", tostring(getAmmoInCharWeapon(PLAYER_PED, getCurrentCharWeapon(PLAYER_PED))))
   ----------
-  -- membersInfo.players[#membersInfo.players + 1] = { mid = id, mrank = rank, mstatus = status, mafk = afk }
   if targetID ~= nil and sampIsPlayerConnected(targetID) then
     args = args:gsub("{tID}", tostring(targetID))
 		args = args:gsub("{tfullname}", tostring(sampGetPlayerNickname(targetID):gsub("_", " ")))
 		args = args:gsub("{tname}", tostring(sampGetPlayerNickname(targetID):gsub("_.*", "")))
 		args = args:gsub("{tsurname}", tostring(sampGetPlayerNickname(targetID):gsub(".*_", "")))
-		args = args:gsub("{tnick}", tostring(sampGetPlayerNickname(targetID)))
+    args = args:gsub("{tnick}", tostring(sampGetPlayerNickname(targetID)))
+    -- Update 1.5
+    local rankname = ""
+    for i = 1, #membersInfo.players do
+      if membersInfo.players[i].mid == targetID then
+        rankname = pInfo.ranknames[membersInfo.players[i].mrank]
+        break
+      end
+    end
+    if rankname == nil then rankname = "" end
+    args = args:gsub("{trankname}", rankname)
   end
+  -----
   if playerMarkerId ~= nil and sampIsPlayerConnected(playerMarkerId) then
     args = args:gsub("{mID}", tostring(playerMarkerId))
 		args = args:gsub("{mfullname}", tostring(sampGetPlayerNickname(playerMarkerId):gsub("_", " ")))
 		args = args:gsub("{mname}", tostring(sampGetPlayerNickname(playerMarkerId):gsub("_.*", "")))
 		args = args:gsub("{msurname}", tostring(sampGetPlayerNickname(playerMarkerId):gsub(".*_", "")))
-		args = args:gsub("{mnick}", tostring(sampGetPlayerNickname(playerMarkerId)))    
+    args = args:gsub("{mnick}", tostring(sampGetPlayerNickname(playerMarkerId)))
+    -- Update 1.5
+    local rankname = ""
+    for i = 1, #membersInfo.players do
+      if membersInfo.players[i].mid == playerMarkerId then
+        rankname = pInfo.ranknames[membersInfo.players[i].mrank]
+        break
+      end
+    end
+    if rankname == nil then rankname = "" end
+    args = args:gsub("{mrankname}", rankname) 
   end
 	return args
 end
@@ -5600,10 +5865,18 @@ function loggerInit()
   if logger.outfile then
     local file = io.open('moonloader/SFAHelper/debug.txt', 'w')
     local dates = '['..os.date('%d.%m.%Y')..' | '..os.date('%H:%M:%S')..']'
-    local text = dates..' ================================================================\n'
-    text = text..dates..'   SFA-Helper version '..SCRIPT_ASSEMBLY..' for SA-MP 0.3.7 loaded.\n'
-    text = text..dates..'   Developers: Edward_Franklin, Thomas_Lawson\n'..dates..'   Copyright (c) 2019, redx\n'
-    text = text..dates..' ================================================================\n'
+    local text = ''
+    local textArray = {
+      ' ================================================================',
+      '   SFA-Helper version '..SCRIPT_ASSEMBLY..' for SA-MP 0.3.7 loaded.',
+      '   Last build: '..LAST_BUILD,
+      '   Developers: Edward_Franklin, Thomas_Lawson',
+      '   Copyright (c) 2019, redx',
+      ' ================================================================'
+    }
+    for i = 1, #textArray do
+      text = text..string.format("%s%s\n", dates, textArray[i])
+    end
     file:write(text)
     file:close()
   end
@@ -6078,26 +6351,6 @@ function encodeURI(str)
    return str
 end
 
--- Доработана. Добавил максимальное кол-во делений
-function string.split(inputstr, sep, limit)
-  if limit == nil then limit = 0 end
-  if sep == nil then sep = "%s" end
-  local t={} ; i=1
-  for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
-    if i >= limit and limit > 0 then
-      if t[i] == nil then
-        t[i] = ""..str
-      else
-        t[i] = t[i]..sep..str
-      end
-    else
-      t[i] = str
-      i = i + 1
-    end
-  end
-  return t
-end
-
 function drawMembersPlayer(table)
 	-- ID  Nick  Rank  Status  AFK  Dist
 	local nickname = sampGetPlayerNickname(table.mid)
@@ -6164,6 +6417,25 @@ function getTargetBlipCoordinatesFixed()
   return bool, x, y, z
 end
 
+function genCode(skey)
+  skey = basexx.from_base32(skey)
+  value = math.floor(os.time() / 30)
+  value = string.char(
+  0, 0, 0, 0,
+  bit.band(value, 0xFF000000) / 0x1000000,
+  bit.band(value, 0xFF0000) / 0x10000,
+  bit.band(value, 0xFF00) / 0x100,
+  bit.band(value, 0xFF))
+  local hash = sha1.hmac_binary(skey, value)
+  local offset = bit.band(hash:sub(-1):byte(1, 1), 0xF)
+  local function bytesToInt(a,b,c,d)
+    return a*0x1000000 + b*0x10000 + c*0x100 + d
+  end
+  hash = bytesToInt(hash:byte(offset + 1, offset + 4))
+  hash = bit.band(hash, 0x7FFFFFFF) % 1000000
+  return ('%06d'):format(hash)
+end
+
 function httpRequest(request, body, handler) -- copas.http
   -- start polling task
   if not copas.running then
@@ -6193,4 +6465,200 @@ function httpRequest(request, body, handler) -- copas.http
     while coroutine.status(thread) ~= 'dead' do wait(0) end
     return table.unpack(results)
   end
+end
+
+-- Функция @FYP, делит строку по паттерну.
+-- string.split(str, delim, plain)
+
+-- Функция обратного поиска
+-- string.rfind(str, pattern, offset, plain)
+
+-- Проверяет находится ли подстрока в строке
+-- string.contains(str, substr)
+
+-- Обрезает с начала и конца указанный символ, если символ не указан - обрезает все пробельные символы
+-- string.trim(str, chars)
+
+-- "Склеивает" все указанные таблицы
+-- table.merge(...)
+
+-- Возвращает все ключи таблицы в виде массива
+-- table.keys(object)
+
+-- Поверхностно копирует массив (только указанный уровень). Параметр mt отвечает вернуть ли метатаблицу или нет.
+-- table.copy(object, mt)
+
+-- Получить индекс по первому найденому значению
+-- table.getIndexOf(object, value)
+
+-- Удалить ячейку по значению
+-- table.removeByValue(object, value)
+
+-- Поиск по значению в таблице, true / false
+-- table.contains(object, value)
+
+-- Полное копирование таблицы включая подтаблицы
+-- table.deepcopy(object, mt)
+
+-- Применит func(valute) к каждому элементы таблицы и заменит изначальные данные результатом выполнения функции
+-- table.transform(object, func)
+
+-- Меняет ключ и значение местами
+-- table.invert(object)
+
+-- Тоже самое что и table.transform, но не заменит оригинал таблицы и вернет копию.
+-- table.map(object, func)
+function string.split(str, delim, plain) -- bh FYP
+  local tokens, pos, plain = {}, 1, not (plain == false) --[[ delimiter is plain text by default ]]
+  repeat
+      local npos, epos = string.find(str, delim, pos, plain)
+      table.insert(tokens, string.sub(str, pos, npos and npos - 1))
+      pos = epos and epos + 1
+  until not pos
+  return tokens
+end
+
+function string.trim(str, chars) -- lume
+  if not chars then
+     return str:match("^[%s]*(.-)[%s]*$")
+  end
+  local chars = chars:gsub("[%(%)%.%%%+%-%*%?%[%]%^%$]", "%%%1")
+  return str:match("^[" .. chars .. "]*(.-)[" .. chars .. "]*$")
+end
+
+function string.contains(str, substr)
+  return string.find(str, substr, 1, true) ~= nil
+end
+
+function string.rfind(str, pattern, offset, plain)
+  local pos, lnpos, lepos, plain = offset and offset - 1 or 0, offset or 1, -1, not (plain == false)
+  repeat
+     local npos, epos = string.find(str, pattern, pos, plain)
+     pos = epos and epos + 1
+     if pos then
+        lnpos, lepos = npos, epos
+     end
+  until not pos
+  return lnpos, lepos
+end
+
+function table.deepcopy(object, mt)
+  local lookup_table = {}
+  mt = mt or false
+  local function _copy(object)
+        if type(object) ~= "table" then
+           return object
+        elseif lookup_table[object] then
+           return lookup_table[object]
+        end
+        local new_table = {}
+        lookup_table[object] = new_table
+        for index, value in pairs(object) do
+           new_table[_copy(index)] = _copy(value)
+        end
+        return mt and setmetatable(new_table, getmetatable(object)) or new_table
+  end
+  return _copy(object)
+end
+
+function table.copy(object, mt)
+  mt = mt or false
+  local newt = {}
+  for k, v in pairs(object) do
+     newt[k] = v
+  end
+  return mt and setmetatable(newt, getmetatable(object)) or newt
+end
+
+function table.contains(object, value)
+  for k, v in pairs(object) do
+     if v == value then
+        return true
+     end
+  end
+  return false
+end
+
+function table.merge(...)
+  local len = select('#', ...)
+  assert(len > 1, "impossible to merge less than two tables")
+  local newTable = {}
+  for i = 1, len do
+     local t = select(i, ...)
+     for k, v in pairs(t) do
+        table.insert(newTable, v)
+     end
+  end
+  return newTable
+end
+
+function table.assocMerge(...)
+  local len = select('#', ...)
+  assert(len > 1, "impossible to merge less than two tables")
+  local newTable = {}
+  for i = 1, len do
+     local t = select(i, ...)
+     for k, v in pairs(t) do
+        newTable[k] = v
+     end
+  end
+  return newTable
+end
+
+function table.map(object, func) -- lume
+  local newTable = {}
+  for k, v in pairs(object) do
+     if type(v) == "table" then
+        newTable[k] = table.map(v, func)
+     else
+        newTable[k] = func(v)
+     end
+  end
+  return newTable
+end
+
+function table.transform(object, func)
+  for k, v in pairs(object) do
+     if type(v) == "table" then
+        object[k] = table.transform(v, func)
+     else
+        object[k] = func(v)
+     end
+  end
+  return object
+end
+
+function table.invert(object) -- lume
+  local newTable = {}
+  for k, v in pairs(object) do
+     newTable[v] = k
+  end
+  return newTable
+end
+
+function table.keys(object) -- lume
+  local newTable = {}
+  local i = 0
+  for k in pairs(object) do
+     i = i + 1
+     newTable[i] = k
+  end
+  return newTable
+end
+
+function table.getIndexOf(object, value)
+  for k, v in pairs(object) do
+     if v == value then
+        return k
+     end
+  end
+  return nil
+end
+
+function table.removeByValue(object, value)
+  local getIndexOf = table.getIndexOf(object, value)
+  if getIndexOf then
+     object[getIndexOf] = nil
+  end
+  return getIndexOf
 end
