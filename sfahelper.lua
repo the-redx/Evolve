@@ -2,18 +2,18 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.5-preview1
+-- Version 1.5-preview2
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.521")
-SCRIPT_ASSEMBLY = "1.5-preview1"
-LAST_BUILD = "November 1, 2019 20:37:15"
+script_version("1.522")
+SCRIPT_ASSEMBLY = "1.5-preview2"
+LAST_BUILD = "November 14, 2019 19:56:43"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
 require 'lib.sampfuncs'
-------------------------
+------------------
 local lsampev, sampevents = pcall(require, 'lib.samp.events')
                             assert(lsampev, 'Library \'lib.samp.events\' not found')
 local lencoding, encoding = pcall(require, 'encoding')
@@ -40,17 +40,17 @@ local lbasexx, basexx     = pcall(require, 'basexx')
 local lsha1, sha1         = pcall(require, 'sha1')
 local lffi, ffi           = pcall(require, 'ffi')
 local lpie, pie           = pcall(require, 'imgui_piemenu')
---local raknet = require "lib.samp.raknet"
-
+local lsocket, websocket  = pcall(require, 'websocket')
 ------------------
 encoding.default = 'CP1251'
 local u8 = encoding.UTF8
 dlstatus = require('moonloader').download_status
 imgui.ToggleButton = imadd.ToggleButton
 imgui.HotKey = imadd.HotKey
-
+socketClient = websocket.client.copas({timeout = 2})
+------------------
+-- InputHelper
 if lffi then
-  ---- InputHelper
   ffi.cdef[[
 	  short GetKeyState(int nVirtKey);
 	  bool GetKeyboardLayoutNameA(char* pwszKLID);
@@ -76,6 +76,15 @@ logger = {
   }
 }
 
+socketInfo = {
+  active = false,
+  ip = 'ws://sfahelper.herokuapp.com',
+  map_hide = false,
+  chat = {},
+  actions = {}
+}
+
+-- Imgui переменные
 window = {
   ['main'] = { bool = imgui.ImBool(false), cursor = true, draw = true },
   ['target'] = { bool = imgui.ImBool(false), cursor = false, draw = true },
@@ -86,7 +95,8 @@ window = {
   ['binder'] = { bool = imgui.ImBool(false), cursor = false, draw = false }
 }
 screenx, screeny = getScreenResolution()
-reloadScriptsParam = false
+
+-- Дефолтные данные (используются при создании конфигов)
 defaultData = {
   gov = {
     {'Реклама призыва','[Army SF]: Уважаемые жители штата, в {time} объявлен призыв в San-Fierro Army!','[Army SF]: Требования: 3 года проживания в штате, не иметь проблем с законом не состоять в ЧС.','[Army SF]: Призывной пункт: Больница города San Fierro. Навигатор Л-2. Спасибо за внимание.'},
@@ -115,7 +125,8 @@ defaultData = {
     { name = "Доки 3", coordX = -1457.19, coordY = 426.95, coordZ = 7.18, radius = 13.0 }
   }
 }
--- Главная таблица с настройками
+
+-- Главная таблица с профилем
 pInfo = {
   info = {
     day = os.date("%d.%m.%y"),
@@ -131,6 +142,7 @@ pInfo = {
   settings = {
     newsload = 0,
     rank = 0,
+    socket = false,
     hud = true,
     hudX = screenx / 1.5,
     watchhud = true,
@@ -162,6 +174,7 @@ pInfo = {
   weeks = {0,0,0,0,0,0,0},
   counter = {0,0,0,0,0,0,0,0,0,0,0,0}
 }
+
 -- Локализация
 localInfo = {
   autopost = {
@@ -179,6 +192,11 @@ localInfo = {
     start_boat_lsa = {'Начал поставки в порт (лодка)', 'На связи борт - {id}. Начал поставки в Порт ЛС.', 'На связи борт - {id}. Начала поставки в Порт ЛС.'},
     unload_boat_lsa = {'Разгрузил материалы в порту (лодка)', 'На связи борт - {id}. Разгрузился в Порту ЛС. Состояние - {sklad}/200', 'На связи борт - {id}. Разгрузилась в Порту ЛС. Состояние - {sklad}/200'},
     ends_boat = {'Закончил поставки (лодка)', "На связи борт - {id}. Завершил поставки, беру курс на часть.", "На связи борт - {id}. Завершила поставки, беру курс на часть."}
+  },
+  lvapost = {
+    title = "Авто-поставки LVA",
+    start = {"Начал поставки", "Взял грузовик снабжения!", "Взяла грузовик снабжения!"},
+    unload = {"Разгрузился на складе", "Разгрузились на складе {frac}. Состояние - {sklad}", "Разгрузились на складе {frac}. Состояние - {sklad}"}
   },
   post = {
     title = "Авто-доклад",
@@ -230,7 +248,7 @@ localInfo = {
   },
   others = {
     title = "Остальное",
-    viezd = {'Разрешить въезд на территорию', '{frac}, рарзешаю въезд', '{frac}, рарзешаю въезд'},
+    viezd = {'Разрешить вьезд на территорию', '{frac}, рарзешаю вьезд', '{frac}, рарзешаю вьезд'},
     udost = {'Отыгровка удостоверения', 'Удостоверение - Организация: {fraction} | Должность: {rankname}', 'Удостоверение - Организация: {fraction} | Должность: {rankname}'},
     dep = {"Занять гос волну", '/d OG, Занимаю волну гос новостей на {time}. Возражения на п.{id}', '/d OG, Занимаю волну гос новостей на {time}. Возражения на п.{id}'},
     dept = {"Напомнить о гос волне", "/d OG, Напоминаю, волна гос новостей на {time} за SFA.", "/d OG, Напоминаю, волна гос новостей на {time} за SFA."},
@@ -239,6 +257,7 @@ localInfo = {
     ev = {"Запросить эвакуацию", 'Запрашиваю эвакуацию! Сектор: {kv}, Количество мест: {mesta}', 'Запрашиваю эвакуацию! Сектор: {kv}, Количество мест: {mesta}'}
   }
 }
+
 -- Таблица для хранения клавиш, биндера
 config_keys = {
   punaccept = {v = {key.VK_Y}},
@@ -249,29 +268,36 @@ config_keys = {
   cmd_binder = {}
 }
 
--- Для /checkbl, /checkrank
+camouflage = {
+  active = false,
+  clist = nil,
+  tag = nil
+}
+
+-- Для /checkbl, /checkrank, /checkvig
 tempFiles = {
   blacklist = {},
   ranks = {},
   vig = {},
+  priziv = {},
+  prizivTime = 0,
   blacklistTime = 0,
   ranksTime = 0,
   vigTime = 0
 }
+
+-- Передача данных на сервер
 request_data = {
   members = 0,
   membersold = 0,
   roles = {
-    ['support'] = {
-      count = 0,
-      users = {}
-    },
-    ['leader'] = {
-      count = 0,
-      users = {}
-    }
+    ['support'] = { count = 0, users = {} },
+    ['leader'] = { count = 0, users = {} },
+    ['admin'] = { count = 0, users = {} }
   }
 }
+
+-- OpenPopup
 dialogPopup = {
   title = "",
   show = 0,
@@ -283,6 +309,7 @@ dialogPopup = {
 pieMenu = {
   active = 0
 }
+
 -- Хлам для imgui
 data = {
   imgui = {
@@ -348,6 +375,7 @@ data = {
   players = {},
   members = {}
 }
+
 -- Таблица для хранения постов
 postInfo = {}
 post = {
@@ -356,6 +384,7 @@ post = {
   next = 0,
   active = false,
 }
+
 -- Сессионные настройки
 sInfo = {
   updateAFK = 0,
@@ -371,7 +400,8 @@ sInfo = {
   isWorking = false,
   blPermissions = false
 }
--- /members 2
+
+-- /members [0-2]
 membersInfo = {
   online = 0,
   work = 0,
@@ -380,8 +410,7 @@ membersInfo = {
   imgui = imgui.ImBuffer(256),
   players = {}
 }
-kvCoord = { x = nil, y = nil, ny = "", nx = "" }
-monitoring = {nil, nil, nil, nil, nil, nil}
+
 -- Клавиши действия
 punkeyActive = 0
 punkey = {
@@ -391,6 +420,7 @@ punkey = {
   { text = nil },
   { text = nil, time = nil }
 }
+
 -- Настройки таргета
 targetMenu = {
   playerid = nil,
@@ -399,53 +429,20 @@ targetMenu = {
   time = nil,
   cursor = nil
 }
+
 -- Для биндера
 tEditData = { id = 0, cmd = '', buffer = '', wait = 1100 }
 tEditKeys = { id = 0, v = {}, buffer = '', wait = 1100 }
 tLastKeys = {}
-------------------------------------------------
-radioStream = nil
-watchFont = renderCreateFont("Arial", 9, 5)
-inputFont = renderCreateFont("Segoe UI", 11, 13)
+
+-- Остальные таблицы
+kvCoord = { x = nil, y = nil, ny = "", nx = "" }
+monitoring = { nil, nil, nil, nil, nil, nil }
 watchList = {}
 selectRadio = { id = 0, title = "", volume = 0.6, url = "", stream = 0 }
 changeText = { id = 0, sex = 0, values = {} }
-contractId = nil
-newsTimer = -1
-warehouseDialog = 0
-selectWarehouse = -1
-dialogCursor = false
-playersAddCounter = 1
-giveDMG = nil
-playerMarker = nil
-hudSizeY = 190
-playerMarkerId = nil
-playerRadar = nil
-selectedContext = nil
-giveDMGTime = nil
-giveDMGSkin = nil
-targetID = nil
-contractRank = nil
-autoBP = 1
-autoBPCounter = 0
-asyncQueue = false
-searchlight = nil
 spectate_list = {}
-lectureStatus = 0
-complete = false
 newsInfo = {}
-updatesInfo = {
-  version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
-  type = "Плановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "10.11.2019",
-  list = {
-    {'Добавлены новые тэги: ``{pRankByID}``, ``{trankname}``, ``{mrankname}``. Все эти тэги выводят ранг игрока в разных ситуациях.', 'Будьте осторожны, для работы тэгов необходимо ввести ``/members [0-2]``;'},
-    {'Теперь на запрос на въезд на базу ответить можно одной клавишей. Доступно 12+ рангам;'},
-    {'Добавлен авто-ввод кода ``Google Authenicator``. Для активации необходимо в ``Настройках`` ввести ключ, который пришёл вам на почту во время привязки аутентификатора;'},
-    {'Добавлен ``умный Авто-БП``. При взятии оружия будет брать то оружие, которое вам необходимо с учётом уже имеющийся оружия;'},
-    {'Изменена система иницилизации скрипта. Система вынесена в отдельный модуль ``"updaterHelper.lua"``. Теперь он отвечает за обновление скриптов, библиотек, файлов, прочего', 'Не пытайтесь удалить файл. Без него хелпер не будет работать;'}
-  }
-}
 adminsList = {}
 zoness = {}
 tCarsName = {"Landstalker", "Bravura", "Buffalo", "Linerunner", "Perrenial", "Sentinel", "Dumper", "Firetruck", "Trashmaster", "Stretch", "Manana", "Infernus",
@@ -467,21 +464,71 @@ tCarsName = {"Landstalker", "Bravura", "Buffalo", "Linerunner", "Perrenial", "Se
 counterNames = {"Принято игроков", "Уволено игроков", "Повышего игроков", "Проведено лекций (/lecture)", "Проведено на посту", "Проведено на КПП", "Выдано нарядов (Меню)", "Запрошено локаций (/loc | Меню)", "Запрошено ЧСов", "Поставок на LVa", "Поставок на LSa"}
 rankings = { ["SFA"] = true, ["LVA"] = true, ["LSPD"] = true, ["SFPD"] = true, ["LVPD"] = true, ["Instructors"] = true, ["FBI"] = true, ["Medic"] = true, ["Mayor"] = true }
 dayName = {"Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"}
+
+------------------------------------------------
+-- Шрифты
+watchFont = renderCreateFont("Arial", 9, 5)
+inputFont = renderCreateFont("Segoe UI", 11, 13)
+
+-- Другие переменные
+radioStream = nil
+reloadScriptsParam = false
+contractId = nil
+newsTimer = -1
+warehouseDialog = 0
+selectWarehouse = -1
+dialogCursor = false
+playersAddCounter = 1
+giveDMG = nil
+playerMarker = nil
+hudSizeY = 190
+playerMarkerId = nil
+playerRadar = nil
+selectedContext = nil
+giveDMGTime = nil
+giveDMGSkin = nil
+targetID = nil
+contractRank = nil
+autoBP = 1
+autoBPCounter = 0
+asyncQueue = false
+searchlight = nil
+lectureStatus = 0
+complete = false
+
+-- Лог обновлений
+updatesInfo = {
+  version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
+  type = "Плановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
+  date = "17.11.2019",
+  list = {
+    {'Добавлены новые тэги: ``{pRankByID}``, ``{trankname}``, ``{mrankname}``. Все эти тэги выводят ранг игрока в разных ситуациях.', 'Будьте осторожны, для работы тэгов необходимо ввести ``/members [0-2]``;'},
+    {'Теперь на запрос на въезд на базу ответить можно одной клавишей. Доступно ``12+`` рангам;'},
+    {'Добавлен авто-ввод кода ``Google Authenicator``. Для активации в ``Настройках`` введите ключ, который пришёл вам на почту во время привязки аутентификатора;'},
+    {'Добавлен ``умный Авто-БП``. При взятии оружия будет брать то оружие, которое вам необходимо с учётом уже имеющийся оружия;'},
+    {'Теперь при авто-докладах на поставках с помощью лодок ``/carm`` вводиться автоматически, ничего больше вводить не нужно;'},
+    {'Добавлена команда ``/shmask``. Команда позволяет внедриться во взвод. Ваш тэг и клист будет автоматически приведен к нужному виду;', 'Авто-клист и авто-тэг также будут изменены. Отключить маскировку можно введя команду ещё раз;'},
+    {'Игрокам из ``LVa`` добавлен авто-доклад во время поставок материалов на склады фракций;', '\n``Остальное:``'},
+    {'Убран баг с отображением диалогового окна на лодках;'},
+    {'Добавлена команда ``/checkpriziv``, для просмотра списка призванных игроков. (Доступно только SFA на ERP01);'},
+    {'В ``/addtable`` добавлена возможность добавлять данные в таблицу призывников'}
+  }
+}
+
 --------------------------------------------------------------------
 
 function main()
     apply_custom_style()
     if not isSampfuncsLoaded() or not isSampLoaded() then return end
     while not isSampAvailable() do wait(100) end
-    if not doesDirectoryExist("moonloader\\SFAHelper") then createDirectory("moonloader\\SFAHelper") end
+    local mstime = os.clock()
     -- Иницилизируем логгер
     loggerInit()
-    --------------------=========----------------------
-    -- Подгружаем необходимые функции, останавливая основной поток до конца выполнения
-    local mstime = os.clock()
+    ------------------
+    --- Подгружаем необходимые функции, останавливая основной поток до конца выполнения
     loadFiles()
     while complete ~= true do wait(0) end
-    logger.debug(("Проверка библиотек | Время: %.3fs"):format(os.clock() - mstime))
+    logger.debug(("Подготовка необходимых файлов и библиотек (%.3fs)"):format(os.clock() - mstime))
     complete = false
     ------
     filesystem.path('moonloader/SFAHelper/accounts/'..sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(playerPed))))
@@ -492,20 +539,20 @@ function main()
       filesystem.movefiles(filesystem.path(), 'moonloader/SFAHelper', { "config.json", "keys.json", "posts.json", "punishlog.json" })
     end
     while complete ~= true do wait(0) end
-    logger.debug(("Иницилизация настроек | Время: %.3fs"):format(os.clock() - mstime))
+    logger.debug(("Иницилизация настроек (%.3fs)"):format(os.clock() - mstime))
     complete = false
     ------
-    --[[autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json")
+    autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json")
     while complete ~= true do wait(0) end
-    logger.debug(("Проверка обновлений | Время: %.3fs"):format(os.clock() - mstime))
+    logger.debug(("Проверка обновлений (%.3fs)"):format(os.clock() - mstime))
     complete = false
     ------
     loadPermissions("https://docs.google.com/spreadsheets/d/1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y/export?format=tsv&id=1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y&gid=1568566199") -- remove
     while complete ~= true do wait(0) end
-    logger.debug(("Загрузка прав доступа | Время: %.3fs"):format(os.clock() - mstime))
-    complete = false]]
-    --------------------=========----------------------
-    ----- Загружаем конфиги
+    logger.debug(("Загрузка прав доступа (%.3fs)"):format(os.clock() - mstime))
+    complete = false
+    ------------------
+    --- Загружаем конфиги
     local configjson = filesystem.load('config.json')
     if configjson ~= nil then
       configjson = filesystem.performOld('config.json', configjson)
@@ -513,7 +560,7 @@ function main()
       pInfo = additionArray(configjson, pInfo, {"gov"})
     end 
     filesystem.save(pInfo, 'config.json')
-    ----------
+    ------
     local keysjson = filesystem.load('keys.json')
     if keysjson ~= nil then
       keysjson = filesystem.performOld('keys.json', keysjson)
@@ -521,7 +568,7 @@ function main()
       config_keys = additionArray(keysjson, config_keys, {"cmd_binder", "binder"})
     end 
     filesystem.save(config_keys, 'keys.json')
-    ----------
+    ------
     local localjson = filesystem.load('local.json')
     if localjson ~= nil then
       localjson = filesystem.performOld('local.json', localjson)
@@ -529,7 +576,7 @@ function main()
       localInfo = additionArray(localjson, localInfo, {}) 
     end 
     filesystem.save(localInfo, 'local.json')
-    ----------
+    ------
     local postsjson = filesystem.load('posts.json')
     if postsjson ~= nil then
       postsjson = filesystem.performOld('posts.json', postsjson)
@@ -537,8 +584,10 @@ function main()
       postInfo = additionArray(postsjson, postInfo, {""}) 
     end
     filesystem.save(postInfo, 'posts.json')
-    logger.debug(("Локальные данные загружены | Время: %.3fs"):format(os.clock() - mstime))
-    --------------------=========----------------------
+    logger.debug(("Локальные данные загружены (%.3fs)"):format(os.clock() - mstime))
+    ------------------
+    --- Иницилизируем команды
+    sampRegisterChatCommand('shmask', cmd_shmask)
     sampRegisterChatCommand('mon', cmd_mon)
     sampRegisterChatCommand('setkv', cmd_setkv)
     sampRegisterChatCommand('stime', cmd_stime)
@@ -554,6 +603,7 @@ function main()
     sampRegisterChatCommand('f', cmd_r)
     sampRegisterChatCommand('checkrank', cmd_checkrank)
     sampRegisterChatCommand('checkbl', cmd_checkbl)
+    sampRegisterChatCommand('checkpriziv', cmd_checkpriziv)
     sampRegisterChatCommand('checkvig', cmd_checkvig)
     sampRegisterChatCommand('cchat', cmd_cchat)
     sampRegisterChatCommand('members', cmd_members)
@@ -569,19 +619,18 @@ function main()
     sampRegisterChatCommand('rpweap', cmd_rpweap)
     sampRegisterChatCommand('punishlog', cmd_punishlog)
     sampRegisterChatCommand('addtable', cmd_addtable)
-    ----- Команды, для которых было лень создавать функции
-    -- sampRegisterChatCommand('importscript', function()
-    --   scripttext = import('moonloader/SFAHelper/updater.lua')
-    -- end)
-    -- sampRegisterChatCommand('checkscript', function()
-    --   print(tostring(scripttext.mes()))
-    -- end)
+    sampRegisterChatCommand('shteam', function()
+      pInfo.settings.socket = not pInfo.settings.socket
+      atext('Сокет '..(pInfo.settings.socket and "включен" or "выключен"))
+      filesystem.save(pInfo, 'config.json')
+    end)
     sampRegisterChatCommand('getweapon', function(arg)
       local weapon, ammo, model = getCharWeaponInSlot(PLAYER_PED, tonumber(arg))
       dtext(weapon)
       dtext(ammo)
       dtext(model)
     end)
+    --- Команды, для которых было лень создавать функции
     sampRegisterChatCommand('shnews', function() window['main'].bool.v = true; data.imgui.menu = 44 end)
     sampRegisterChatCommand('shnote', function() window['shpora'].bool.v = not window['shpora'].bool.v end)
     sampRegisterChatCommand('shradio', function() window['main'].bool.v = true; data.imgui.menu = 3 end)
@@ -597,22 +646,25 @@ function main()
       pInfo.settings.target = not pInfo.settings.target
       atext(("Target Bar %s"):format(pInfo.settings.target and "включен" or "выключен"))
     end)
-    -- Загрузка командного биндера
+    --- Загрузка командного биндера
     registerFastCmd()
-    logger.debug(("Команды загружены | Время: %.3fs"):format(os.clock() - mstime))
-    --------------------=========----------------------
+    logger.debug(("Команды загружены (%.3fs)"):format(os.clock() - mstime))
+    ------------------
+    --- Иницилизируем клавишу согласия на действие (default: Y)
     punacceptbind = rkeys.registerHotKey(config_keys.punaccept.v, true, punaccept)
-    -- Клавишный биндер
+    --- Клавишный биндер
     for k, v in ipairs(config_keys.binder) do
       rkeys.registerHotKey(v.v, true, onHotKey)
       if v.time == nil then v.time = 0 end
     end
-    logger.debug(("Бинды загружены | Время: %.3fs"):format(os.clock() - mstime))
-    --------------------=========----------------------
-    atext('SFA-Helper успешно загружен (/sh)')
+    logger.debug(("Бинды загружены (%.3fs)"):format(os.clock() - mstime))
+    ------------------
+    --- Хелпер загружен
+    atext(script.this.name..' успешно загружен (/sh)')
     if DEBUG_MODE then
       atext('Вы используете тестовую версию - '..SCRIPT_ASSEMBLY)
     end
+    --- Обновляем онлайн
     local day = os.date("%d.%m.%y")
     if pInfo.info.thisWeek == 0 then pInfo.info.thisWeek = os.date("%W") end
     -- Начался новый день
@@ -621,33 +673,32 @@ function main()
       if weeknum == 0 then weeknum = 7 end
       pInfo.weeks[weeknum] = pInfo.info.dayOnline
       atext(string.format("Начался новый день. Итоги предыдущего дня (%s): %s", pInfo.info.day, secToTime(pInfo.info.dayOnline)))
-      -----------------
-      -- Началась новая идея
+      logger.info("Начался новый день. Итоги предыдущего: "..secToTime(pInfo.info.dayOnline))
+      -- Началась новая неделя
       if tonumber(pInfo.info.thisWeek) ~= tonumber(os.date("%W")) then
         atext("Началась новая неделя. Итоги предыдущей недели: "..secToTime(pInfo.info.weekOnline))
-        logger.info("Началась новая неделя. Итоги предыдущей: "..secToTime(pInfo.info.weekOnline).."")
-        -- Очищаем все счётчики, кроме настроек
-        for key in pairs(pInfo) do
-          if key ~= "settings" and key ~= "gov" and key ~= "func" and key ~= 'ranknames' then
-            for k in pairs(pInfo[key]) do
-              pInfo[key][k] = 0
-            end
-          end
-        end
+        logger.info("Началась новая неделя. Итоги предыдущей: "..secToTime(pInfo.info.weekOnline))
+        -- Очищаем все счётчики
+        pInfo.info.weekOnline = 0
+        pInfo.info.weekPM = 0
+        pInfo.info.weekWorkOnline = 0
+        for i = 1, #pInfo.weeks do pInfo.weeks[i] = 0 end
+        for i = 1, #pInfo.counter do pInfo.counter[i] = 0 end
         pInfo.info.thisWeek = os.date("%W")
       end
-      logger.info("Начался новый день. Итоги предыдущего: "..secToTime(pInfo.info.dayOnline).."")
       pInfo.info.day = day
       pInfo.info.dayPM = 0
       pInfo.info.dayAFK = 0
       pInfo.info.dayOnline = 0
       pInfo.info.dayWorkOnline = 0
     end
-    logger.debug(("Онлайн успешно обновлен | Время: %.3fs"):format(os.clock() - mstime))
+    logger.debug(("Онлайн успешно обновлен (%.3fs)"):format(os.clock() - mstime))
+    ------------------
+    --- Загружаем новости из сервера
     loadNews("https://redx-dev.web.app/sfahelper?data={%22function%22:%22news%22}")
-    sendDataToServer_Timer(600000) -- Задержка
-    --------------------=========----------------------
+    ------------------
     while not sampIsLocalPlayerSpawned() do wait(0) end
+    --- Записываем сессионную информацию
     local _, myid = sampGetPlayerIdByCharHandle(playerPed)
     local serverip, serverport = sampGetCurrentServerAddress()
     sInfo.updateAFK = os.time()
@@ -656,21 +707,27 @@ function main()
     sInfo.nick = sampGetPlayerNickname(myid)
     sInfo.server = serverip..":"..serverport
     sInfo.weapon = getCurrentCharWeapon(PLAYER_PED)
-    -- Сбор данных о фракции и ранге
+    --- Сбор данных о фракции и ранге
     cmd_stats("checkout")
+    --- Иницилизируем различные таймеры
     secoundTimer()
     changeWeapons()
     loadAdmins()
+    sendDataToServer_Timer(600000)
+    --- Иницилизируем сокет
+    if pInfo.settings.socket and lsocket then
+      lua_thread.create(connectSocket)
+    end
+    ------------------
+    logger.trace(("Пользователь успешно авторизован на сервере (Недельный онлайн: %d, Дневной онлайн: %d, Затрачено: %.3fs)"):format(pInfo.info.weekOnline, pInfo.info.dayOnline, os.clock() - mstime))
     if pInfo.settings.hud == true then window['hud'].bool.v = true end
-    logger.trace(("Конец Main функции. | (weekOnline = %d | dayOnline = %d | Время: %.3fs)"):format(pInfo.info.weekOnline, pInfo.info.dayOnline, os.clock() - mstime))
-    --------------------=========----------------------
     while true do wait(0)
-      -- Если игрок вылетел, заканчиваем рабочий день
+      --- Если игрок вылетел, заканчиваем рабочий день
       if sampGetGamestate() ~= 3 and sInfo.isWorking == true then
         sInfo.isWorking = false
-        logger.warn("Связь с сервером разорвана")
+        logger.warn("Связь с сервером разорвана. Рабочий день закончен")
       end
-      -- Определяем самостоятельные окна, и окна для которых нужка мышка
+      --- Определяем самостоятельные окна, и окна для которых нужка мышка
       local skip = {false, false}
       for key, val in pairs(window) do
         if val.bool.v and val.draw and skip[1] == false then
@@ -683,12 +740,10 @@ function main()
         end
       end
       if dialogCursor == true then imgui.ShowCursor = true
-      else
-        if skip[2] == false then imgui.ShowCursor = false end
-      end
+      elseif skip[2] == false then imgui.ShowCursor = false end
       if skip[1] == false then imgui.Process = false end
       -----------
-      ---- InputHelper
+      --- InputHelper
       if sampIsChatInputActive() == true and pInfo.settings.inputhelper == true then
         local function getStrByState(keyState)
           if keyState == 0 then
@@ -726,8 +781,7 @@ function main()
         )
         renderFontDrawText(inputFont, text, fib2, fib, -1)
       end
-
-      ---- Watch-list
+      --- Watch-list
       if pInfo.settings.watchhud and #spectate_list > 0 then
         local checkerheight = renderGetFontDrawHeight(watchFont)
         local count = 0
@@ -758,7 +812,7 @@ function main()
           end
         end
       end
-      -- Перемещение watch-list'а
+      --- Перемещение watch-list'а
       if data.imgui.watchpos then
         window['hud'].bool.v = true
         sampToggleCursor(true)
@@ -766,7 +820,7 @@ function main()
         pInfo.settings.watchX = curX
         pInfo.settings.watchY = curY
       end
-      -- Перемещение худа
+      --- Перемещение худа
       if data.imgui.hudpos then
         window['hud'].bool.v = true
         sampToggleCursor(true)
@@ -774,12 +828,13 @@ function main()
         pInfo.settings.hudX = curX
         pInfo.settings.hudY = curY
       end
+      --- Активация окна с тэгами при активном окне биндера
       if window['main'].bool.v and (data.imgui.menu == 21 or data.imgui.menu == 22) then
         window['binder'].bool.v = true
       else
         window['binder'].bool.v = false
       end
-      -- Сохраняем новые координаты watch-list'а
+      --- Сохраняем новые координаты watch-list'а
       if isKeyJustPressed(key.VK_LBUTTON) and data.imgui.watchpos then
         data.imgui.watchpos = false
         if not pInfo.settings.hud then window['hud'].bool.v = false end
@@ -787,21 +842,23 @@ function main()
         window['main'].bool.v = true
         filesystem.save(pInfo, 'config.json')
       end
-      -- Сохраняем новые координаты худа
+      --- Сохраняем новые координаты худа
       if isKeyJustPressed(key.VK_LBUTTON) and data.imgui.hudpos then
         data.imgui.hudpos = false
         sampToggleCursor(false)
         window['main'].bool.v = true
         filesystem.save(pInfo, 'config.json')
       end
+      --- Активация чата на Т
       if isKeyJustPressed(VK_T) and not sampIsDialogActive() and not sampIsScoreboardOpen() and not isSampfuncsConsoleActive() then
         sampSetChatInputEnabled(true)
       end
+      --- Надпись внизу с радиостанцией
       if selectRadio.stream == 1 and renderStream then
         renderFontDrawText(renderStream, ("%s - %s"):format(selectRadio.streamTitle and selectRadio.streamTitle or "", selectRadio.streamUrl and selectRadio.streamUrl or ""), 150, screeny-20, -1)
       end
       ------------------
-      -- Таргет меню
+      --- Таргет меню
       local result, target = getCharPlayerIsTargeting(playerHandle)
       if result then result, player = sampGetPlayerIdByCharHandle(target) end
       if result and isKeyJustPressed(key.VK_MENU) and targetMenu.playerid ~= player then
@@ -809,14 +866,14 @@ function main()
         targetID = player
       end
       ------------------
-      -- Обновляем некоторые переменные
+      --- Обновляем некоторые переменные
       local cx, cy, cz = getCharCoordinates(PLAYER_PED)
       local zcode = getNameOfZone(cx, cy, cz)
       playerZone = getZones(zcode)
       sInfo.armour = getCharArmour(PLAYER_PED)
       sInfo.health = getCharHealth(PLAYER_PED)
       sInfo.interior = getActiveInterior()
-      -- Определение города
+      --- Определение города
       local citiesList = {'Los-Santos', 'San-Fierro', 'Las-Venturas'}
       local city = getCityPlayerIsIn(PLAYER_HANDLE)
       if city > 0 then playerCity = citiesList[city] else playerCity = "Нет сигнала" end
@@ -831,7 +888,9 @@ function cmd_r(args)
     sampAddChatMessage('Введите: /r [текст]', -1)
     return
   end
-  if pInfo.settings.tag ~= nil then
+  if camouflage.active and camouflage.tag then
+    sampSendChat('/r '..camouflage.tag..' '..args)
+  elseif pInfo.settings.tag ~= nil then
     sampSendChat('/r '..pInfo.settings.tag..' '..args)
   else
     sampSendChat('/r '..args)
@@ -1196,6 +1255,63 @@ function cmd_checkrank(arg)
 end
 
 -- Проверка ЧС из гугл таблиц
+function cmd_checkpriziv(arg)
+  if sInfo.fraction ~= "SFA" then dtext('Команда доступна только игрокам из SFA') return end
+  if sInfo.isWorking == false then dtext('Необходимо начать рабочий день!') return end
+  if sInfo.server ~= "185.169.134.67:7777" then dtext('Данная команда не доступна для вашего сервера') return end
+  if #arg == 0 then
+    dtext('Введите: /checkpriziv [id / nick]')
+    return
+  end
+  local id = tonumber(arg)
+  if id ~= nil then
+    if sampIsPlayerConnected(id) then arg = sampGetPlayerNickname(id)
+    else dtext('Игрок оффлайн!') return end
+  end
+  if tempFiles.prizivTime >= os.time() - 180 then
+    -- Ищем из конца для получения последней записи
+    for i = #tempFiles.priziv, 1, -1 do
+      -- tempFiles.priziv[#tempFiles.priziv + 1] = { nick = arr[1], comissar = arr[2], date = arr[3], enddate = arr[4] }
+      local line = tempFiles.priziv[i]
+      if line.nick == arg or line.nick == string.gsub(arg, "_", " ") then
+        dtext('Данные о призовнике '..line.nick..':')
+        if line.comissar ~= nil and line.date ~= nil and line.enddate ~= nil then 
+          dtext(("Внёс: %s | Дата: %s | Конец срока: %s"):format(line.comissar, line.date, line.enddate))
+        end
+        return
+      end  
+    end
+    dtext('Игрок не найден в списке призывников!')
+    return
+  end
+  -- Файл не загружен, или прошло более 3-х минут с момента прошлого обновления
+  local updatelink = 'https://docs.google.com/spreadsheets/d/1F8uOhtVSMJIvsiJcyOINZOEAh0cc3PK1_m3oPrLlatw/export?format=tsv&id=1F8uOhtVSMJIvsiJcyOINZOEAh0cc3PK1_m3oPrLlatw&gid=1970774806'
+  local downloadpath = getWorkingDirectory() .. '\\SFAHelper\\priziv.tsv'
+  sampAddChatMessage('Загрузка данных...', 0xFFFF00)
+  logger.trace("Отправляем асинхронку. Очередь: "..tostring(asyncQueue))
+  asyncQueue = true
+  httpRequest(updatelink, nil, function(response, code, headers, status)
+    if response then
+      -- Регулярка для парсинга строчек, т.к. в запросе все приходит в 1 строчке
+      for line in response:gmatch('[^\r\n]+') do
+        -- Consigliere_Milos	Warc_Awerio	02.11.2019	04.11.2019
+        -- .tsv файлы представляют данные, которые отделяются табом
+        local arr = string.split(line, "\t")
+        tempFiles.priziv[#tempFiles.priziv + 1] = { nick = arr[1], comissar = arr[2], date = arr[3], enddate = arr[4] }
+      end
+      logger.trace("Обработка ответа успешно завершена")
+      asyncQueue = false
+      -- Обновляем время, возвращаемся в функцию
+      tempFiles.prizivTime = os.time()
+      cmd_checkpriziv(arg)
+    else
+      logger.trace("Ответ был получен с ошибкой")
+      asyncQueue = false
+    end
+  end)
+end
+
+-- Проверка ЧС из гугл таблиц
 function cmd_checkbl(arg)
   if sInfo.fraction ~= "SFA" then dtext('Команда доступна только игрокам из SFA') return end
   if sInfo.isWorking == false then dtext('Необходимо начать рабочий день!') return end
@@ -1392,6 +1508,11 @@ function cmd_setkv(arg)
   placeWaypoint(kvCoord.x, kvCoord.y, 0)
 end
 
+function cmd_shmask()
+  data.imgui.menu = 45
+  window['main'].bool.v = not window['main'].bool.v
+end
+
 function cmd_mon(arg)
   if arg == "1" and sInfo.fraction ~= "SFA" and sInfo.fraction ~= "LVA" then dtext('Доклад в рацию доступен только SFA/LVA! Чтобы вывести данные в локальный чат введите /mon без аргументов') return end
   if isCharInArea3d(PLAYER_PED, -1325-5, 492-5, 28-3, -1325+5, 492+5, 28+3, false) then
@@ -1503,7 +1624,7 @@ function cmd_rpweap(arg)
 end
 
 function cmd_addtable()
-  if sInfo.fraction ~= "SFA" or pInfo.settings.rank < 12 then dtext('Команда доступна со звания Майор и выше') return end
+  if (sInfo.fraction ~= "SFA" or pInfo.settings.rank < 12) and not DEBUG_MODE then dtext('Команда доступна со звания Майор и выше') return end
   if sInfo.server ~= "185.169.134.67:7777" then dtext('Данная команда не доступна для вашего сервера') return end
   data.combo.addtable.v = 0
   data.addtable.nick.v = ""
@@ -1642,6 +1763,111 @@ function changeWeapons()
       sInfo.weapon = weapon
     end
   end)
+end
+
+function parseSocket(res)
+  logger.trace('parseSocket()')
+  if res.data then
+    -- Чат, обновление информации о тиммейтах, ...
+  end
+  -----
+  if res.act then
+    -- Добавление, изменение, изгнание из группы, предложение что-то сделать
+  end
+  --[[
+    socketInfo = {
+      active = false,
+      ip = 'ws://sfahelper.herokuapp.com',
+      map_hide = false,
+      chat = {},
+      actions = {}
+    }
+  ]]
+end
+
+function updateSocket()
+  while socketInfo.active do
+    wait(0)
+    local unix_time = os.clock()
+    local request = {
+      action = 'get',
+      nick = sInfo.nick,
+      server = sInfo.server,
+      time = unix_time
+    }
+    request.data = { health = getCharHealth(playerPed), armour = getCharArmour(playerPed) }
+    if getActiveInterior() == 0 and not socketInfo.map_hide then
+      local x, y, z = getCharCoordinates(playerPed)
+      request.data.pos = {x = x, y = y, z = z}
+      request.data.heading = getCharHeading(playerPed)
+    end
+    -- Здесь ещё будем отправлять мемберс и прочую фигню, которая висит на redx-dev
+    if #socketInfo.actions > 0 then
+      request.act = socketInfo.actions
+      socketInfo.actions = {}
+    end
+    logger.trace('REQUEST: '..encodeJson(request))
+    local ok = socketClient:send(encodeJson(request))
+    if ok then
+      local message, opcode = socketClient:receive()
+      if message then
+        local response = decodeJson(message)
+        logger.trace(('RESPONSE: %s | PING: Client(0s) -> Server(%0.3fs) -> Client (%0.3fs)'):format(message, response.time, os.clock() - unix_time))
+        if response.code == "OK" then
+          parseSocket(response)
+        else logger.warn(response.message) end
+      else
+        loogger.trace("WebSocket: Ответ не был получен")
+      end
+    else
+      dtext('Соединение с сервером прервано')
+      disconnectSocket()
+    end
+  end
+end
+
+function disconnectSocket()
+  if socketInfo.active == false then return end
+  socketInfo.active = false
+  socketClient:close()
+end
+
+function connectSocket()
+  logger.debug('connectSocket')
+  if socketInfo.active == true then 
+    dtext('Вы уже подключены к серверу!')
+    return false
+  end
+  local connected, err = socketClient:connect(socketInfo.ip, 'echo')
+  if not connected then
+    logger.trace('not connected')
+    dtext('Не удалось установить связь с сервером')
+    return false
+  end
+  local ok = socketClient:send(encodeJson({ action = 'auth', nick = sInfo.nick, server = sInfo.server }))
+  if ok then
+    local message, opcode = socketClient:receive()
+    if message then
+      if message == "OK" then
+        dtext('Связь с сервером установлена')
+        socketInfo.active = true
+        updateSocket()
+      else
+        dtext('У вас нет доступа для взаимодействия с сервером')
+        pInfo.settings.socket = false
+        socketClient:close()
+        return false
+      end
+    else
+      dtext('Ошибка соединения с сервером')
+      socketClient:close()
+      return false
+    end
+  else
+    dtext('Ошибка соединения с сервером')
+    socketClient:close()
+    return false
+  end
 end
 
 function secoundTimer()
@@ -1912,6 +2138,7 @@ function loadFiles()
       reloadScriptsParam = true    
     end
     ------------------------
+    if not doesDirectoryExist("moonloader\\SFAHelper") then createDirectory("moonloader\\SFAHelper") end
     if not doesDirectoryExist("moonloader\\SFAHelper\\lectures") then
       createDirectory("moonloader\\SFAHelper\\lectures")
       local file = io.open('moonloader/SFAHelper/lectures/firstlecture.txt', "w+")
@@ -2216,7 +2443,7 @@ end
 
 -- Авто-БП
 function sampevents.onShowDialog(dialogid, style, title, button1, button2, text)
-  logger.trace(dialogid)
+  --logger.trace(dialogid)
   if dialogid == 9653 and selectWarehouse >= 0 then
     lua_thread.create(function()
       wait(1)
@@ -2242,7 +2469,7 @@ function sampevents.onShowDialog(dialogid, style, title, button1, button2, text)
       { id = 31, ammo = 150, rep = 2, slot = 6 },
       { id = 33, ammo = 30, rep = 2, slot = 7 },
       { id = 0, ammo = 100, rep = 1, slot = 0 },
-      { id = 46, ammo = 1, rep = 1, slot = 12 }
+      { id = 46, ammo = 0, rep = 1, slot = 12 }
     }
     lua_thread.create(function()
       for i = autoBP, #pInfo.settings.autobpguns do
@@ -2335,8 +2562,12 @@ end]]
 function sampevents.onSetSpawnInfo(team, skin, unk, position, rotation, weapons, ammo)
   lua_thread.create(function()
     wait(1100)
-    if pInfo.settings.clist ~= nil and sInfo.isWorking == true then
-      sampSendChat('/clist '..pInfo.settings.clist)
+    if sInfo.isWorking == true then
+      if camouflage.active and camouflage.clist then
+        sampSendChat('/clist '..camouflage.clist)
+      elseif pInfo.settings.clist ~= nil then
+        sampSendChat('/clist '..pInfo.settings.clist)
+      end
     end
     return
   end)
@@ -2552,6 +2783,25 @@ function sampevents.onServerMessage(color, text)
       end)
     end
   end
+  if text:match("На складе .-%: %d+/200000") and color == -65366 and pInfo.settings.autodoklad == true then
+    local frac, sklad = text:match("На складе (.-)%: (%d+)/200000")
+    punkeyActive = 3
+    punkey[3].text = localVars("lvapost", "unload", { ['id'] = sInfo.playerid, ['sklad'] = sklad, ['frac'] = frac })
+    punkey[3].time = os.time()
+    dtext(("Нажмите {139904}%s{FFFFFF} для оповещения о разгрузке"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+  end
+  -- if text:match("На главном складе%: %d+/300000") and color == -65366 then
+  --   punkeyActive = 3
+  --   punkey[3].text = localVars("lvapost", "load", { ['id'] = sInfo.playerid })
+  --   punkey[3].time = os.time()
+  --   dtext(("Нажмите {139904}%s{FFFFFF} для оповещения о загрузке"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+  -- end
+  if text:match("Используйте%: /conveyingarms %-%> /carm") and color == 14221512 and pInfo.settings.autodoklad == true then
+    punkeyActive = 3
+    punkey[3].text = localVars("lvapost", "start", { ['id'] = sInfo.playerid })
+    punkey[3].time = os.time()
+    dtext(("Нажмите {139904}%s{FFFFFF} для оповещения о начале поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
+  end
   if text:match("Материалов%: 30000/30000") and color == 14221512 then
     if pInfo.settings.autodoklad == true then
       if warehouseDialog == 1 then
@@ -2729,12 +2979,6 @@ function sampevents.onServerMessage(color, text)
       sInfo.isWorking = true
       logger.info("Проверка прошла успешно, рабочий день начат.")
     end
-    if text:match("^ %(%( .- Eduardo_Carmone%: !getVersion %)%)$") or text:match("^ %(%( .- Edward_Franklin%: !getVersion %)%)$") then
-      lua_thread.create(function()
-        wait(0)
-        sampSendChat("/rb "..SCRIPT_ASSEMBLY)
-      end)
-    end
     lua_thread.create(function()
       local tt = rusLower(text)
       if tt:match("наряд") or tt:match('местоположение') or tt:match('понижен') or tt:match('уволен') or tt:match('комиссован') or tt:match('занесён') or tt:match('выговор') or tt:match('предупреждение') then
@@ -2794,6 +3038,9 @@ function onScriptTerminate(scr, quitGame)
     if radioStream ~= nil then bass.BASS_StreamFree(radioStream) end
     if not quitGame and reloadScriptsParam == false then
       showCursor(false)
+      if pInfo.settings.socket and socketInfo.active then
+        disconnectSocket()
+      end
       logger.fatal(string.format('Завершение скрипта. Причина: ', quitGame == true and "Выход из игры" or "Принудительное завершение / Краш"))
       logger.fatal("Для восстановния работы используйте Ctrl + R, либо перезайдите в игру")
     end
@@ -3341,6 +3588,7 @@ imgui_windows.main = function(menu)
     imgui.TextColoredRGB('{FFFFFF}(/lec)ture [start/pause/stop]'); imgui.SameLine(spacing); imgui.Text(u8'Вывести подготовленную лекцию в чат')
     imgui.TextColoredRGB('{FFFFFF}/createpost [радиус] [название поста]'); imgui.SameLine(spacing); imgui.Text(u8'Создать пост, для автодокладов')
     imgui.TextColoredRGB('{FFFFFF}/addbl'); imgui.SameLine(spacing); imgui.TextColoredRGB('Добавить игрока в Черный Список {954F4F}(Доступно по привязке)')
+    imgui.TextColoredRGB('{FFFFFF}/checkpriziv [id/nick]'); imgui.SameLine(spacing); imgui.Text(u8'Проверить игрока в списке призывников. {954F4F}(Доступно SFA)')
     imgui.TextColoredRGB('{FFFFFF}/addtable'); imgui.SameLine(spacing); imgui.TextColoredRGB('Добавить игрока в таблицу {954F4F}(Доступно SFA 12+)')
     imgui.TextColoredRGB('{FFFFFF}/vig [id] [тип] [причина]'); imgui.SameLine(spacing); imgui.Text(u8'Выдать игроку выговор')
     imgui.TextColoredRGB('{FFFFFF}/reconnect [секунды]'); imgui.SameLine(spacing); imgui.Text(u8'Переподключение к серверу')
@@ -3351,6 +3599,7 @@ imgui_windows.main = function(menu)
     imgui.TextColoredRGB('{FFFFFF}/shradio'); imgui.SameLine(spacing); imgui.Text(u8'Открыть меню радио')
     imgui.TextColoredRGB('{FFFFFF}/shnote'); imgui.SameLine(spacing); imgui.Text(u8'Открыть меню шпаргалок')
     imgui.TextColoredRGB('{FFFFFF}/setkv [квадрат (опционально)]'); imgui.SameLine(spacing); imgui.Text(u8'Отметить квадрат на карте')
+    imgui.TextColoredRGB('{FFFFFF}/shmask'); imgui.SameLine(spacing); imgui.Text(u8'Открыть меню маскировки')
   elseif menu == 11 then
     imgui.PushItemWidth(150)
     if data.lecture.string == "" then
@@ -4574,11 +4823,51 @@ imgui_windows.main = function(menu)
       imgui.Text(u8:encode("Текст: "..data.punishlog[i].text))
       imgui.NewLine()
     end
+  elseif menu == 45 then
+    local togglemask = imgui.ImBool(camouflage.active)
+    local intext = imgui.ImBuffer(camouflage.tag and camouflage.tag or "", 256)
+    local inint = imgui.ImInt(camouflage.clist and camouflage.clist or -1)
+    imgui.PushItemWidth(250)
+    if imgui.ToggleButton('##123toggle', togglemask) then
+      camouflage.active = togglemask.v
+      if camouflage.active then
+        dtext('Маскировка успешно включена. Ваш клист и тэг изменены автоматически')
+        lua_thread.create(function()
+          wait(25)
+          if camouflage.clist then sampSendChat('/clist '..camouflage.clist) end
+        end)
+      end
+    end
+    imgui.SameLine()
+    imgui.Text(u8'Включить маскировку')
+    imgui.Spacing()
+    imgui.Separator()
+    imgui.Spacing()
+    imgui.Text(u8(('Необходимый тэг%s:'):format(camouflage.tag and " (Текущий: "..camouflage.tag..")" or "")))
+    if imgui.InputText('##intag', intext, 0) then
+      camouflage.tag = u8:decode(intext.v)
+    end
+    imgui.SameLine()
+    if imgui.Button(u8'Удалить тэг') then
+      camouflage.tag = nil
+    end
+    imgui.Spacing()
+    imgui.Text(u8(('Необходимый клист%s:'):format(camouflage.clist and " (Текущий: /clist "..camouflage.clist..")" or "")))
+    if imgui.InputInt('##inclist', inint, 0) then
+      if inint.v > 0 and inint.v <= 33 then
+       camouflage.clist = inint.v
+      end
+    end
+    imgui.SameLine()
+    if imgui.Button(u8'Удалить клист') then
+      camouflage.clist = nil
+    end
   end
 end
 
 imgui_windows.addtable = function()
-  imgui.Combo(u8'Выберите тип данных', data.combo.addtable, u8"Не выбрано\0Повышение\0Увольнение\0Контракт\0Выговор\0\0")
+  imgui.Text(u8'Выберите тип данных')
+  imgui.Combo('##combo', data.combo.addtable, u8"Не выбрано\0Повышение\0Увольнение\0Контракт\0Выговор\0Призывник\0\0")
   imgui.Separator()
   if data.combo.addtable.v > 0 then
     imgui.InputText(u8 'Введите ID/ник игрока', data.addtable.nick)
@@ -4638,6 +4927,12 @@ imgui_windows.addtable = function()
                 sendGoogleMessage("reprimand", nickname, param1, param2, reason, os.time())
               else atext('Неверный тип выговора') end
             else atext('Все поля должны быть заполнены!') end
+
+          elseif data.combo.addtable.v == 5 then
+            if nickname ~= "" and nickname ~= nil then
+              atext(("Призывник: [Ник: %s] [Дата: %s]"):format(nickname, os.date("%d.%m.%y")))
+              sendGoogleMessage("prizivnik", nickname, _, _, _, os.time())
+            else atext('Все поля должны быть заполнены!') end            
           end
         else atext('Неверный ID игрока!') end
       else atext('Вы не можете внести себя в таблицу!') end
@@ -5051,6 +5346,12 @@ function sendGoogleMessage(type, name, param1, param2, reason, time)
     url = url..("&type=%s&who=%s&reason=%s&date=%s&param1=%s&param2=1"):format(type, name, encodeURI(u8:encode(reason)), date, encodeURI(u8:encode(param1)))
   elseif type == "blacklist" then
     url = url..("&type=%s&who=%s&reason=%s&date=%s&param1=%s&param2=%s"):format(type, name, encodeURI(u8:encode(reason)), date, encodeURI(u8:encode(param1)), encodeURI(u8:encode(param2)))
+  elseif type == "prizivnik" then
+    local newdate = os.date("*t", time+(86400*2))
+    newdate = ("%d.%d.%d"):format(newdate.day, newdate.month, newdate.year)
+    local olddate = os.date("*t", time)
+    olddate = ("%d.%d.%d"):format(olddate.day, olddate.month, olddate.year)
+    url = url..("&type=%s&who=%s&date=%s&reason=1&param1=%s&param2=1"):format(type, name, olddate, newdate)
   else return end
   logger.trace("Исходящий запрос к Google Script")
   local complete = false
@@ -5333,510 +5634,7 @@ function tags(args, param)
 	return args
 end
 
-function getZones(zone)
-  local names = {
-    ["SUNMA"] = "Bayside Marina",
-    ["SUNNN"] = "Bayside",
-    ["BATTP"] = "Battery Point",
-    ["PARA"] = "Paradiso",
-    ["CIVI"] = "Santa Flora",
-    ["BAYV"] = "Palisades",
-    ["CITYS"] = "City Hall",
-    ["OCEAF"] = "Ocean Flats",
-    ["OCEAF"] = "Ocean Flats",
-    ["OCEAF"] = "Ocean Flats",
-    ["SILLY"] = "Foster Valley",
-    ["SILLY"] = "Foster Valley",
-    ["HASH"] = "Hashbury",
-    ["JUNIHO"] = "Juniper Hollow",
-    ["ESPN"] = "Esplanade North",
-    ["ESPN"] = "Esplanade North",
-    ["ESPN"] = "Esplanade North",
-    ["FINA"] = "Financial",
-    ["CALT"] = "Calton Heights",
-    ["SFDWT"] = "Downtown",
-    ["SFDWT"] = "Downtown",
-    ["SFDWT"] = "Downtown",
-    ["SFDWT"] = "Downtown",
-    ["JUNIHI"] = "Juniper Hill",
-    ["CHINA"] = "Chinatown",
-    ["SFDWT"] = "Downtown",
-    ["THEA"] = "King's",
-    ["THEA"] = "King's",
-    ["THEA"] = "King's",
-    ["GARC"] = "Garcia",
-    ["DOH"] = "Doherty",
-    ["DOH"] = "Doherty",
-    ["SFDWT"] = "Downtown",
-    ["SFAIR"] = "Easter Bay Airport",
-    ["EASB"] = "Easter Basin",
-    ["EASB"] = "Easter Basin",
-    ["ESPE"] = "Esplanade East",
-    ["ESPE"] = "Esplanade East",
-    ["ESPE"] = "Esplanade East",
-    ["ANGPI"] = "Angel Pine",
-    ["SHACA"] = "Shady Cabin",
-    ["BACKO"] = "Back o Beyond",
-    ["LEAFY"] = "Leafy Hollow",
-    ["FLINTR"] = "Flint Range",
-    ["HAUL"] = "Fallen Tree",
-    ["FARM"] = "The Farm",
-    ["ELQUE"] = "El Quebrados",
-    ["ALDEA"] = "Aldea Malvada",
-    ["DAM"] = "The Sherman Dam",
-    ["BARRA"] = "Las Barrancas",
-    ["CARSO"] = "Fort Carson",
-    ["QUARY"] = "Hunter Quarry",
-    ["OCTAN"] = "Octane Springs",
-    ["PALMS"] = "Green Palms",
-    ["TOM"] = "Regular Tom",
-    ["BRUJA"] = "Las Brujas",
-    ["MEAD"] = "Verdant Meadows",
-    ["PAYAS"] = "Las Payasadas",
-    ["ARCO"] = "Arco del Oeste",
-    ["SFAIR"] = "Easter Bay Airport",
-    ["HANKY"] = "Hankypanky Point",
-    ["PALO"] = "Palomino Creek",
-    ["NROCK"] = "North Rock",
-    ["MONT"] = "Montgomery",
-    ["MONT"] = "Montgomery",
-    ["HBARNS"] = "Hampton Barns",
-    ["FERN"] = "Fern Ridge",
-    ["DILLI"] = "Dillimore",
-    ["TOPFA"] = "Hilltop Farm",
-    ["BLUEB"] = "Blueberry",
-    ["BLUEB"] = "Blueberry",
-    ["PANOP"] = "The Panopticon",
-    ["FRED"] = "Frederick Bridge",
-    ["MAKO"] = "The Mako Span",
-    ["BLUAC"] = "Blueberry Acres",
-    ["MART"] = "Martin Bridge",
-    ["FALLO"] = "Fallow Bridge",
-    ["CREEK"] = "Shady Creeks",
-    ["CREEK"] = "Shady Creeks",
-    ["WESTP"] = "Queens",
-    ["WESTP"] = "Queens",
-    ["WESTP"] = "Queens",
-    ["LA"] = "Los Santos",
-    ["VE"] = "Las Venturas",
-    ["BONE"] = "Bone County",
-    ["ROBAD"] = "Tierra Robada",
-    ["GANTB"] = "Gant Bridge",
-    ["GANTB"] = "Gant Bridge",
-    ["SF"] = "San Fierro",
-    ["ROBAD"] = "Tierra Robada",
-    ["RED"] = "Red County",
-    ["FLINTC"] = "Flint County",
-    ["EBAY"] = "Easter Bay Chemicals",
-    ["EBAY"] = "Easter Bay Chemicals",
-    ["SFAIR"] = "Easter Bay Airport",
-    ["SILLY"] = "Foster Valley",
-    ["SILLY"] = "Foster Valley",
-    ["SFAIR"] = "Easter Bay Airport",
-    ["SFAIR"] = "Easter Bay Airport",
-    ["WHET"] = "Whetstone",
-    ["LAIR"] = "Los Santos International",
-    ["LAIR"] = "Los Santos International",
-    ["BLUF"] = "Verdant Bluffs",
-    ["ELCO"] = "El Corona",
-    ["LIND"] = "Willowfield",
-    ["LIND"] = "Willowfield",
-    ["LIND"] = "Willowfield",
-    ["LIND"] = "Willowfield",
-    ["LDOC"] = "Ocean Docks",
-    ["LDOC"] = "Ocean Docks",
-    ["MAR"] = "Marina",
-    ["VERO"] = "Verona Beach",
-    ["VERO"] = "Verona Beach",
-    ["BLUF"] = "Verdant Bluffs",
-    ["BLUF"] = "Verdant Bluffs",
-    ["ELCO"] = "El Corona",
-    ["VERO"] = "Verona Beach",
-    ["MAR"] = "Marina",
-    ["MAR"] = "Marina",
-    ["VERO"] = "Verona Beach",
-    ["VERO"] = "Verona Beach",
-    ["CONF"] = "Conference Center",
-    ["CONF"] = "Conference Center",
-    ["COM"] = "Commerce",
-    ["COM"] = "Commerce",
-    ["COM"] = "Commerce",
-    ["COM"] = "Commerce",
-    ["PER1"] = "Pershing Square",
-    ["COM"] = "Commerce",
-    ["LMEX"] = "Little Mexico",
-    ["LMEX"] = "Little Mexico",
-    ["COM"] = "Commerce",
-    ["IWD"] = "Idlewood",
-    ["IWD"] = "Idlewood",
-    ["IWD"] = "Idlewood",
-    ["IWD"] = "Idlewood",
-    ["IWD"] = "Idlewood",
-    ["GLN"] = "Glen Park",
-    ["GLN"] = "Glen Park",
-    ["JEF"] = "Jefferson",
-    ["JEF"] = "Jefferson",
-    ["JEF"] = "Jefferson",
-    ["JEF"] = "Jefferson",
-    ["JEF"] = "Jefferson",
-    ["CHC"] = "Las Colinas",
-    ["CHC"] = "Las Colinas",
-    ["CHC"] = "Las Colinas",
-    ["CHC"] = "Las Colinas",
-    ["IWD"] = "Idlewood",
-    ["GAN"] = "Ganton",
-    ["GAN"] = "Ganton",
-    ["LIND"] = "Willowfield",
-    ["EBE"] = "East Beach",
-    ["EBE"] = "East Beach",
-    ["EBE"] = "East Beach",
-    ["ELS"] = "East Los Santos",
-    ["ELS"] = "East Los Santos",
-    ["JEF"] = "Jefferson",
-    ["ELS"] = "East Los Santos",
-    ["ELS"] = "East Los Santos",
-    ["ELS"] = "East Los Santos",
-    ["ELS"] = "East Los Santos",
-    ["ELS"] = "East Los Santos",
-    ["LFL"] = "Los Flores",
-    ["LFL"] = "Los Flores",
-    ["EBE"] = "East Beach",
-    ["CHC"] = "Las Colinas",
-    ["CHC"] = "Las Colinas",
-    ["CHC"] = "Las Colinas",
-    ["LDT"] = "Downtown Los Santos",
-    ["LDT"] = "Downtown Los Santos",
-    ["LDT"] = "Downtown Los Santos",
-    ["LDT"] = "Downtown Los Santos",
-    ["LDT"] = "Downtown Los Santos",
-    ["MULINT"] = "Mulholland Intersection",
-    ["MUL"] = "Mulholland",
-    ["MUL"] = "Mulholland",
-    ["MUL"] = "Mulholland",
-    ["MKT"] = "Market",
-    ["VIN"] = "Vinewood",
-    ["MKT"] = "Market",
-    ["LDT"] = "Downtown Los Santos",
-    ["LDT"] = "Downtown Los Santos",
-    ["LDT"] = "Downtown Los Santos",
-    ["SUN"] = "Temple",
-    ["SUN"] = "Temple",
-    ["SUN"] = "Temple",
-    ["MUL"] = "Mulholland",
-    ["MUL"] = "Mulholland",
-    ["MUL"] = "Mulholland",
-    ["VIN"] = "Vinewood",
-    ["SUN"] = "Temple",
-    ["SUN"] = "Temple",
-    ["SUN"] = "Temple",
-    ["MUL"] = "Mulholland",
-    ["MUL"] = "Mulholland",
-    ["MUL"] = "Mulholland",
-    ["MUL"] = "Mulholland",
-    ["MUL"] = "Mulholland",
-    ["MUL"] = "Mulholland",
-    ["MUL"] = "Mulholland",
-    ["SMB"] = "Santa Maria Beach",
-    ["SMB"] = "Santa Maria Beach",
-    ["ROD"] = "Rodeo",
-    ["ROD"] = "Rodeo",
-    ["ROD"] = "Rodeo",
-    ["ROD"] = "Rodeo",
-    ["ROD"] = "Rodeo",
-    ["ROD"] = "Rodeo",
-    ["ROD"] = "Rodeo",
-    ["ROD"] = "Rodeo",
-    ["ROD"] = "Rodeo",
-    ["ROD"] = "Rodeo",
-    ["VIN"] = "Vinewood",
-    ["RIH"] = "Richman",
-    ["RIH"] = "Richman",
-    ["ROD"] = "Rodeo",
-    ["ROD"] = "Rodeo",
-    ["RIH"] = "Richman",
-    ["RIH"] = "Richman",
-    ["RIH"] = "Richman",
-    ["RIH"] = "Richman",
-    ["RIH"] = "Richman",
-    ["RIH"] = "Richman",
-    ["RIH"] = "Richman",
-    ["RIH"] = "Richman",
-    ["STRIP"] = "The Strip",
-    ["STRIP"] = "The Strip",
-    ["DRAG"] = "The Four Dragons Casino",
-    ["PINK"] = "The Pink Swan",
-    ["HIGH"] = "The High Roller",
-    ["PIRA"] = "Pirates in Men's Pants",
-    ["VISA"] = "The Visage",
-    ["VISA"] = "The Visage",
-    ["JTS"] = "Julius Thruway South",
-    ["JTW"] = "Julius Thruway West",
-    ["JTS"] = "Julius Thruway South",
-    ["RSE"] = "Rockshore East",
-    ["LOT"] = "Come-A-Lot",
-    ["CAM"] = "The Camel's Toe",
-    ["ROY"] = "Royal Casino",
-    ["CALI"] = "Caligula's Palace",
-    ["CALI"] = "Caligula's Palace",
-    ["PILL"] = "Pilgrim",
-    ["STAR"] = "Starfish Casino",
-    ["STRIP"] = "The Strip",
-    ["STRIP"] = "The Strip",
-    ["ISLE"] = "The Emerald Isle",
-    ["OVS"] = "Old Venturas Strip",
-    ["KACC"] = "K.A.C.C. Military Fuels",
-    ["CREE"] = "Creek",
-    ["SRY"] = "Sobell Rail Yards",
-    ["LST"] = "Linden Station",
-    ["JTE"] = "Julius Thruway East",
-    ["LDS"] = "Linden Side",
-    ["JTE"] = "Julius Thruway East",
-    ["JTN"] = "Julius Thruway North",
-    ["JTE"] = "Julius Thruway East",
-    ["JTE"] = "Julius Thruway East",
-    ["JTN"] = "Julius Thruway North",
-    ["JTN"] = "Julius Thruway North",
-    ["JTN"] = "Julius Thruway North",
-    ["JTN"] = "Julius Thruway North",
-    ["JTW"] = "Julius Thruway West",
-    ["JTN"] = "Julius Thruway North",
-    ["HGP"] = "Harry Gold Parkway",
-    ["REDE"] = "Redsands East",
-    ["REDE"] = "Redsands East",
-    ["REDE"] = "Redsands East",
-    ["JTN"] = "Julius Thruway North",
-    ["REDW"] = "Redsands West",
-    ["REDW"] = "Redsands West",
-    ["REDW"] = "Redsands West",
-    ["REDW"] = "Redsands West",
-    ["VAIR"] = "Las Venturas Airport",
-    ["VAIR"] = "Las Venturas Airport",
-    ["VAIR"] = "Las Venturas Airport",
-    ["LVA"] = "LVA Freight Depot",
-    ["BINT"] = "Blackfield Intersection",
-    ["BINT"] = "Blackfield Intersection",
-    ["BINT"] = "Blackfield Intersection",
-    ["BINT"] = "Blackfield Intersection",
-    ["LVA"] = "LVA Freight Depot",
-    ["LVA"] = "LVA Freight Depot",
-    ["LVA"] = "LVA Freight Depot",
-    ["LVA"] = "LVA Freight Depot",
-    ["GGC"] = "Greenglass College",
-    ["GGC"] = "Greenglass College",
-    ["BFLD"] = "Blackfield",
-    ["BFLD"] = "Blackfield",
-    ["ROCE"] = "Roca Escalante",
-    ["ROCE"] = "Roca Escalante",
-    ["LDM"] = "Last Dime Motel",
-    ["RSW"] = "Rockshore West",
-    ["RSW"] = "Rockshore West",
-    ["RIE"] = "Randolph Industrial Estate",
-    ["BFC"] = "Blackfield Chapel",
-    ["BFC"] = "Blackfield Chapel",
-    ["JTN"] = "Julius Thruway North",
-    ["PINT"] = "Pilson Intersection",
-    ["WWE"] = "Whitewood Estates",
-    ["PRP"] = "Prickle Pine",
-    ["PRP"] = "Prickle Pine",
-    ["PRP"] = "Prickle Pine",
-    ["SPIN"] = "Spinybed",
-    ["PRP"] = "Prickle Pine",
-    ["PILL"] = "Pilgrim",
-    ["SASO"] = "San Andreas Sound",
-    ["FISH"] = "Fisher's Lagoon",
-    ["GARV"] = "Garver Bridge",
-    ["GARV"] = "Garver Bridge",
-    ["GARV"] = "Garver Bridge",
-    ["KINC"] = "Kincaid Bridge",
-    ["KINC"] = "Kincaid Bridge",
-    ["KINC"] = "Kincaid Bridge",
-    ["LSINL"] = "Los Santos Inlet",
-    ["SHERR"] = "Sherman Reservoir",
-    ["FLINW"] = "Flint Water",
-    ["ETUNN"] = "Easter Tunnel",
-    ["BYTUN"] = "Bayside Tunnel",
-    ["BIGE"] = "'The Big Ear'",
-    ["PROBE"] = "Lil' Probe Inn",
-    ["VALLE"] = "Valle Ocultado",
-    ["GLN"] = "Glen Park",
-    ["LDOC"] = "Ocean Docks",
-    ["LINDEN"] = "Linden Station",
-    ["UNITY"] = "Unity Station",
-    ["VIN"] = "Vinewood",
-    ["MARKST"] = "Market Station",
-    ["CRANB"] = "Cranberry Station",
-    ["YELLOW"] = "Yellow Bell Station",
-    ["SANB"] = "San Fierro Bay",
-    ["SANB"] = "San Fierro Bay",
-    ["ELCA"] = "El Castillo del Diablo",
-    ["ELCA"] = "El Castillo del Diablo",
-    ["ELCA"] = "El Castillo del Diablo",
-    ["REST"] = "Restricted Area",
-    ["MONINT"] = "Montgomery Intersection",
-    ["MONINT"] = "Montgomery Intersection",
-    ["ROBINT"] = "Robada Intersection",
-    ["FLINTI"] = "Flint Intersection",
-    ["SFAIR"] = "Easter Bay Airport",
-    ["SFAIR"] = "Easter Bay Airport",
-    ["SFAIR"] = "Easter Bay Airport",
-    ["MKT"] = "Market",
-    ["MKT"] = "Market",
-    ["CUNTC"] = "Avispa Country Club",
-    ["CUNTC"] = "Avispa Country Club",
-    ["HILLP"] = "Missionary Hill",
-    ["MTCHI"] = "Mount Chiliad",
-    ["MTCHI"] = "Mount Chiliad",
-    ["MTCHI"] = "Mount Chiliad",
-    ["MTCHI"] = "Mount Chiliad",
-    ["YBELL"] = "Yellow Bell Golf Course",
-    ["YBELL"] = "Yellow Bell Golf Course",
-    ["VAIR"] = "Las Venturas Airport",
-    ["LDOC"] = "Ocean Docks",
-    ["LAIR"] = "Los Santos International",
-    ["LDOC"] = "Ocean Docks",
-    ["LAIR"] = "Los Santos International",
-    ["LAIR"] = "Los Santos International",
-    ["LAIR"] = "Los Santos International",
-    ["STAR"] = "Starfish Casino",
-    ["BEACO"] = "Beacon Hill",
-    ["CUNTC"] = "Avispa Country Club",
-    ["CUNTC"] = "Avispa Country Club",
-    ["GARC"] = "Garcia",
-    ["CUNTC"] = "Avispa Country Club",
-    ["CUNTC"] = "Avispa Country Club",
-    ["PLS"] = "Playa del Seville",
-    ["LDOC"] = "Ocean Docks",
-    ["STAR"] = "Starfish Casino",
-    ["RING"] = "The Clown's Pocket",
-    ["LDOC"] = "Ocean Docks",
-    ["LIND"] = "Willowfield",
-    ["LIND"] = "Willowfield",
-    ["WWE"] = "Whitewood Estates",
-    ["LDT"] = "Downtown Los Santos"
-  }
-  if names[zone] == nil then return "Не определено" end
-  return names[zone]
-end
-
-function getweaponname(weapon)
-  local names = {
-  [0] = "Fist",
-  [1] = "Brass Knuckles",
-  [2] = "Golf Club",
-  [3] = "Nightstick",
-  [4] = "Knife",
-  [5] = "Baseball Bat",
-  [6] = "Shovel",
-  [7] = "Pool Cue",
-  [8] = "Katana",
-  [9] = "Chainsaw",
-  [10] = "Purple Dildo",
-  [11] = "Dildo",
-  [12] = "Vibrator",
-  [13] = "Silver Vibrator",
-  [14] = "Flowers",
-  [15] = "Cane",
-  [16] = "Grenade",
-  [17] = "Tear Gas",
-  [18] = "Molotov Cocktail",
-  [22] = "9mm",
-  [23] = "Silenced 9mm",
-  [24] = "Desert Eagle",
-  [25] = "Shotgun",
-  [26] = "Sawnoff Shotgun",
-  [27] = "Combat Shotgun",
-  [28] = "Micro SMG/Uzi",
-  [29] = "MP5",
-  [30] = "AK-47",
-  [31] = "M4",
-  [32] = "Tec-9",
-  [33] = "Country Rifle",
-  [34] = "Sniper Rifle",
-  [35] = "RPG",
-  [36] = "HS Rocket",
-  [37] = "Flamethrower",
-  [38] = "Minigun",
-  [39] = "Satchel Charge",
-  [40] = "Detonator",
-  [41] = "Spraycan",
-  [42] = "Fire Extinguisher",
-  [43] = "Camera",
-  [44] = "Night Vis Goggles",
-  [45] = "Thermal Goggles",
-  [46] = "Parachute" }
-  return names[weapon]
-end
-
-function getKVNumber(param)
-  local KV = {
-    ["а"] = 1,
-    ["б"] = 2,
-    ["в"] = 3,
-    ["г"] = 4,
-    ["д"] = 5,
-    ["ж"] = 6,
-    ["з"] = 7,
-    ["и"] = 8,
-    ["к"] = 9,
-    ["л"] = 10,
-    ["м"] = 11,
-    ["н"] = 12,
-    ["о"] = 13,
-    ["п"] = 14,
-    ["р"] = 15,
-    ["с"] = 16,
-    ["т"] = 17,
-    ["у"] = 18,
-    ["ф"] = 19,
-    ["х"] = 20,
-    ["ц"] = 21,
-    ["ч"] = 22,
-    ["ш"] = 23,
-    ["я"] = 24,
-  }
-  return KV[rusLower(param)]
-end
-
-function kvadrat()
-  local KV = {"А","Б","В","Г","Д","Ж","З","И","К","Л","М","Н","О","П","Р","С","Т","У","Ф","Х","Ц","Ч","Ш","Я"}
-  local X, Y, Z = getCharCoordinates(playerPed)
-  X = math.ceil((X + 3000) / 250)
-  Y = math.ceil((Y * - 1 + 3000) / 250)
-  -- Fix #7469 (27/7/19)
-  if X <= 0 or Y < 1 or Y > #KV then return "Нет" end
-  Y = KV[Y]
-  local KVX = (Y.."-"..X)
-  return KVX
-end
-
-function sampGetFraktionBySkin(id)
-  local t = 'Гражданский'
-  id = tonumber(id)
-  if id ~= nil and sampIsPlayerConnected(id) then
-    local result, ped = sampGetCharHandleBySampPlayerId(id)
-    if result then
-      local skin = getCharModel(ped)
-      if skin == 102 or skin == 103 or skin == 104 or skin == 195 or skin == 21 then t = 'Ballas Gang' end
-      if skin == 105 or skin == 106 or skin == 107 or skin == 269 or skin == 270 or skin == 271 or skin == 86 or skin == 149 or skin == 297 then t = 'Grove Gang' end
-      if skin == 108 or skin == 109 or skin == 110 or skin == 190 or skin == 47 then t = 'Vagos Gang' end
-      if skin == 114 or skin == 115 or skin == 116 or skin == 48 or skin == 44 or skin == 41 or skin == 292 then t = 'Aztec Gang' end
-      if skin == 173 or skin == 174 or skin == 175 or skin == 193 or skin == 226 or skin == 30 or skin == 119 then t = 'Rifa Gang' end
-      if skin == 73 or skin == 191 or skin == 252 or skin == 287 or skin == 61 or skin == 179 or skin == 255 then t = 'Army' end
-      if skin == 57 or skin == 98 or skin == 147 or skin == 150 or skin == 187 or skin == 216 then t = 'Mayor' end
-      if skin == 59 or skin == 172 or skin == 189 or skin == 240 then t = 'Instructors' end
-      if skin == 201 or skin == 247 or skin == 248 or skin == 254 or skin == 248 or skin == 298 then t = 'Bikers' end
-      if skin == 272 or skin == 112 or skin == 125 or skin == 214 or skin == 111  or skin == 126 then t = 'Russian Mafia' end
-      if skin == 113 or skin == 124 or skin == 214 or skin == 223 then t = 'La Cosa Nostra' end
-      if skin == 120 or skin == 123 or skin == 169 or skin == 186 then t = 'Yakuza' end
-      if skin == 211 or skin == 217 or skin == 250 or skin == 261 then t = 'News' end
-      if skin == 70 or skin == 219 or skin == 274 or skin == 275 or skin == 276 or skin == 70 then t = 'Medic' end
-      if skin == 286 or skin == 141 or skin == 163 or skin == 164 or skin == 165 or skin == 166 then t = 'FBI' end
-      if skin == 280 or skin == 265 or skin == 266 or skin == 267 or skin == 281 or skin == 282 or skin == 288 or skin == 284 or skin == 285 or skin == 304 or skin == 305 or skin == 306 or skin == 307 or skin == 309 or skin == 283 or skin == 303 then t = 'Police' end
-    end
-  end
-  return t
-end
-
+--- Иницилизируем логгер
 function loggerInit()
   local levels = {}
   local round = function(x, increment)
@@ -5913,7 +5711,6 @@ filesystem.path = function(path)
     filesystem.param.path = path
   end
 end
-
 filesystem.init = function(path)
   logger.debug('Иницилизируем настройки. Директория: '..path)
   -----
@@ -6013,13 +5810,11 @@ filesystem.performOld = function(filename, tab)
           for j = 1, #tab.binder[i].text do
             if type(tab.binder[i].text[j]) == "string" and tab.binder[i].text[j]:find("%[enter%]$") then
               tab.binder[i].text[j] = tab.binder[i].text[j]:gsub("%[enter%]$", "")
-              logger.trace('replaced!')
             end
           end
         end
       end
       if replaced then
-        logger.trace('replaced is true (binder)')
         local newBinder = {}
         local replacedBinder = {}
         for i = 1, #tab.binder do
@@ -6037,29 +5832,44 @@ filesystem.performOld = function(filename, tab)
       end
     end
     if tab.cmd_binder ~= nil then
-      local replaced = false
       for i = 1, #tab.cmd_binder do
         if type(tab.cmd_binder[i].text) == "string" then
           local text = tab.cmd_binder[i].text
           tab.cmd_binder[i].text = { text }
           tab.cmd_binder[i].wait = 1100
-          replaced = true
         end
-      end
-      if replaced then
-        logger.trace('replaced is true (cmd_binder)')
-        table.insert(tab.cmd_binder, { cmd = "uinv", wait = 1100, text = { "/uninvite {param} {param2}" } })
-        table.insert(tab.cmd_binder, { cmd = "gr", wait = 1100, text = { "/giverank {param} {param2}" } })
-        table.insert(tab.cmd_binder, { cmd = "inv", wait = 1100, text = { "/invite {param}" } })
-        table.insert(tab.cmd_binder, { cmd = "cl", wait = 1100, text = { "/clist {param}" } })
-        table.insert(tab.cmd_binder, { cmd = "rpmask", wait = 1100, text = { "/me достал маску из кармана и надел на лицо", "/clist 32", "/do На лице маска, на форме нет опознавательных знаков. Личность не опознать" } })
       end
     end
   end
   return tab
 end
+function drawMembersPlayer(table)
+	-- ID  Nick  Rank  Status  AFK  Dist
+	local nickname = sampGetPlayerNickname(table.mid)
+	local color = sampGetPlayerColor(table.mid)
+	local r, g, b = bitex.bextract(color, 16, 8), bitex.bextract(color, 8, 8), bitex.bextract(color, 0, 8)
+	local imgui_RGBA = imgui.ImVec4(r / 255.0, g / 255.0, b / 255.0, 1)
+	local _, ped = sampGetCharHandleBySampPlayerId(table.mid)
+	local distance = "Нет"
+	if doesCharExist(ped) then
+	  local mx, my, mz = getCharCoordinates(PLAYER_PED)
+	  local cx, cy, xz = getCharCoordinates(ped)
+	  distance = ("%0.2f"):format(getDistanceBetweenCoords3d(mx, my, mz,cx, cy, xz))
+	end
+	imgui.Text(tostring(table.mid)); imgui.NextColumn()
+  imgui.TextColored(imgui_RGBA, nickname)
+  if imgui.IsItemClicked(1) then
+    selectedContext = table.mid
+    imgui.OpenPopup("ContextMenu")
+  end
+  imgui.NextColumn()
+	imgui.Text(u8:encode(("%s[%d]"):format(pInfo.ranknames[table.mrank], table.mrank))); imgui.NextColumn()
+	imgui.Text(u8:encode(table.mstatus and "На работе" or "Выходной")); imgui.NextColumn()
+	imgui.Text(u8:encode(table.mafk ~= nil and table.mafk.." секунд" or "")); imgui.NextColumn()
+	imgui.Text(u8:encode(distance)); imgui.NextColumn()
+end
 
---------------------------------[ DO NOT TOUCH ]--------------------------------
+--------------------------------[ Вспомогательные функции ]--------------------------------
 function imgui.TextQuestion(text)
   imgui.TextDisabled('(?)')
   if imgui.IsItemHovered() then
@@ -6136,7 +5946,7 @@ function apply_custom_style()
   local clr = imgui.Col
   local ImVec4 = imgui.ImVec4
   local ImVec2 = imgui.ImVec2
-
+  ------
   style.WindowPadding = ImVec2(15, 15)
   style.WindowRounding = 0.0
   style.FramePadding = ImVec2(5, 5)
@@ -6149,7 +5959,7 @@ function apply_custom_style()
   style.ScrollbarRounding = 9.0
   style.GrabMinSize = 5.0
   style.GrabRounding = 3.0
-
+  ------
   colors[clr.Text] = ImVec4(0.80, 0.80, 0.83, 1.00)
   colors[clr.TextDisabled] = ImVec4(0.24, 0.23, 0.29, 1.00)
   colors[clr.WindowBg] = ImVec4(0.06, 0.05, 0.07, 1.00)
@@ -6160,13 +5970,9 @@ function apply_custom_style()
   colors[clr.FrameBg] = ImVec4(0.10, 0.09, 0.12, 1.00)
   colors[clr.FrameBgHovered] = ImVec4(0.24, 0.23, 0.29, 1.00)
   colors[clr.FrameBgActive] = ImVec4(0.56, 0.56, 0.58, 1.00)
-  -- colors[clr.TitleBg] = ImVec4(0.10, 0.09, 0.12, 1.00)
-  -- colors[clr.TitleBgCollapsed] = ImVec4(1.00, 0.98, 0.95, 0.75)
-  -- colors[clr.TitleBgActive] = ImVec4(0.07, 0.07, 0.09, 1.00)
   colors[clr.TitleBg] = ImVec4(0.68, 0.25, 0.25, 1.00)
   colors[clr.TitleBgCollapsed] = ImVec4(0.68, 0.25, 0.25, 1.00)
   colors[clr.TitleBgActive] = ImVec4(0.68, 0.25, 0.25, 1.00)
-
   colors[clr.MenuBarBg] = ImVec4(0.10, 0.09, 0.12, 1.00)
   colors[clr.ScrollbarBg] = ImVec4(0.10, 0.09, 0.12, 1.00)
   colors[clr.ScrollbarGrab] = ImVec4(0.80, 0.80, 0.83, 0.31)
@@ -6179,23 +5985,15 @@ function apply_custom_style()
   colors[clr.Button] = ImVec4(0.10, 0.09, 0.12, 1.00)
   colors[clr.ButtonHovered] = ImVec4(0.24, 0.23, 0.29, 1.00)
   colors[clr.ButtonActive] = ImVec4(0.56, 0.56, 0.58, 1.00)
-  -- colors[clr.Header] = ImVec4(0.10, 0.09, 0.12, 1.00)
-  -- colors[clr.HeaderHovered] = ImVec4(0.56, 0.56, 0.58, 1.00)
-  -- colors[clr.HeaderActive] = ImVec4(0.06, 0.05, 0.07, 1.00)
   colors[clr.Header] = ImVec4(0.68, 0.25, 0.25, 1.00)
   colors[clr.HeaderHovered] = ImVec4(0.68, 0.25, 0.25, 0.75)
   colors[clr.HeaderActive] = ImVec4(0.68, 0.25, 0.25, 1.00)
-
   colors[clr.ResizeGrip] = ImVec4(0.00, 0.00, 0.00, 0.00)
   colors[clr.ResizeGripHovered] = ImVec4(0.56, 0.56, 0.58, 1.00)
   colors[clr.ResizeGripActive] = ImVec4(0.06, 0.05, 0.07, 1.00)
-  -- colors[clr.CloseButton] = ImVec4(0.40, 0.39, 0.38, 0.16)
-  -- colors[clr.CloseButtonHovered] = ImVec4(0.40, 0.39, 0.38, 0.39)
-  -- colors[clr.CloseButtonActive] = ImVec4(0.40, 0.39, 0.38, 1.00)
   colors[clr.CloseButton] = ImVec4(0.56, 0.56, 0.58, 0.75)
   colors[clr.CloseButtonHovered] = ImVec4(0.56, 0.56, 0.58, 1.00)
   colors[clr.CloseButtonActive] = ImVec4(0.56, 0.56, 0.58, 1.00)
-  
   colors[clr.PlotLines] = ImVec4(0.40, 0.39, 0.38, 0.63)
   colors[clr.PlotLinesHovered] = ImVec4(0.25, 1.00, 0.00, 1.00)
   colors[clr.PlotHistogram] = ImVec4(0.40, 0.39, 0.38, 0.63)
@@ -6204,6 +6002,7 @@ function apply_custom_style()
   colors[clr.ModalWindowDarkening] = ImVec4(0.24, 0.23, 0.29, 0.65)
 end
 
+--- Проверяет, является ли фракция гос фракцией
 function isGosFraction(fracname)
   local fracs = {"SFA", "LVA", "LSPD", "SFPD", "LVPD", "Instructors", "FBI", "Medic", "Mayor"}
   for i = 1, #fracs do
@@ -6214,13 +6013,7 @@ function isGosFraction(fracname)
   return false
 end
 
-function checkIntable(t, key)
-  for k, v in pairs(t) do
-    if v == key then return true end
-  end
-  return false
-end
-
+--- Переводит ARGS цвет в RGB
 function ARGBtoRGB(color)
   local a = bit.band(bit.rshift(color, 24), 0xFF)
   local r = bit.band(bit.rshift(color, 16), 0xFF)
@@ -6232,6 +6025,7 @@ function ARGBtoRGB(color)
   return rgb
 end
 
+--- Для библиотеки BASS.lua
 function bassFlagsOrOperation(flags)
   local result = 0
   for i, v in pairs(flags) do
@@ -6244,7 +6038,7 @@ local russian_characters = {
   [168] = 'Ё', [184] = 'ё', [192] = 'А', [193] = 'Б', [194] = 'В', [195] = 'Г', [196] = 'Д', [197] = 'Е', [198] = 'Ж', [199] = 'З', [200] = 'И', [201] = 'Й', [202] = 'К', [203] = 'Л', [204] = 'М', [205] = 'Н', [206] = 'О', [207] = 'П', [208] = 'Р', [209] = 'С', [210] = 'Т', [211] = 'У', [212] = 'Ф', [213] = 'Х', [214] = 'Ц', [215] = 'Ч', [216] = 'Ш', [217] = 'Щ', [218] = 'Ъ', [219] = 'Ы', [220] = 'Ь', [221] = 'Э', [222] = 'Ю', [223] = 'Я', [224] = 'а', [225] = 'б', [226] = 'в', [227] = 'г', [228] = 'д', [229] = 'е', [230] = 'ж', [231] = 'з', [232] = 'и', [233] = 'й', [234] = 'к', [235] = 'л', [236] = 'м', [237] = 'н', [238] = 'о', [239] = 'п', [240] = 'р', [241] = 'с', [242] = 'т', [243] = 'у', [244] = 'ф', [245] = 'х', [246] = 'ц', [247] = 'ч', [248] = 'ш', [249] = 'щ', [250] = 'ъ', [251] = 'ы', [252] = 'ь', [253] = 'э', [254] = 'ю', [255] = 'я',
 }
 
--- string.lower для русских букв
+--- string.lower для русских букв
 function rusLower(s)
   local strlen = s:len()
   if strlen == 0 then return s end
@@ -6263,7 +6057,7 @@ function rusLower(s)
   return output
 end
 
--- string.upper для русских букв
+--- string.upper для русских букв
 function rusUpper(s)
   local strlen = s:len()
   if strlen == 0 then return s end
@@ -6282,6 +6076,7 @@ function rusUpper(s)
   return output
 end
 
+--- Проверяет, является ли таблица массивом
 function isArray(t)
   if type(t) ~= "table" then return nil end
   local count = 0
@@ -6296,20 +6091,8 @@ function isArray(t)
   return true
 end
 
-function isInArray(table, string)
-  for k, v in pairs(table) do
-    if v == string then return true end
-  end
-  return false
-end
---[[
-  - pInfo: gov
-- config_keys: cmd_binder, binder
-  - postInfo: all
-]]
--- Дополняет таблицу 'to' таблицей 'table'.
--- Максимальная глубина вхождения = 5 (table.one.two.three.four)
--- postInfo, localInfo, config_keys, pInfo
+--- Дополняет таблицу 'to' таблицей 'table'.
+--- Максимальная глубина вхождения = 5 (table.one.two.three.four)
 function additionArray(table, to)
   if table == nil then return to end
   for k, v in pairs(table) do
@@ -6335,12 +6118,15 @@ function additionArray(table, to)
   return to
 end
 
+--- Определяет расстояние между двумя точками
 function distBetweenCoords(cx, cy, cz, px, py, pz)
   return tonumber(("%0.2f"):format(getDistanceBetweenCoords3d(cx, cy, cz, px, py, pz)))
 end
 
+--- Делает скриншот игры
 function screen() memory.setuint8(sampGetBase() + 0x119CBC, 1) end
 
+--- Кодирует текст для передачи в URI
 function encodeURI(str)
   if (str) then
     str = string.gsub (str, "\n", "\r\n")
@@ -6351,34 +6137,7 @@ function encodeURI(str)
    return str
 end
 
-function drawMembersPlayer(table)
-	-- ID  Nick  Rank  Status  AFK  Dist
-	local nickname = sampGetPlayerNickname(table.mid)
-	local color = sampGetPlayerColor(table.mid)
-	local r, g, b = bitex.bextract(color, 16, 8), bitex.bextract(color, 8, 8), bitex.bextract(color, 0, 8)
-	local imgui_RGBA = imgui.ImVec4(r / 255.0, g / 255.0, b / 255.0, 1)
-	local _, ped = sampGetCharHandleBySampPlayerId(table.mid)
-	local distance = "Нет"
-	if doesCharExist(ped) then
-	  local mx, my, mz = getCharCoordinates(PLAYER_PED)
-	  local cx, cy, xz = getCharCoordinates(ped)
-	  distance = ("%0.2f"):format(getDistanceBetweenCoords3d(mx, my, mz,cx, cy, xz))
-	end
-	imgui.Text(tostring(table.mid)); imgui.NextColumn()
-  imgui.TextColored(imgui_RGBA, nickname)
-  if imgui.IsItemClicked(1) then
-    selectedContext = table.mid
-    imgui.OpenPopup("ContextMenu")
-  end
-  imgui.NextColumn()
-	imgui.Text(u8:encode(("%s[%d]"):format(pInfo.ranknames[table.mrank], table.mrank))); imgui.NextColumn()
-	imgui.Text(u8:encode(table.mstatus and "На работе" or "Выходной")); imgui.NextColumn()
-	imgui.Text(u8:encode(table.mafk ~= nil and table.mafk.." секунд" or "")); imgui.NextColumn()
-	imgui.Text(u8:encode(distance)); imgui.NextColumn()
-end
-
--- Определяет день недели по дате.
--- Начинает с Воскресенья (0)
+--- Определяет день недели по дате. Начинает с Воскресенья (0)
 function dateToWeekNumber(date)
   local wsplit = string.split(date, ".")
   local day = tonumber(wsplit[1])
@@ -6390,11 +6149,295 @@ function dateToWeekNumber(date)
   return math.floor((day + y + math.floor(y / 4) - math.floor(y / 100) + math.floor(y / 400) + (31 * m) / 12) % 7)
 end
 
+--- Превращает кол-во секунд во время - HH:mm:ss
 function secToTime(sec)
   local hour, minute, second = sec / 3600, math.floor(sec / 60), sec % 60
   return string.format("%02d:%02d:%02d", math.floor(hour) ,  minute - (math.floor(hour) * 60), second)
 end
 
+
+function getZones(zone)
+  local names = {
+    ["SUNMA"] = "Bayside Marina",
+    ["SUNNN"] = "Bayside",
+    ["BATTP"] = "Battery Point",
+    ["PARA"] = "Paradiso",
+    ["CIVI"] = "Santa Flora",
+    ["BAYV"] = "Palisades",
+    ["CITYS"] = "City Hall",
+    ["OCEAF"] = "Ocean Flats",
+    ["HASH"] = "Hashbury",
+    ["JUNIHO"] = "Juniper Hollow",
+    ["ESPN"] = "Esplanade North",
+    ["FINA"] = "Financial",
+    ["CALT"] = "Calton Heights",
+    ["SFDWT"] = "Downtown",
+    ["JUNIHI"] = "Juniper Hill",
+    ["CHINA"] = "Chinatown",
+    ["THEA"] = "King's",
+    ["GARC"] = "Garcia",
+    ["DOH"] = "Doherty",
+    ["SFAIR"] = "Easter Bay Airport",
+    ["EASB"] = "Easter Basin",
+    ["ESPE"] = "Esplanade East",
+    ["ANGPI"] = "Angel Pine",
+    ["SHACA"] = "Shady Cabin",
+    ["BACKO"] = "Back o Beyond",
+    ["LEAFY"] = "Leafy Hollow",
+    ["FLINTR"] = "Flint Range",
+    ["HAUL"] = "Fallen Tree",
+    ["FARM"] = "The Farm",
+    ["ELQUE"] = "El Quebrados",
+    ["ALDEA"] = "Aldea Malvada",
+    ["DAM"] = "The Sherman Dam",
+    ["BARRA"] = "Las Barrancas",
+    ["CARSO"] = "Fort Carson",
+    ["QUARY"] = "Hunter Quarry",
+    ["OCTAN"] = "Octane Springs",
+    ["PALMS"] = "Green Palms",
+    ["TOM"] = "Regular Tom",
+    ["BRUJA"] = "Las Brujas",
+    ["MEAD"] = "Verdant Meadows",
+    ["PAYAS"] = "Las Payasadas",
+    ["ARCO"] = "Arco del Oeste",
+    ["HANKY"] = "Hankypanky Point",
+    ["PALO"] = "Palomino Creek",
+    ["NROCK"] = "North Rock",
+    ["MONT"] = "Montgomery",
+    ["HBARNS"] = "Hampton Barns",
+    ["FERN"] = "Fern Ridge",
+    ["DILLI"] = "Dillimore",
+    ["TOPFA"] = "Hilltop Farm",
+    ["BLUEB"] = "Blueberry",
+    ["PANOP"] = "The Panopticon",
+    ["FRED"] = "Frederick Bridge",
+    ["MAKO"] = "The Mako Span",
+    ["BLUAC"] = "Blueberry Acres",
+    ["MART"] = "Martin Bridge",
+    ["FALLO"] = "Fallow Bridge",
+    ["CREEK"] = "Shady Creeks",
+    ["WESTP"] = "Queens",
+    ["LA"] = "Los Santos",
+    ["VE"] = "Las Venturas",
+    ["BONE"] = "Bone County",
+    ["ROBAD"] = "Tierra Robada",
+    ["GANTB"] = "Gant Bridge",
+    ["SF"] = "San Fierro",
+    ["RED"] = "Red County",
+    ["FLINTC"] = "Flint County",
+    ["EBAY"] = "Easter Bay Chemicals",
+    ["SILLY"] = "Foster Valley",
+    ["WHET"] = "Whetstone",
+    ["LAIR"] = "Los Santos International",
+    ["BLUF"] = "Verdant Bluffs",
+    ["ELCO"] = "El Corona",
+    ["LIND"] = "Willowfield",
+    ["MAR"] = "Marina",
+    ["VERO"] = "Verona Beach",
+    ["CONF"] = "Conference Center",
+    ["COM"] = "Commerce",
+    ["PER1"] = "Pershing Square",
+    ["LMEX"] = "Little Mexico",
+    ["IWD"] = "Idlewood",
+    ["GLN"] = "Glen Park",
+    ["JEF"] = "Jefferson",
+    ["CHC"] = "Las Colinas",
+    ["GAN"] = "Ganton",
+    ["EBE"] = "East Beach",
+    ["ELS"] = "East Los Santos",
+    ["JEF"] = "Jefferson",
+    ["LFL"] = "Los Flores",
+    ["LDT"] = "Downtown Los Santos",
+    ["MULINT"] = "Mulholland Intersection",
+    ["MUL"] = "Mulholland",
+    ["MKT"] = "Market",
+    ["VIN"] = "Vinewood",
+    ["SUN"] = "Temple",
+    ["SMB"] = "Santa Maria Beach",
+    ["ROD"] = "Rodeo",
+    ["RIH"] = "Richman",
+    ["STRIP"] = "The Strip",
+    ["DRAG"] = "The Four Dragons Casino",
+    ["PINK"] = "The Pink Swan",
+    ["HIGH"] = "The High Roller",
+    ["PIRA"] = "Pirates in Men's Pants",
+    ["VISA"] = "The Visage",
+    ["JTS"] = "Julius Thruway South",
+    ["JTW"] = "Julius Thruway West",
+    ["RSE"] = "Rockshore East",
+    ["LOT"] = "Come-A-Lot",
+    ["CAM"] = "The Camel's Toe",
+    ["ROY"] = "Royal Casino",
+    ["CALI"] = "Caligula's Palace",
+    ["PILL"] = "Pilgrim",
+    ["STAR"] = "Starfish Casino",
+    ["ISLE"] = "The Emerald Isle",
+    ["OVS"] = "Old Venturas Strip",
+    ["KACC"] = "K.A.C.C. Military Fuels",
+    ["CREE"] = "Creek",
+    ["SRY"] = "Sobell Rail Yards",
+    ["LST"] = "Linden Station",
+    ["JTE"] = "Julius Thruway East",
+    ["LDS"] = "Linden Side",
+    ["JTN"] = "Julius Thruway North",
+    ["HGP"] = "Harry Gold Parkway",
+    ["REDE"] = "Redsands East",
+    ["VAIR"] = "Las Venturas Airport",
+    ["LVA"] = "LVA Freight Depot",
+    ["BINT"] = "Blackfield Intersection",
+    ["GGC"] = "Greenglass College",
+    ["BFLD"] = "Blackfield",
+    ["ROCE"] = "Roca Escalante",
+    ["LDM"] = "Last Dime Motel",
+    ["RSW"] = "Rockshore West",
+    ["RIE"] = "Randolph Industrial Estate",
+    ["BFC"] = "Blackfield Chapel",
+    ["PINT"] = "Pilson Intersection",
+    ["WWE"] = "Whitewood Estates",
+    ["PRP"] = "Prickle Pine",
+    ["SPIN"] = "Spinybed",
+    ["SASO"] = "San Andreas Sound",
+    ["FISH"] = "Fisher's Lagoon",
+    ["GARV"] = "Garver Bridge",
+    ["KINC"] = "Kincaid Bridge",
+    ["LSINL"] = "Los Santos Inlet",
+    ["SHERR"] = "Sherman Reservoir",
+    ["FLINW"] = "Flint Water",
+    ["ETUNN"] = "Easter Tunnel",
+    ["BYTUN"] = "Bayside Tunnel",
+    ["BIGE"] = "'The Big Ear'",
+    ["PROBE"] = "Lil' Probe Inn",
+    ["VALLE"] = "Valle Ocultado",
+    ["LINDEN"] = "Linden Station",
+    ["UNITY"] = "Unity Station",
+    ["MARKST"] = "Market Station",
+    ["CRANB"] = "Cranberry Station",
+    ["YELLOW"] = "Yellow Bell Station",
+    ["SANB"] = "San Fierro Bay",
+    ["ELCA"] = "El Castillo del Diablo",
+    ["REST"] = "Restricted Area",
+    ["MONINT"] = "Montgomery Intersection",
+    ["ROBINT"] = "Robada Intersection",
+    ["FLINTI"] = "Flint Intersection",
+    ["SFAIR"] = "Easter Bay Airport",
+    ["MKT"] = "Market",
+    ["CUNTC"] = "Avispa Country Club",
+    ["HILLP"] = "Missionary Hill",
+    ["MTCHI"] = "Mount Chiliad",
+    ["YBELL"] = "Yellow Bell Golf Course",
+    ["VAIR"] = "Las Venturas Airport",
+    ["LDOC"] = "Ocean Docks",
+    ["STAR"] = "Starfish Casino",
+    ["BEACO"] = "Beacon Hill",
+    ["GARC"] = "Garcia",
+    ["PLS"] = "Playa del Seville",
+    ["STAR"] = "Starfish Casino",
+    ["RING"] = "The Clown's Pocket",
+    ["LIND"] = "Willowfield",
+    ["WWE"] = "Whitewood Estates",
+    ["LDT"] = "Downtown Los Santos"
+  }
+  if names[zone] == nil then return "Не определено" end
+  return names[zone]
+end
+
+function getweaponname(weapon)
+  local names = {
+  [0] = "Fist",
+  [1] = "Brass Knuckles",
+  [2] = "Golf Club",
+  [3] = "Nightstick",
+  [4] = "Knife",
+  [5] = "Baseball Bat",
+  [6] = "Shovel",
+  [7] = "Pool Cue",
+  [8] = "Katana",
+  [9] = "Chainsaw",
+  [10] = "Purple Dildo",
+  [11] = "Dildo",
+  [12] = "Vibrator",
+  [13] = "Silver Vibrator",
+  [14] = "Flowers",
+  [15] = "Cane",
+  [16] = "Grenade",
+  [17] = "Tear Gas",
+  [18] = "Molotov Cocktail",
+  [22] = "9mm",
+  [23] = "Silenced 9mm",
+  [24] = "Desert Eagle",
+  [25] = "Shotgun",
+  [26] = "Sawnoff Shotgun",
+  [27] = "Combat Shotgun",
+  [28] = "Micro SMG/Uzi",
+  [29] = "MP5",
+  [30] = "AK-47",
+  [31] = "M4",
+  [32] = "Tec-9",
+  [33] = "Country Rifle",
+  [34] = "Sniper Rifle",
+  [35] = "RPG",
+  [36] = "HS Rocket",
+  [37] = "Flamethrower",
+  [38] = "Minigun",
+  [39] = "Satchel Charge",
+  [40] = "Detonator",
+  [41] = "Spraycan",
+  [42] = "Fire Extinguisher",
+  [43] = "Camera",
+  [44] = "Night Vis Goggles",
+  [45] = "Thermal Goggles",
+  [46] = "Parachute" }
+  return names[weapon]
+end
+
+--- Определяет номер квадрата по букве
+function getKVNumber(param)
+  local KV = {"А","Б","В","Г","Д","Ж","З","И","К","Л","М","Н","О","П","Р","С","Т","У","Ф","Х","Ц","Ч","Ш","Я"}
+  return table.getIndexOf(KV, rusUpper(param))
+end
+
+-- Определяем квадрат по координатам
+function kvadrat()
+  local KV = {"А","Б","В","Г","Д","Ж","З","И","К","Л","М","Н","О","П","Р","С","Т","У","Ф","Х","Ц","Ч","Ш","Я"}
+  local X, Y, Z = getCharCoordinates(playerPed)
+  X = math.ceil((X + 3000) / 250)
+  Y = math.ceil((Y * - 1 + 3000) / 250)
+  -- Fix #7469 (27/7/19)
+  if X <= 0 or Y < 1 or Y > #KV then return "Нет" end
+  Y = KV[Y]
+  return (Y.."-"..X)
+end
+
+--- Определяем фракцию по скину
+function sampGetFraktionBySkin(id)
+  local t = 'Гражданский'
+  id = tonumber(id)
+  if id ~= nil and sampIsPlayerConnected(id) then
+    local result, ped = sampGetCharHandleBySampPlayerId(id)
+    if result then
+      local skin = getCharModel(ped)
+      if skin == 102 or skin == 103 or skin == 104 or skin == 195 or skin == 21 then t = 'Ballas Gang' end
+      if skin == 105 or skin == 106 or skin == 107 or skin == 269 or skin == 270 or skin == 271 or skin == 86 or skin == 149 or skin == 297 then t = 'Grove Gang' end
+      if skin == 108 or skin == 109 or skin == 110 or skin == 190 or skin == 47 then t = 'Vagos Gang' end
+      if skin == 114 or skin == 115 or skin == 116 or skin == 48 or skin == 44 or skin == 41 or skin == 292 then t = 'Aztec Gang' end
+      if skin == 173 or skin == 174 or skin == 175 or skin == 193 or skin == 226 or skin == 30 or skin == 119 then t = 'Rifa Gang' end
+      if skin == 73 or skin == 191 or skin == 252 or skin == 287 or skin == 61 or skin == 179 or skin == 255 then t = 'Army' end
+      if skin == 57 or skin == 98 or skin == 147 or skin == 150 or skin == 187 or skin == 216 then t = 'Mayor' end
+      if skin == 59 or skin == 172 or skin == 189 or skin == 240 then t = 'Instructors' end
+      if skin == 201 or skin == 247 or skin == 248 or skin == 254 or skin == 248 or skin == 298 then t = 'Bikers' end
+      if skin == 272 or skin == 112 or skin == 125 or skin == 214 or skin == 111  or skin == 126 then t = 'Russian Mafia' end
+      if skin == 113 or skin == 124 or skin == 214 or skin == 223 then t = 'La Cosa Nostra' end
+      if skin == 120 or skin == 123 or skin == 169 or skin == 186 then t = 'Yakuza' end
+      if skin == 211 or skin == 217 or skin == 250 or skin == 261 then t = 'News' end
+      if skin == 70 or skin == 219 or skin == 274 or skin == 275 or skin == 276 or skin == 70 then t = 'Medic' end
+      if skin == 286 or skin == 141 or skin == 163 or skin == 164 or skin == 165 or skin == 166 then t = 'FBI' end
+      if skin == 280 or skin == 265 or skin == 266 or skin == 267 or skin == 281 or skin == 282 or skin == 288 or skin == 284 or skin == 285 or skin == 304 or skin == 305 or skin == 306 or skin == 307 or skin == 309 or skin == 283 or skin == 303 then t = 'Police' end
+    end
+  end
+  return t
+end
+
+--- Адаптированная версия под разное кол-во секунд
 function _secToTime(sec)
   sec = tonumber(sec)
   if sec == nil then return end
@@ -6410,6 +6453,7 @@ function _secToTime(sec)
   return result
 end
 
+--- Возвращает координаты точки, помеченой на карте (с пофикшеной Z координатой)
 function getTargetBlipCoordinatesFixed()
   local bool, x, y, z = getTargetBlipCoordinates(); if not bool then return false end
   requestCollision(x, y); loadScene(x, y, z)
@@ -6417,6 +6461,7 @@ function getTargetBlipCoordinatesFixed()
   return bool, x, y, z
 end
 
+--- Генерирует ключ для Google Authenicator
 function genCode(skey)
   skey = basexx.from_base32(skey)
   value = math.floor(os.time() / 30)
@@ -6436,6 +6481,7 @@ function genCode(skey)
   return ('%06d'):format(hash)
 end
 
+--- Генерирует асинхронный запрос
 function httpRequest(request, body, handler) -- copas.http
   -- start polling task
   if not copas.running then
@@ -6467,48 +6513,8 @@ function httpRequest(request, body, handler) -- copas.http
   end
 end
 
--- Функция @FYP, делит строку по паттерну.
--- string.split(str, delim, plain)
-
--- Функция обратного поиска
--- string.rfind(str, pattern, offset, plain)
-
--- Проверяет находится ли подстрока в строке
--- string.contains(str, substr)
-
--- Обрезает с начала и конца указанный символ, если символ не указан - обрезает все пробельные символы
--- string.trim(str, chars)
-
--- "Склеивает" все указанные таблицы
--- table.merge(...)
-
--- Возвращает все ключи таблицы в виде массива
--- table.keys(object)
-
--- Поверхностно копирует массив (только указанный уровень). Параметр mt отвечает вернуть ли метатаблицу или нет.
--- table.copy(object, mt)
-
--- Получить индекс по первому найденому значению
--- table.getIndexOf(object, value)
-
--- Удалить ячейку по значению
--- table.removeByValue(object, value)
-
--- Поиск по значению в таблице, true / false
--- table.contains(object, value)
-
--- Полное копирование таблицы включая подтаблицы
--- table.deepcopy(object, mt)
-
--- Применит func(valute) к каждому элементы таблицы и заменит изначальные данные результатом выполнения функции
--- table.transform(object, func)
-
--- Меняет ключ и значение местами
--- table.invert(object)
-
--- Тоже самое что и table.transform, но не заменит оригинал таблицы и вернет копию.
--- table.map(object, func)
-function string.split(str, delim, plain) -- bh FYP
+--- Функция @FYP, делит строку по паттерну.
+function string.split(str, delim, plain)
   local tokens, pos, plain = {}, 1, not (plain == false) --[[ delimiter is plain text by default ]]
   repeat
       local npos, epos = string.find(str, delim, pos, plain)
@@ -6518,6 +6524,7 @@ function string.split(str, delim, plain) -- bh FYP
   return tokens
 end
 
+--- Обрезает с начала и конца указанный символ, если символ не указан - обрезает все пробельные символы
 function string.trim(str, chars) -- lume
   if not chars then
      return str:match("^[%s]*(.-)[%s]*$")
@@ -6526,10 +6533,12 @@ function string.trim(str, chars) -- lume
   return str:match("^[" .. chars .. "]*(.-)[" .. chars .. "]*$")
 end
 
+--- Проверяет находится ли подстрока в строке
 function string.contains(str, substr)
   return string.find(str, substr, 1, true) ~= nil
 end
 
+--- Функция обратного поиска
 function string.rfind(str, pattern, offset, plain)
   local pos, lnpos, lepos, plain = offset and offset - 1 or 0, offset or 1, -1, not (plain == false)
   repeat
@@ -6542,6 +6551,7 @@ function string.rfind(str, pattern, offset, plain)
   return lnpos, lepos
 end
 
+--- Полное копирование таблицы включая подтаблицы
 function table.deepcopy(object, mt)
   local lookup_table = {}
   mt = mt or false
@@ -6561,6 +6571,7 @@ function table.deepcopy(object, mt)
   return _copy(object)
 end
 
+--- Поверхностно копирует массив (только указанный уровень). Параметр mt отвечает вернуть ли метатаблицу или нет.
 function table.copy(object, mt)
   mt = mt or false
   local newt = {}
@@ -6570,6 +6581,7 @@ function table.copy(object, mt)
   return mt and setmetatable(newt, getmetatable(object)) or newt
 end
 
+--- Поиск по значению в таблице, true / false
 function table.contains(object, value)
   for k, v in pairs(object) do
      if v == value then
@@ -6579,6 +6591,7 @@ function table.contains(object, value)
   return false
 end
 
+--- "Склеивает" все указанные таблицы
 function table.merge(...)
   local len = select('#', ...)
   assert(len > 1, "impossible to merge less than two tables")
@@ -6605,6 +6618,7 @@ function table.assocMerge(...)
   return newTable
 end
 
+--- Тоже самое что и table.transform, но не заменит оригинал таблицы и вернет копию.
 function table.map(object, func) -- lume
   local newTable = {}
   for k, v in pairs(object) do
@@ -6617,6 +6631,7 @@ function table.map(object, func) -- lume
   return newTable
 end
 
+--- Применит func(valute) к каждому элементы таблицы и заменит изначальные данные результатом выполнения функции
 function table.transform(object, func)
   for k, v in pairs(object) do
      if type(v) == "table" then
@@ -6628,6 +6643,7 @@ function table.transform(object, func)
   return object
 end
 
+--- Меняет ключ и значение местами
 function table.invert(object) -- lume
   local newTable = {}
   for k, v in pairs(object) do
@@ -6636,6 +6652,7 @@ function table.invert(object) -- lume
   return newTable
 end
 
+--- Возвращает все ключи таблицы в виде массива
 function table.keys(object) -- lume
   local newTable = {}
   local i = 0
@@ -6646,6 +6663,7 @@ function table.keys(object) -- lume
   return newTable
 end
 
+--- Получить индекс по первому найденому значению
 function table.getIndexOf(object, value)
   for k, v in pairs(object) do
      if v == value then
@@ -6655,6 +6673,7 @@ function table.getIndexOf(object, value)
   return nil
 end
 
+--- Удалить ячейку по значению
 function table.removeByValue(object, value)
   local getIndexOf = table.getIndexOf(object, value)
   if getIndexOf then

@@ -7,8 +7,8 @@
     },
 	"sfahelpertest":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.lua",
-        "version":"1.521",
-		"versiontext":"1.5-preview1",
+        "version":"1.522",
+		"versiontext":"1.5-preview2",
 		"testers":["Edward_Franklin", "Eduardo_Carmone", "Jonathan_Belin", "William_French", "Anthony_Raphael", "Henrich_Rogge", "Taddeo_Marshall"]
     },
     "sfahelpernew":{
