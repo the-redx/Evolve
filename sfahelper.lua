@@ -47,7 +47,6 @@ local u8 = encoding.UTF8
 dlstatus = require('moonloader').download_status
 imgui.ToggleButton = imadd.ToggleButton
 imgui.HotKey = imadd.HotKey
-socketClient = websocket.client.copas({timeout = 2})
 ------------------
 -- InputHelper
 if lffi then
@@ -716,6 +715,7 @@ function main()
     sendDataToServer_Timer(600000)
     --- Иницилизируем сокет
     if pInfo.settings.socket and lsocket then
+      socketClient = websocket.client.copas({timeout = 2})
       lua_thread.create(connectSocket)
     end
     ------------------
