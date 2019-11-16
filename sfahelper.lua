@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.5-preview3
+-- Version 1.5-release1
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.523")
-SCRIPT_ASSEMBLY = "1.5-preview3"
-LAST_BUILD = "November 16, 2019 16:24:35"
+script_version("1.531")
+SCRIPT_ASSEMBLY = "1.5-release1"
+LAST_BUILD = "November 17, 2019 00:48:28"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -121,7 +121,15 @@ defaultData = {
     { name = "Склад 2", coordX = -1410.75, coordY = 502.03, coordZ = 11.20, radius = 14.0 },
     { name = "Доки 1", coordX = -1457.57, coordY = 355.17, coordZ = 7.18, radius = 13.0 },
     { name = "Доки 2", coordX = -1457.55, coordY = 390.83, coordZ = 7.18, radius = 13.0 },
-    { name = "Доки 3", coordX = -1457.19, coordY = 426.95, coordZ = 7.18, radius = 13.0 }
+    { name = "Доки 3", coordX = -1457.19, coordY = 426.95, coordZ = 7.18, radius = 13.0 },
+    { name = "SAP-1", coordX = 122.97, coordY = 1924.77, coordZ = 19.14, radius = 25.0 },
+    { name = "MW", coordX = 142.56, coordY = 1877.74, coordZ = 18.01, radius = 10.0 },
+    { name = "Hangar-1", coordX = 138.72, coordY = 1836.17, coordZ = 17.64, radius = 15.0 },
+    { name = "Hangar-2", coordX = 277.11, coordY = 1955.92, coordZ = 17.64, radius = 15.0 },
+    { name = "Hangar-3", coordX = 275.38, coordY = 1989.43, coordZ = 17.64, radius = 15.0 },
+    { name = "MAC", coordX = 351.20, coordY = 1935.34, coordZ = 17.69, radius = 30.0 },
+    { name = "SAP-2", coordX = 345.97, coordY = 1795.89, coordZ = 18.26, radius = 15.0 },
+    { name = "Staff", coordX = 212.47, coordY = 1810.58, coordZ = 21.86, radius = 5.0 },
   }
 }
 
@@ -510,7 +518,8 @@ updatesInfo = {
     {'Игрокам из ``LVa`` добавлен авто-доклад во время поставок материалов на склады фракций;', '\n``Остальное:``'},
     {'Убран баг с отображением диалогового окна на лодках;'},
     {'Добавлена команда ``/checkpriziv``, для просмотра списка призванных игроков. (Доступно только SFA на ERP01);'},
-    {'В ``/addtable`` добавлена возможность добавлять данные в таблицу призывников'}
+    {'В ``/addtable`` добавлена возможность добавлять данные в таблицу призывников;'},
+    {'В авто-докладах добавлены посты для ЛВа;'}
   }
 }
 
@@ -2311,18 +2320,26 @@ function autoupdate(json_url)
       updatelink = info.sfahelpernew.url
       updateversion = info.sfahelpernew.version
       updateversiontext = info.sfahelpernew.versiontext
+      local found = false
       if DEBUG_MODE then
-        for k, v in ipairs(info.sfahelpertest.testers) do
-          if v == sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(playerPed))) then
-            updatelink = info.sfahelpertest.url
-            updateversion = info.sfahelpertest.version
-            updateversiontext = info.sfahelpertest.versiontext
-            break
+        local ver = info.sfahelpertest.version
+        if ver > thisScript().version then
+          for k, v in ipairs(info.sfahelpertest.testers) do
+            if v == sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(playerPed))) then
+              updatelink = info.sfahelpertest.url
+              updateversion = info.sfahelpertest.version
+              updateversiontext = info.sfahelpertest.versiontext
+              found = true
+              break
+            end
           end
+        else found = true end
+        if not found then
+          dtext('У Вас обнаружена тестовая версия, хотя вы не являетесь тестером. Откатываемся...')
         end
       end
       logger.debug('Версия на сервере: '..tostring(updateversion))
-      if updateversion > thisScript().version then
+      if updateversion > thisScript().version or (DEBUG_MODE and not found) then
         lua_thread.create(function()
           atext('Обнаружено обновление. Пытаюсь обновиться c "'..SCRIPT_ASSEMBLY..'" на "'..updateversiontext..'"')
           logger.info("Обнаружено обновление. Версия: "..updateversiontext)
