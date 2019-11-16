@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.5-preview2
+-- Version 1.5-preview3
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.522")
-SCRIPT_ASSEMBLY = "1.5-preview2"
-LAST_BUILD = "November 14, 2019 19:56:43"
+script_version("1.523")
+SCRIPT_ASSEMBLY = "1.5-preview3"
+LAST_BUILD = "November 16, 2019 16:24:35"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -247,7 +247,7 @@ localInfo = {
   },
   others = {
     title = "Остальное",
-    viezd = {'Разрешить вьезд на территорию', '{frac}, рарзешаю вьезд', '{frac}, рарзешаю вьезд'},
+    viezd = {'Разрешить вьезд на территорию', '{frac}, разрешаю вьезд', '{frac}, разрешаю вьезд'},
     udost = {'Отыгровка удостоверения', 'Удостоверение - Организация: {fraction} | Должность: {rankname}', 'Удостоверение - Организация: {fraction} | Должность: {rankname}'},
     dep = {"Занять гос волну", '/d OG, Занимаю волну гос новостей на {time}. Возражения на п.{id}', '/d OG, Занимаю волну гос новостей на {time}. Возражения на п.{id}'},
     dept = {"Напомнить о гос волне", "/d OG, Напоминаю, волна гос новостей на {time} за SFA.", "/d OG, Напоминаю, волна гос новостей на {time} за SFA."},
@@ -2771,7 +2771,7 @@ function sampevents.onServerMessage(color, text)
   end 
   if text:match("На складе Армия СФ%: %d+/200000") and color == -65366 then
     local sklad = text:match('На складе Армия СФ%: (%d+)/200000')
-    if pInfo.settings.autodoklad == true and tonumber(sklad) ~= nil then
+    if pInfo.settings.autodoklad == true and tonumber(sklad) ~= nil and sInfo.fraction == "SFA" then
       lua_thread.create(function()
         wait(5)
         selectWarehouse = 0
@@ -2783,10 +2783,10 @@ function sampevents.onServerMessage(color, text)
       end)
     end
   end
-  if text:match("На складе .-%: %d+/200000") and color == -65366 and pInfo.settings.autodoklad == true then
+  if text:match("На складе .-%: %d+/200000") and color == -65366 and pInfo.settings.autodoklad == true and sInfo.fraction == "LVA" then
     local frac, sklad = text:match("На складе (.-)%: (%d+)/200000")
     punkeyActive = 3
-    punkey[3].text = localVars("lvapost", "unload", { ['id'] = sInfo.playerid, ['sklad'] = sklad, ['frac'] = frac })
+    punkey[3].text = localVars("lvapost", "unload", { ['id'] = sInfo.playerid, ['sklad'] = math.floor((tonumber(sklad) / 1000) + 0.5), ['frac'] = frac })
     punkey[3].time = os.time()
     dtext(("Нажмите {139904}%s{FFFFFF} для оповещения о разгрузке"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
   end
