@@ -6,7 +6,7 @@
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.531")
+script_version("1.532")
 SCRIPT_ASSEMBLY = "1.5-release1"
 LAST_BUILD = "November 17, 2019 00:48:28"
 DEBUG_MODE = true
@@ -621,7 +621,6 @@ function main()
     sampRegisterChatCommand('createpost', cmd_createpost)
     sampRegisterChatCommand('addbl', cmd_addbl)
     sampRegisterChatCommand('vig', cmd_vig)
-    sampRegisterChatCommand('adm', cmd_adm)
     sampRegisterChatCommand('match', cmd_match)
     sampRegisterChatCommand('contract', cmd_contract)
     sampRegisterChatCommand('rpweap', cmd_rpweap)
@@ -1686,22 +1685,6 @@ function cmd_cn(args)
     dtext("Введите: /cn [id] [0 - RP nick, 1 - NonRP nick]")
     return
   end 
-end
-
--- Раньше работала, после удаления хоста не работает
-function cmd_adm()
-  if sInfo.nick == "FAlfals" or sInfo.nick == "Chase_Yanetto" or sInfo.nick == "Sayz_Armstrong" then return end
-  sampAddChatMessage(' Админы Online:', 0xFFFF00)
-  for i = 0, 1000 do
-    if sampIsPlayerConnected(i) then
-      for j = 1, #adminsList do
-        if adminsList[j].nick == sampGetPlayerNickname(i) then
-          sampAddChatMessage((" %s | ID: %d | Level: %d"):format(adminsList[j].nick, i, adminsList[j].level), 0xF5DEB3)
-          break
-        end
-      end
-    end
-  end
 end
 
 -- Реконнект
