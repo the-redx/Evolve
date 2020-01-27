@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.5-release4
+-- Version 1.5-release5
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.534")
-SCRIPT_ASSEMBLY = "1.5-release4"
-LAST_BUILD = "January 27, 2020 20:30:00"
+script_version("1.535")
+SCRIPT_ASSEMBLY = "1.5-release5"
+LAST_BUILD = "January 27, 2020 21:10:00"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -2227,7 +2227,8 @@ function sendDataToServer_Timer(time)
       }))
     end
     while true do wait(1000)
-      if pInfo.settings.requests then
+	  while sInfo.fraction == "no" do wait(1000) end
+      if pInfo.settings.requests and sInfo.server == "185.169.134.67:7777" then
         local requestData = ""
         local send = false
         -- Members фракции
