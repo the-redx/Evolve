@@ -1,13 +1,13 @@
 -- This file is a SFA-Helper project
 -- Licensed under MIT License
--- Copyright (c) 2019 redx
+-- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.5-release3
+-- Version 1.5-release4
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.533")
-SCRIPT_ASSEMBLY = "1.5-release3"
+script_version("1.534")
+SCRIPT_ASSEMBLY = "1.5-release4"
 LAST_BUILD = "January 27, 2020 20:30:00"
 DEBUG_MODE = true
 --------------------------------------------------------------------
@@ -708,7 +708,7 @@ function main()
     --- Иницилизируем различные таймеры
     secoundTimer()
     changeWeapons()
-    sendDataToServer_Timer(60) -- В секундах
+    sendDataToServer_Timer(600) -- В секундах
     --- Иницилизируем сокет
     if pInfo.settings.socket and lsocket then
       socketClient = websocket.client.copas({timeout = 2})
