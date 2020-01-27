@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2019 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.5-release1
+-- Version 1.5-release3
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.532")
-SCRIPT_ASSEMBLY = "1.5-release1"
-LAST_BUILD = "November 17, 2019 00:48:28"
+script_version("1.533")
+SCRIPT_ASSEMBLY = "1.5-release3"
+LAST_BUILD = "January 27, 2020 20:30:00"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -174,7 +174,8 @@ pInfo = {
     autologin = false,
     password = "",
     gauth = false,
-    gcode = ""
+    gcode = "",
+    requests = true
   },
   ranknames = {'Рядовой', 'Ефрейтор', 'Мл.Сержант', 'Сержант', 'Ст.Сержант', 'Старшина', 'Прапорщик', 'Мл.Лейтенант', 'Лейтенант', 'Ст.Лейтенант', 'Капитан', 'Майор', 'Подполковник', 'Полковник', 'Генерал'},
   gov = {},
@@ -296,12 +297,8 @@ tempFiles = {
 -- Передача данных на сервер
 request_data = {
   members = 0,
-  membersold = 0,
-  roles = {
-    ['support'] = { count = 0, users = {} },
-    ['leader'] = { count = 0, users = {} },
-    ['admin'] = { count = 0, users = {} }
-  }
+  updated = 0,
+  last_request = os.time()
 }
 
 -- OpenPopup
@@ -506,20 +503,12 @@ complete = false
 -- Лог обновлений
 updatesInfo = {
   version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
-  type = "Плановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "17.11.2019",
+  type = "Внеплановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
+  date = "27.01.2020",
   list = {
-    {'Добавлены новые тэги: ``{pRankByID}``, ``{trankname}``, ``{mrankname}``. Все эти тэги выводят ранг игрока в разных ситуациях.', 'Будьте осторожны, для работы тэгов необходимо ввести ``/members [0-2]``;'},
-    {'Теперь на запрос на въезд на базу ответить можно одной клавишей. Доступно ``12+`` рангам;'},
-    {'Добавлен авто-ввод кода ``Google Authenicator``. Для активации в ``Настройках`` введите ключ, который пришёл вам на почту во время привязки аутентификатора;'},
-    {'Добавлен ``умный Авто-БП``. При взятии оружия будет брать то оружие, которое вам необходимо с учётом уже имеющийся оружия;'},
-    {'Теперь при авто-докладах на поставках с помощью лодок ``/carm`` вводиться автоматически, ничего больше вводить не нужно;'},
-    {'Добавлена команда ``/shmask``. Команда позволяет внедриться во взвод. Ваш тэг и клист будет автоматически приведен к нужному виду;', 'Авто-клист и авто-тэг также будут изменены. Отключить маскировку можно введя команду ещё раз;'},
-    {'Игрокам из ``LVa`` добавлен авто-доклад во время поставок материалов на склады фракций;', '\n``Остальное:``'},
-    {'Убран баг с отображением диалогового окна на лодках;'},
-    {'Добавлена команда ``/checkpriziv``, для просмотра списка призванных игроков. (Доступно только SFA на ERP01);'},
-    {'В ``/addtable`` добавлена возможность добавлять данные в таблицу призывников;'},
-    {'В авто-докладах добавлены посты для ЛВа;'}
+    {'Удалена функция ``/adm`` и загрузка админов из сервера (Требование администрации);'},
+    {'Ограничена команда ``/watch``, теперь отслеживает только изменения клиста игроков (Требование администрации);'},
+    {'Была изменена система синхронизации данных, повышена производительность;', '\n\nrockefeller top\nспасибо за обнову wesley lewis && gosha fantom'}
   }
 }
 
@@ -595,6 +584,15 @@ function main()
     logger.debug(("Локальные данные загружены (%.3fs)"):format(os.clock() - mstime))
     ------------------
     --- Иницилизируем команды
+    sampRegisterChatCommand('shrequests', function()
+      pInfo.settings.requests = not pInfo.settings.requests
+      if pInfo.settings.requests then
+        atext('Запросы к серверу успешно включены!')
+      else
+        atext('Запросы к серверу выключены!')
+        dtext('Внимание! Отключение запросов может помешать работе некоторых модулей')
+      end
+    end)
     sampRegisterChatCommand('shmask', cmd_shmask)
     sampRegisterChatCommand('mon', cmd_mon)
     sampRegisterChatCommand('setkv', cmd_setkv)
@@ -630,12 +628,6 @@ function main()
       pInfo.settings.socket = not pInfo.settings.socket
       atext('Сокет '..(pInfo.settings.socket and "включен" or "выключен"))
       filesystem.save(pInfo, 'config.json')
-    end)
-    sampRegisterChatCommand('getweapon', function(arg)
-      local weapon, ammo, model = getCharWeaponInSlot(PLAYER_PED, tonumber(arg))
-      dtext(weapon)
-      dtext(ammo)
-      dtext(model)
     end)
     --- Команды, для которых было лень создавать функции
     sampRegisterChatCommand('shnews', function() window['main'].bool.v = true; data.imgui.menu = 44 end)
@@ -701,9 +693,6 @@ function main()
     end
     logger.debug(("Онлайн успешно обновлен (%.3fs)"):format(os.clock() - mstime))
     ------------------
-    --- Загружаем новости из сервера
-    loadNews("https://redx-dev.web.app/sfahelper?data={%22function%22:%22news%22}")
-    ------------------
     while not sampIsLocalPlayerSpawned() do wait(0) end
     --- Записываем сессионную информацию
     local _, myid = sampGetPlayerIdByCharHandle(playerPed)
@@ -719,8 +708,7 @@ function main()
     --- Иницилизируем различные таймеры
     secoundTimer()
     changeWeapons()
-    loadAdmins()
-    sendDataToServer_Timer(600000)
+    sendDataToServer_Timer(60) -- В секундах
     --- Иницилизируем сокет
     if pInfo.settings.socket and lsocket then
       socketClient = websocket.client.copas({timeout = 2})
@@ -799,21 +787,23 @@ function main()
           if v ~= nil and sampIsPlayerConnected(v.id) then
             local string = ""
             local color = ("%06X"):format(bit.band(sampGetPlayerColor(v.id), 0xFFFFFF))
-            local result, ped = sampGetCharHandleBySampPlayerId(v.id)
-            if doesCharExist(ped) then
-              local mx, my, mz = getCharCoordinates(PLAYER_PED)
-              local cx, cy, xz = getCharCoordinates(ped)
-              local distance = ("%0.2f"):format(getDistanceBetweenCoords3d(mx, my, mz,cx, cy, xz))
-              local forma = "Нет"
-              if sampGetFraktionBySkin(v.id) == "Army" then
-                local skin = getCharModel(ped)
-                if skin == 252 then forma = "Голый"
-                else forma = "Да" end
-              end
-              string = ("{%s}%s [%s]{ffffff} - {00BF80}Форма: %s{FFFFFF} - {00BF80}Dist: %s"):format(color, v.nick, v.id, forma, distance)
-            else
-              string = ("{%s}%s [%s]{FFFFFF} - {ec3737}No stream"):format(color, v.nick, v.id)
-            end
+            string = ("{%s}%s [%s]{FFFFFF}"):format(color, v.nick, v.id) -- temp
+
+            -- local result, ped = sampGetCharHandleBySampPlayerId(v.id)
+            -- if doesCharExist(ped) then
+            --   local mx, my, mz = getCharCoordinates(PLAYER_PED)
+            --   local cx, cy, xz = getCharCoordinates(ped)
+            --   local distance = ("%0.2f"):format(getDistanceBetweenCoords3d(mx, my, mz,cx, cy, xz))
+            --   local forma = "Нет"
+            --   if sampGetFraktionBySkin(v.id) == "Army" then
+            --     local skin = getCharModel(ped)
+            --     if skin == 252 then forma = "Голый"
+            --     else forma = "Да" end
+            --   end
+            --   string = ("{%s}%s [%s]{ffffff} - {00BF80}Форма: %s{FFFFFF} - {00BF80}Dist: %s"):format(color, v.nick, v.id, forma, distance)
+            -- else
+            --   string = ("{%s}%s [%s]{FFFFFF} - {ec3737}No stream"):format(color, v.nick, v.id)
+            -- end
             count = count + 1
             renderFontDrawText(watchFont, string, pInfo.settings.watchX, pInfo.settings.watchY + (count * checkerheight), -1)
             watchList[#watchList + 1] = string
@@ -2059,22 +2049,6 @@ function punaccept()
   punkeyActive = 0
 end
 
--- Загружаем админов из файла
-function loadAdmins()
-  local file = io.open("moonloader/SFAHelper/admins.txt", "a+")
-  local count = 0
-  adminsList = {}
-  for line in file:lines() do
-    local n, l = line:match("(.+)=(.+)")
-    if n ~= nil and tonumber(l) ~= nil then
-      adminsList[#adminsList + 1] = { nick = n, level = tonumber(l) }
-      count = count + 1
-    end
-  end
-  file:close()
-  logger.info("Загружено "..count.." админов")
-end
-
 -- Загружаем необходимые файлы
 function loadFiles()
   lua_thread.create(function()
@@ -2212,6 +2186,7 @@ function loadNews(url)
   asyncQueue = true
   httpRequest(url, nil, function(response, code, headers, status)
     if response then
+      logger.trace(response)
       local info = decodeJson(response)
       if info.success then
         local unread = 0
@@ -2240,54 +2215,38 @@ end
 
 function sendDataToServer_Timer(time)
   lua_thread.create(function()
-    while true do wait(time)
-      local requestData = {}
-      -- Members фракции
-      if request_data.members ~= request_data.membersold and sInfo.fraction ~= "no" then
-        table.insert(requestData, {
-          jsonrpc = '2.0',
-          id = os.time(),
-          method = 'set.Members',
-          params = {
-            frac = sInfo.fraction,
-            nick = sInfo.nickname,
-            online = request_data.members,
-            hash = string.lower('jd2o8i9jd8hdui2k9dhu492hu8f4jf94d1')
-          }
-        })
-        request_data.membersold = request_data.members
-      end
-      for k, v in pairs(request_data.roles) do
-        if #v.users > v.count then
-          local users = {}
-          for i = v.count, #v.users do
-            table.insert(users, v.users[i])
-          end
-          table.insert(requestData, {
-            jsonrpc = '2.0',
-            id = os.time(),
-            method = 'set.Roles',
-            params = {
-              role = k,
-              members = users,
-              -- nick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED))),
-              hash = string.lower('hg278hy27hdjd9dudg3j1dy3hd803du1d1')
-            }
-          })
-          v.count = #v.users
+    wait(5000)
+    --- Загружаем новости из сервера
+    if pInfo.settings.requests then
+      loadNews("https://redx-dev.web.app/sfahelper?data="..encodeJson({
+        method = "news",
+        nick = sInfo.nick,
+        server = sInfo.server:gsub("%.", "_"),
+        fraction = sInfo.fraction,
+        rank = pInfo.settings.rank
+      }))
+    end
+    while true do wait(1000)
+      if pInfo.settings.requests then
+        local requestData = ""
+        local send = false
+        -- Members фракции
+        if request_data.updated ~= 0 and sInfo.fraction ~= "no" and request_data.last_request < os.time() - time and request_data.updated > os.time() - time * 2 then
+          requestData = ("fraction=%s&online=%s&updated=%s"):format(sInfo.fraction, request_data.members, request_data.updated)
+          send = true
+          request_data.updated = 0
+          request_data.last_request = os.time()
         end
-      end
-      if #requestData > 0 then
-        --logger.debug(encodeJson(requestData))
-        ----------
-        httpRequest("https://redx-dev.web.app/sfahelper?data="..encodeJson(requestData), nil, function(response, code, headers, status)
-          if not response then
-            logger.error("sendDataToServer: "..code)
-            logger.error('Params: '..encodeJson(requestData))
-          else
-            logger.info('Данные синхронизированы с сервером')
-          end
-        end)
+        if send then
+          httpRequest("https://sfahelper.herokuapp.com/members?"..requestData, nil, function(response, code, headers, status)
+            if not response then
+              logger.error("sendDataToServer: "..code)
+              logger.error('Params: '..requestData)
+            else
+              logger.info('Данные синхронизированы с сервером')
+            end
+          end)
+        end
       end
     end
   end)
@@ -2414,7 +2373,7 @@ function sampevents.onSetPlayerColor(player, color)
   for i = 1, #spectate_list do
     if spectate_list[i] ~= nil then
       if player == spectate_list[i].id  and spectate_list[i].clist ~= color then
-        atext(string.format('Игрок %s[%d] сменил цвет ника с %s на %s', spectate_list[i].nick, spectate_list[i].id, getcolorname(spectate_list[i].clist), getcolorname(color)))
+        dtext(string.format('Игрок %s[%d] сменил цвет ника с %s на %s', spectate_list[i].nick, spectate_list[i].id, getcolorname(spectate_list[i].clist), getcolorname(color)))
         spectate_list[i].clist = color
         return
       end
@@ -2636,6 +2595,7 @@ function sampevents.onServerMessage(color, text)
       if membersInfo.mode >= 2 then membersInfo.mode = 0 return false end
       membersInfo.mode = 0
       request_data.members = membersInfo.online
+      request_data.updated = os.time()
     end
     if text:match("") and color == -1 and membersInfo.mode >= 2 then return false end
     -----------------
@@ -2945,33 +2905,12 @@ function sampevents.onServerMessage(color, text)
   end
   if color == -1713456726 and text:find('^  .-%: .- %[тел%: %d+%]$') then
     local frac, nick, _ = text:match('^  (.-)%: (.-) %[тел%: (%d+)%]$')
-    local contains = false
-    for k, v in ipairs(request_data.roles['leader'].users) do
-      if v.nick == nick then contains = true end
-    end
-    if not contains then
-      table.insert(request_data.roles['leader'].users, { nick = nick, rank = frac })
-    end
   end
   if color == -169954390 and text:find('^ .-%[ID%: %d+%]') then
     local nick, _ = text:match('^ (.-)%[ID%: (%d+)%]')
-    local contains = false
-    for k, v in ipairs(request_data.roles['support'].users) do
-      if v.nick == nick then contains = true end
-    end
-    if not contains then
-      table.insert(request_data.roles['support'].users, { nick = nick, rank = 'support' })
-    end
   end
   if color == -169954390 and text:find('^ .- | ID%: %d+ | Level%: %d+$') then
     local nick, id, lvl = text:match('^ (.-) | ID%: (%d+) | Level%: (%d+)$')
-    local contains = false
-    for k, v in ipairs(request_data.roles['admin'].users) do
-      if v.nick == nick then contains = true end
-    end
-    if not contains then
-      table.insert(request_data.roles['admin'].users, { nick = nick, level = lvl })
-    end
   end
   -- Рация фракции
   if color == -1920073984 then
@@ -4574,37 +4513,6 @@ imgui_windows.main = function(menu)
     imgui.SameLine(); imgui.Text(u8 'Клавиша РП отыгровки оружия')
     imgui.Spacing()
     imgui.Separator()
-    if imgui.Button(u8'Обновить список админов') then
-      atext('Запрос отправлен. Ожидание ответа от сервера...')
-      logger.info('Отправен запрос на обновление админов')
-      local ip, port = sampGetCurrentServerAddress()
-      httpRequest('http://opentest3.000webhostapp.com/api.php?act=getadmins&server='..ip..':'..port, nil, function(response, code, headers, status)
-        if response then
-          logger.trace("Ответ получен. Код: "..code..", Статус: "..status)
-          local info = decodeJson(response)
-          if info.success == true then
-            local output = ""
-            local count = 0
-            for key, value in ipairs(info.answer) do
-              output = output..string.format("%s=%s\n", value.nick, value.level)
-              count = count + 1
-            end
-            local file = io.open("moonloader/SFAHelper/admins.txt", "w+")
-            file:write(output)
-            file:close()
-            atext('Список админов успешно обновлен! Загружено '..count..' админов')
-            loadAdmins()
-          else
-            logger.warn(string.format("Ошибка сервера: ", info.error == nil and "Подробности не были получены" or info.error))
-            atext(string.format('Ошибка сервера: ', info.error == nil and "Подробности не были получены" or info.error))
-          end
-        else
-          logger.warn("Ответ не получен. Код: "..code..", Статус: "..status)
-          atext('При обработке запроса произошла ошибка. Попробуйте позже')
-        end
-      end)
-    end
-    imgui.SameLine()
     if imgui.Button(u8'Сохранить настройки') then
       filesystem.save(pInfo, 'config.json')
       atext('Настройки успешно сохранены!')
