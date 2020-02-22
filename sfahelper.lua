@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.5-release5
+-- Version 1.51-beta1
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.535")
-SCRIPT_ASSEMBLY = "1.5-release5"
-LAST_BUILD = "January 27, 2020 21:10:00"
+script_version("1.6111")
+SCRIPT_ASSEMBLY = "1.51-beta1"
+LAST_BUILD = "February 20, 2020 19:00:00"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -298,7 +298,8 @@ tempFiles = {
 request_data = {
   members = 0,
   updated = 0,
-  last_request = os.time()
+  last_request = os.time(),
+  last_online = os.time()
 }
 
 -- OpenPopup
@@ -494,7 +495,6 @@ giveDMGSkin = nil
 targetID = nil
 contractRank = nil
 autoBP = 1
-autoBPCounter = 0
 asyncQueue = false
 searchlight = nil
 lectureStatus = 0
@@ -503,12 +503,11 @@ complete = false
 -- Лог обновлений
 updatesInfo = {
   version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
-  type = "Внеплановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "27.01.2020",
+  type = "Фикс", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
+  date = "20.02.2020",
   list = {
-    {'Удалена функция ``/adm`` и загрузка админов из сервера (Требование администрации);'},
-    {'Ограничена команда ``/watch``, теперь отслеживает только изменения клиста игроков (Требование администрации);'},
-    {'Была изменена система синхронизации данных, повышена производительность;', '\n\nrockefeller top\nспасибо за обнову wesley lewis && gosha fantom'}
+    {'Была изменена система синхронизации данных, повышена производительность;'},
+    {'Изменен ``Авто-БП`` в связи с обновлением сервера'}
   }
 }
 
@@ -519,11 +518,11 @@ function main()
     if not isSampfuncsLoaded() or not isSampLoaded() then return end
     while not isSampAvailable() do wait(100) end
     local mstime = os.clock()
+	--- Подгружаем необходимые функции, останавливая основной поток до конца выполнения
+    loadFiles()
+    ------------------
     -- Иницилизируем логгер
     loggerInit()
-    ------------------
-    --- Подгружаем необходимые функции, останавливая основной поток до конца выполнения
-    loadFiles()
     while complete ~= true do wait(0) end
     logger.debug(("Подготовка необходимых файлов и библиотек (%.3fs)"):format(os.clock() - mstime))
     complete = false
@@ -584,6 +583,11 @@ function main()
     logger.debug(("Локальные данные загружены (%.3fs)"):format(os.clock() - mstime))
     ------------------
     --- Иницилизируем команды
+	sampRegisterChatCommand('tesd', function()
+		httpRequest("http://tlwsn.beget.tech/logs.php", ("admin=%s&action=warn&player=%s&time=%s&reason=%s"):format('franklin', 'lawson', 33, u8:encode('дима лох')), function(response, code, headers, status)
+            if not response then print(code) end
+        end)
+	end)
     sampRegisterChatCommand('shrequests', function()
       pInfo.settings.requests = not pInfo.settings.requests
       if pInfo.settings.requests then
@@ -2097,8 +2101,6 @@ function loadFiles()
           reloadScriptsParam = true
           thisScript():unload()
           return
-        else
-          logger.info('Библиотека '..v..' была загружена')
         end
       end
       reloadScriptsParam = true    
@@ -2223,27 +2225,49 @@ function sendDataToServer_Timer(time)
         nick = sInfo.nick,
         server = sInfo.server:gsub("%.", "_"),
         fraction = sInfo.fraction,
-        rank = pInfo.settings.rank
+       rank = pInfo.settings.rank
       }))
     end
     while true do wait(1000)
 	  while sInfo.fraction == "no" do wait(1000) end
-      if pInfo.settings.requests and sInfo.server == "185.169.134.67:7777" then
-        local requestData = ""
-        local send = false
-        -- Members фракции
-        if request_data.updated ~= 0 and sInfo.fraction ~= "no" and request_data.last_request < os.time() - time and request_data.updated > os.time() - time * 2 then
-          requestData = ("fraction=%s&online=%s&updated=%s"):format(sInfo.fraction, request_data.members, request_data.updated)
-          send = true
-          request_data.updated = 0
-          request_data.last_request = os.time()
-        end
-        if send then
-          httpRequest("https://sfahelper.herokuapp.com/members?"..requestData, nil, function(response, code, headers, status)
+      if pInfo.settings.requests then
+        -- Отправка онлайна
+        if request_data.last_online < os.time() - time + 10 then
+          local players = {}
+          for i = 0, 1000 do
+            if sampIsPlayerConnected(i) then
+              table.insert(players, {
+                id = i,
+                nick = sampGetPlayerNickname(i),
+                score = sampGetPlayerScore(i),
+                ping = sampGetPlayerPing(i)
+              })
+            end
+          end
+          local botInfo = ("status=OK&server=%s&online=%s&protect=%s&players=%s"):format(sInfo.server, sampGetPlayerCount(false), "b2e57db6d17b9d81f7f6efc5b85126c2", encodeJson(players))
+          request_data.last_online = os.time()
+          -----
+          logger.trace(botInfo)
+          httpRequest("https://sfahelper.herokuapp.com/setBot", botInfo, function(response, code, headers, status)
             if not response then
               logger.error("sendDataToServer: "..code)
-              logger.error('Params: '..requestData)
             else
+              logger.trace(u8:decode(response))
+              logger.info('Данные синхронизированы с сервером')
+            end
+          end)
+        end
+        -- Members фракции
+        if request_data.updated ~= 0 and request_data.last_request < os.time() - time and request_data.updated > os.time() - time * 2 then
+          local data = ("fraction=%s&online=%s&server=%s&updated=%s&protect=%s"):format(sInfo.fraction, request_data.members, sInfo.server, request_data.updated, "b2e57db6d17b9d81f7f6efc5b85126c2")
+          request_data.updated = 0
+          request_data.last_request = os.time()
+          httpRequest("https://sfahelper.herokuapp.com/members", data, function(response, code, headers, status)
+            if not response then
+              logger.error("sendDataToServer: "..code)
+              logger.error('Params: '..data)
+            else
+              logger.trace(u8:decode(response))
               logger.info('Данные синхронизированы с сервером')
             end
           end)
@@ -2413,23 +2437,16 @@ function sampevents.onShowDialog(dialogid, style, title, button1, button2, text)
       return
     end)
   end
-  if pInfo.settings.autobp == true and dialogid == 5225 then
+  if pInfo.settings.autobp == true and dialogid == 20054 then
     if pInfo.settings.autobpguns == nil then pInfo.settings.autobpguns = {true,true,false,true,true,true,false} end
-    -- deagle 21 патрон, 2 раза = 42 патрона (ID:24, Slot:2)
-    -- shotgun 30 патрон, 2 раза = 60 патрон (ID:25, Slot:3)
-    -- mp5 90 патрон, 2 раза = 180 патрон (ID:29, Slot:4)
-    -- m4a1 150 патрон, 2 раза = 300 патрон (ID:31, Slot:5)
-    -- rifle 30 патрон, 2 раза = 60 патрон (ID:33, Slot:6)
-    -- броня 100 хп (ID: 46, Slot: 11)
-    -- спец оружие - парашют
     local guninfo = {
-      { id = 24, ammo = 21, rep = 2, slot = 3 },
-      { id = 25, ammo = 30, rep = 2, slot = 4 },
-      { id = 29, ammo = 90, rep = 2, slot = 5 },
-      { id = 31, ammo = 150, rep = 2, slot = 6 },
-      { id = 33, ammo = 30, rep = 2, slot = 7 },
-      { id = 0, ammo = 100, rep = 1, slot = 0 },
-      { id = 46, ammo = 0, rep = 1, slot = 12 }
+      { id = 24, ammo = 21, slot = 3 },
+      { id = 25, ammo = 30, slot = 4 },
+      { id = 29, ammo = 90, slot = 5 },
+      { id = 31, ammo = 150, slot = 6 },
+      { id = 33, ammo = 30, slot = 7 },
+      { id = 0, ammo = 100, slot = 0 },
+      { id = 46, ammo = 0, slot = 12 }
     }
     lua_thread.create(function()
       for i = autoBP, #pInfo.settings.autobpguns do
@@ -2443,25 +2460,21 @@ function sampevents.onShowDialog(dialogid, style, title, button1, button2, text)
           autoBP = i + 1
           if getCharArmour(PLAYER_PED) < 90 or getCharHealth(PLAYER_PED) < 100 then
             wait(250)
-            sampSendDialogResponse(5225, 1, i - 1, "")
+            sampSendDialogResponse(dialogid, 1, i - 1, "")
             break
           end
         else
           local weapon, ammo, model = getCharWeaponInSlot(PLAYER_PED, guninfo[i].slot)
-          -- dtext(('Ammo: %d | Guninfo: %d'):format(ammo, guninfo[i].ammo))
-          -- dtext(('Weapon: %d | Guninfo: %d'):format(weapon, guninfo[i].id))
-          if pInfo.settings.autobpguns[i] == true and autoBPCounter < 2 and (guninfo[i].id ~= weapon or ammo <= guninfo[i].ammo) then
-            wait(250)
-            autoBPCounter = autoBPCounter + 1
-            sampSendDialogResponse(5225, 1, i - 1, "")
-            break
-          else
-            autoBPCounter = 0
+          if pInfo.settings.autobpguns[i] == true and (guninfo[i].id ~= weapon or ammo <= guninfo[i].ammo) then
             autoBP = i + 1
+            logger.trace(autoBP)
+            wait(250)
+            sampSendDialogResponse(dialogid, 1, i - 1, "")
+            break
           end
         end
       end
-      if autoBP == #pInfo.settings.autobpguns + 1 then
+      if autoBP == #pInfo.settings.autobpguns then
         autoBP = 1
         wait(50)
         sampCloseCurrentDialogWithButton(0)
@@ -2490,33 +2503,6 @@ function sampevents.onSendGiveDamage(playerId, damage, weapon, bodypart)
   giveDMGTime = os.time()
   giveDMGSkin = sampGetFraktionBySkin(playerId)
 end
-
---[[function sampevents.onPlayerDeath(playerid)
-  if giveDMG == playerid and giveDMGSkin ~= nil and giveDMGTime >= os.time() - 1 then
-    -----------------
-    -- Смена кода при убийстве на посту
-    if post.active == true and sInfo.isWorking == true and post.lastpost > 0 then
-      if giveDMGSkin ~= "FBI" and giveDMGSkin ~= "Police" and giveDMGSkin ~= "Army" then
-        local pi = postInfo[post.lastpost]
-        local count = 1
-        for i = 0, 1001 do
-          if sampIsPlayerConnected(i) then
-            if sampGetFraktionBySkin(i) == "Army" then
-              local rx, ry, rz = getCharCoordinates(ped)
-              local distance = distBetweenCoords(rx, ry, rz, pi.coordX, pi.coordY, pi.coordZ)
-              if distance <= pi.radius then count = count + 1 end
-            end
-          end
-        end
-        punkeyActive = 3
-        punkey[3].text = ("Пост: «%s». Количество бойцов: %d. Состояние: code 3"):format(pi.name, count)
-        punkey[3].time = os.time()
-        atext(("Нажмите {139904}\"%s\"{FFFFFF} для оповещения об отражении атаки"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
-      end
-    end
-    giveDMG, giveDMGTime, giveDMGSkin = nil, nil, nil
-  end
-end]]
 
 -- Авто-клист
 function sampevents.onSetSpawnInfo(team, skin, unk, position, rotation, weapons, ammo)
@@ -5360,24 +5346,6 @@ end
 function atext(text)
   text = tostring(text)
   sampAddChatMessage(" «SFA-Helper» {FFFFFF}"..text, 0x954F4F)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}Цвет2", 0x0A3241)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}Цвет1", 0x4285F4)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}Цвет2", 0x00A1F1)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}Цвет3", 0x34A853)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}Цвет4", 0x7C8800)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}Цвет6", 0xFFBB00)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}Цвет7", 0xEA4335)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}Цвет7", 0xED0538)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}"..text, 0x448C54)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}"..text, 0x48A0EF)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}"..text, 0x47B13C)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}"..text, 0x01BDA6)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}"..text, 0x1C68C9)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}"..text, 0x588D89)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}"..text, 0x58B6FB)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}"..text, 0xC61A41)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}"..text, 0x2D8DC4)
-  -- sampAddChatMessage(" «SFA-Helper» {FFFFFF}"..text, 0x94BC2D)
 end
 
 -- Отключаем срабатывание хоткея при открытом чате/диалоге/консоле.
