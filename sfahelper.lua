@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.51-beta1
+-- Version 1.51-release
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.6111")
-SCRIPT_ASSEMBLY = "1.51-beta1"
+script_version("1.6131")
+SCRIPT_ASSEMBLY = "1.51-release"
 LAST_BUILD = "February 20, 2020 19:00:00"
 DEBUG_MODE = true
 --------------------------------------------------------------------
