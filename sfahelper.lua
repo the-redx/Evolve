@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.51-release
+-- Version 1.52-release
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.6131")
-SCRIPT_ASSEMBLY = "1.51-release"
-LAST_BUILD = "February 20, 2020 19:00:00"
+script_version("1.6231")
+SCRIPT_ASSEMBLY = "1.52-release"
+LAST_BUILD = "March 8, 2020 22:27:00"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -174,6 +174,7 @@ pInfo = {
     autologin = false,
     password = "",
     gauth = false,
+    color_r = false,
     gcode = "",
     requests = true
   },
@@ -507,7 +508,8 @@ updatesInfo = {
   date = "20.02.2020",
   list = {
     {'Была изменена система синхронизации данных, повышена производительность;'},
-    {'Изменен ``Авто-БП`` в связи с обновлением сервера'}
+    {'Изменен ``Авто-БП`` в связи с обновлением сервера'},
+    {'Добавлен цветной чат. Активировать можно в ``/sh - Настройки``;'}
   }
 }
 
@@ -2538,32 +2540,33 @@ function sampevents.onServerMessage(color, text)
   if pInfo.settings.chatconsole then sampfuncsLog(tostring(text)) end
   local date = os.date("%d.%m.%y %H:%M:%S")
   local file = io.open('moonloader/SFAHelper/chatlog.txt', 'a+')
+  local textID = text
   file:write(('[%s] %s\n'):format(date, tostring(text)))
   file:close()
   file = nil
   -- chatID fix. Удаляет все ID возле ника игрока
   local finds = {1, 1}
    while true do
-    local space_match = text:find("%w+_%w+ %[%d+%]", finds[1])
-    local match = text:find("%w+_%w+%[%d+%]", finds[2])
+    local space_match = textID:find("%w+_%w+ %[%d+%]", finds[1])
+    local match = textID:find("%w+_%w+%[%d+%]", finds[2])
     if space_match ~= nil and space_match > finds[1] then
-      local name, surname, playerid = text:match("(%w+)_(%w+) %[(%d+)%]")
+      local name, surname, playerid = textID:match("(%w+)_(%w+) %[(%d+)%]")
       local nick = name.."_"..surname
       finds[1] = space_match
       playerid = tonumber(playerid)
       if playerid ~= nil and (sampIsPlayerConnected(playerid) or playerid == sInfo.playerid) then
         if sampGetPlayerNickname(playerid) == nick then
-          text = text:gsub(" %["..playerid.."%]", "")
+          textID = textID:gsub(" %["..playerid.."%]", "")
         end
       end
     elseif match ~= nil and match > finds[2] then
-      local name, surname, playerid = text:match("(%w+)_(%w+)%[(%d+)%]")
+      local name, surname, playerid = textID:match("(%w+)_(%w+)%[(%d+)%]")
       local nick = name.."_"..surname
       finds[2] = match
       playerid = tonumber(playerid)
       if playerid ~= nil and (sampIsPlayerConnected(playerid) or playerid == sInfo.playerid) then
         if sampGetPlayerNickname(playerid) == nick then
-          text = text:gsub("%["..playerid.."%]", "")
+          textID = textID:gsub("%["..playerid.."%]", "")
         end
       end
     else break end
@@ -2571,23 +2574,23 @@ function sampevents.onServerMessage(color, text)
   ------------------------
   -- /members
   if isGosFraction(sInfo.fraction) then
-    if text:match("^ Члены организации Он%-лайн:$") then
+    if textID:match("^ Члены организации Он%-лайн:$") then
       data.members = {}
       membersInfo.work = 0
       membersInfo.nowork = 0
       if membersInfo.mode >= 2 then return false end
     end
-    if text:match("^ Всего: %d+ человек$") then
-      membersInfo.online = tonumber(text:match("^ Всего: (%d+) человек$"))
+    if textID:match("^ Всего: %d+ человек$") then
+      membersInfo.online = tonumber(textID:match("^ Всего: (%d+) человек$"))
       if membersInfo.mode >= 2 then membersInfo.mode = 0 return false end
       membersInfo.mode = 0
       request_data.members = membersInfo.online
       request_data.updated = os.time()
     end
-    if text:match("") and color == -1 and membersInfo.mode >= 2 then return false end
+    if textID:match("") and color == -1 and membersInfo.mode >= 2 then return false end
     -----------------
-    if text:match("^ ID: %d+ | .- | .-%: .-%[%d+%] %- {.+}.+{FFFFFF} | {FFFFFF}%[AFK%]%: .+ секунд$") then
-      local id, date, nick, rankname, rank, status, afk = text:match("^ ID: (%d+) | (.-) | (.-)%: (.-)%[(%d+)%] %- (.+){FFFFFF} | {FFFFFF}%[AFK%]%: (.+) секунд$")
+    if textID:match("^ ID: %d+ | .- | .-%: .-%[%d+%] %- {.+}.+{FFFFFF} | {FFFFFF}%[AFK%]%: .+ секунд$") then
+      local id, date, nick, rankname, rank, status, afk = textID:match("^ ID: (%d+) | (.-) | (.-)%: (.-)%[(%d+)%] %- (.+){FFFFFF} | {FFFFFF}%[AFK%]%: (.+) секунд$")
       id = tonumber(id)
       rank = tonumber(rank)
       if pInfo.ranknames[rank] ~= rankname then
@@ -2609,18 +2612,18 @@ function sampevents.onServerMessage(color, text)
       -- colormembers
       if membersInfo.mode == 1 then
         streamed, _ = sampGetCharHandleBySampPlayerId(id)
-        -- Убираем даты инвайта
         if pInfo.settings.membersdate == true then
           text = ("ID: %d | %s: %s[%d] - %s{FFFFFF} | [AFK]: %s секунд"):format(id, sampGetPlayerNickname(id), pInfo.ranknames[rank], rank, status and "{008000}На работе" or "{ae433d}Выходной", afk)
         end
-        if id == sInfo.playerid then sampAddChatMessage(text, sampGetPlayerColor(id))
-        else sampAddChatMessage(string.format("%s - %s", text, streamed and "{00BF80}in stream" or "{ec3737}not in stream"), sampGetPlayerColor(id)) end
-        return false
+        if id ~= sInfo.playerid then
+          text = string.format("%s - %s", text, streamed and "{00BF80}in stream" or "{ec3737}not in stream")
+        end
+        color = argb_to_rgba(sampGetPlayerColor(id))
       elseif membersInfo.mode == 2 then
         return false
       end
-    elseif text:match("^ ID: %d+ | .+%[%d+%] %- {.+}.+{FFFFFF}$") then
-      local id, date, nick, rankname, rank, status = text:match("^ ID: (%d+) | (.-) | (.-)%: (.-)%[(%d+)%] %- (.+){FFFFFF}$")
+    elseif textID:match("^ ID: %d+ | .+%[%d+%] %- {.+}.+{FFFFFF}$") then
+      local id, date, nick, rankname, rank, status = textID:match("^ ID: (%d+) | (.-) | (.-)%: (.-)%[(%d+)%] %- (.+){FFFFFF}$")
       id = tonumber(id)
       rank = tonumber(rank)
       if pInfo.ranknames[rank] ~= rankname then
@@ -2644,16 +2647,17 @@ function sampevents.onServerMessage(color, text)
         if pInfo.settings.membersdate == true then
           text = ("ID: %d | %s: %s[%d] - %s{FFFFFF}"):format(id, sampGetPlayerNickname(id), pInfo.ranknames[rank], rank, status and "{008000}На работе" or "{ae433d}Выходной")
         end
-        if id == sInfo.playerid then sampAddChatMessage(text, sampGetPlayerColor(id))
-        else sampAddChatMessage(string.format("%s - %s", text, streamed and "{00BF80}in stream" or "{ec3737}not in stream"), sampGetPlayerColor(id)) end
-        return false
+        if id ~= sInfo.playerid then
+          text = string.format("%s - %s", text, streamed and "{00BF80}in stream" or "{ec3737}not in stream")
+        end
+        color = argb_to_rgba(sampGetPlayerColor(id))
       elseif membersInfo.mode == 2 then
         return false
       end
     end
   end
   -- Отслеживаем начало рабочего дня
-  if text:match("Рабочий день начат") and color == 1687547391 then
+  if textID:match("Рабочий день начат") and color == 1687547391 then
     sInfo.isWorking = true
     if pInfo.settings.clist ~= nil then
       lua_thread.create(function() wait(250) sampSendChat('/clist '..pInfo.settings.clist) end)
@@ -2661,13 +2665,13 @@ function sampevents.onServerMessage(color, text)
     logger.info('Рабочий день начат')
   end
   -- Отслеживаем конец рабочего дня
-  if text:match("Рабочий день окончен") and color == 1687547391 then
+  if textID:match("Рабочий день окончен") and color == 1687547391 then
     sInfo.isWorking = false
     logger.info('Рабочий день окончен')
   end
   -- /giverank
-  if text:match("Вы назначили .+ .+%[%d+%]") and color == -1697828097 then
-    local pNick, _, pRank = text:match("Вы назначили (.+) (.+)%[(%d+)%]")
+  if textID:match("Вы назначили .+ .+%[%d+%]") and color == -1697828097 then
+    local pNick, _, pRank = textID:match("Вы назначили (.+) (.+)%[(%d+)%]")
     addcounter(3, 1)
     lua_thread.create(function()
       wait(100)
@@ -2678,12 +2682,11 @@ function sampevents.onServerMessage(color, text)
         punkey[2].rank = tonumber(pRank)
         dtext(("Нажмите {139904}%s{FFFFFF} для РП отыгровки повышения"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
       end
-      return
     end)
   end
   -- /invite
-  if text:match(".+ передал%(%- а%) .- .+") and color == -1029514582 then
-    local kto, _, kogo = text:match("(.+) передал%(%- а%) (.-) (.+)")
+  if textID:match(".+ передал%(%- а%) .- .+") and color == -1029514582 then
+    local kto, _, kogo = textID:match("(.+) передал%(%- а%) (.-) (.+)")
     if kto == sInfo.nick then
       -- Если это контрактник, повышаем
       if sampGetPlayerNickname(contractId) == kogo then
@@ -2692,7 +2695,6 @@ function sampevents.onServerMessage(color, text)
           sampSendChat(("/giverank %s %s"):format(contractId, contractRank))
           contractId = nil
           contractRank = nil
-          return
         end)
       end
       addcounter(1, 1)
@@ -2702,8 +2704,8 @@ function sampevents.onServerMessage(color, text)
       cmd_stats("checkout")
     end  
   end
-  if text:match("На складе Порта LS%: %d+/200000") and color == -65366 then
-    local sklad = text:match('На складе Порта LS%: (%d+)/200000')
+  if textID:match("На складе Порта LS%: %d+/200000") and color == -65366 then
+    local sklad = textID:match('На складе Порта LS%: (%d+)/200000')
     if pInfo.settings.autodoklad == true and tonumber(sklad) ~= nil then
       lua_thread.create(function()
         wait(5)
@@ -2716,8 +2718,8 @@ function sampevents.onServerMessage(color, text)
       end)
     end
   end 
-  if text:match("На складе Армия СФ%: %d+/200000") and color == -65366 then
-    local sklad = text:match('На складе Армия СФ%: (%d+)/200000')
+  if textID:match("На складе Армия СФ%: %d+/200000") and color == -65366 then
+    local sklad = textID:match('На складе Армия СФ%: (%d+)/200000')
     if pInfo.settings.autodoklad == true and tonumber(sklad) ~= nil and sInfo.fraction == "SFA" then
       lua_thread.create(function()
         wait(5)
@@ -2730,8 +2732,8 @@ function sampevents.onServerMessage(color, text)
       end)
     end
   end
-  if text:match("На складе .-%: %d+/200000") and color == -65366 and pInfo.settings.autodoklad == true and sInfo.fraction == "LVA" then
-    local frac, sklad = text:match("На складе (.-)%: (%d+)/200000")
+  if textID:match("На складе .-%: %d+/200000") and color == -65366 and pInfo.settings.autodoklad == true and sInfo.fraction == "LVA" then
+    local frac, sklad = textID:match("На складе (.-)%: (%d+)/200000")
     punkeyActive = 3
     punkey[3].text = localVars("lvapost", "unload", { ['id'] = sInfo.playerid, ['sklad'] = math.floor((tonumber(sklad) / 1000) + 0.5), ['frac'] = frac })
     punkey[3].time = os.time()
@@ -2743,13 +2745,13 @@ function sampevents.onServerMessage(color, text)
   --   punkey[3].time = os.time()
   --   dtext(("Нажмите {139904}%s{FFFFFF} для оповещения о загрузке"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
   -- end
-  if text:match("Используйте%: /conveyingarms %-%> /carm") and color == 14221512 and pInfo.settings.autodoklad == true then
+  if textID:match("Используйте%: /conveyingarms %-%> /carm") and color == 14221512 and pInfo.settings.autodoklad == true then
     punkeyActive = 3
     punkey[3].text = localVars("lvapost", "start", { ['id'] = sInfo.playerid })
     punkey[3].time = os.time()
     dtext(("Нажмите {139904}%s{FFFFFF} для оповещения о начале поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
   end
-  if text:match("Материалов%: 30000/30000") and color == 14221512 then
+  if textID:match("Материалов%: 30000/30000") and color == 14221512 then
     if pInfo.settings.autodoklad == true then
       if warehouseDialog == 1 then
         lua_thread.create(function()
@@ -2774,14 +2776,14 @@ function sampevents.onServerMessage(color, text)
       end
     end
   end
-  if text:match("Лодка загружена на %d+ из %d+ материалов%.") and color == 866792447 then
+  if textID:match("Лодка загружена на %d+ из %d+ материалов%.") and color == 866792447 then
     if pInfo.settings.autodoklad == true then
       punkeyActive = 4
       punkey[4].text = localVars("autopost", "start_boat", { ['id'] = sInfo.playerid })
       dtext(("Нажмите {139904}%s{FFFFFF} для начала поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
     end
   end
-  if text:match("Доставьте материалы на Зону 51") and color == -86 then -- Загрузился на корабле, лечу в лва
+  if textID:match("Доставьте материалы на Зону 51") and color == -86 then -- Загрузился на корабле, лечу в лва
     if pInfo.settings.autodoklad == true then
       punkeyActive = 3
       punkey[3].text = localVars("autopost", "load", { ['id'] = sInfo.playerid })
@@ -2789,17 +2791,17 @@ function sampevents.onServerMessage(color, text)
       dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
     end
   end
-  if text:match("На складе Зоны 51 %d+/300000 материалов") and color == -65366 then -- Разгрузился на лва
+  if textID:match("На складе Зоны 51 %d+/300000 материалов") and color == -65366 then -- Разгрузился на лва
     addcounter(10, 1)
     if pInfo.settings.autodoklad == true then
-      local materials = tonumber(text:match("На складе Зоны 51 (%d+)/300000 материалов"))
+      local materials = tonumber(textID:match("На складе Зоны 51 (%d+)/300000 материалов"))
       punkeyActive = 3
       punkey[3].text = localVars("autopost", "unload", { ['id'] = sInfo.playerid, ['sklad'] = math.floor((materials / 1000) + 0.5) })
       punkey[3].time = os.time()
       dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
     end
   end
-  if text:match("Отправляйтесь на корабль для загрузки материалов") then
+  if textID:match("Отправляйтесь на корабль для загрузки материалов") then
     if pInfo.settings.autodoklad == true then
       if color == -1697828182 then -- Сел в вертолет на ЛВа
         punkeyActive = 3
@@ -2821,10 +2823,10 @@ function sampevents.onServerMessage(color, text)
       --cmd_r("загрузился на корабле, лечу на лса")
     end
   end]]
-  if text:match("На складе LSA %d+/200000 материалов") and color == -86 then -- Разгрузился на лса
+  if textID:match("На складе LSA %d+/200000 материалов") and color == -86 then -- Разгрузился на лса
     addcounter(11, 1)
     if pInfo.settings.autodoklad == true then
-      local materials = tonumber(text:match("На складе LSA (%d+)/300000 материалов"))
+      local materials = tonumber(textID:match("На складе LSA (%d+)/300000 материалов"))
       punkeyActive = 3
       punkey[3].text = localVars("autopost", "endp")
       punkey[3].time = os.time()
@@ -2832,8 +2834,8 @@ function sampevents.onServerMessage(color, text)
     end
   end
   -- /uninvite
-  if text:match("Вы выгнали .+ из организации. Причина: .+") and color == 1806958506 then
-    local pNick, pReason = text:match("Вы выгнали (.+) из организации. Причина: (.+)")
+  if textID:match("Вы выгнали .+ из организации. Причина: .+") and color == 1806958506 then
+    local pNick, pReason = textID:match("Вы выгнали (.+) из организации. Причина: (.+)")
     if sInfo.isWorking then
       addcounter(2, 1)
       lua_thread.create(function()
@@ -2845,21 +2847,20 @@ function sampevents.onServerMessage(color, text)
         punkey[1].time = os.time()
         punkey[1].reason = pReason
         dtext(("Нажмите {139904}%s{FFFFFF} оповещения в рацию об увольнении"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
-        return 
       end)
     end
   end
   -- /pm
-  if text:match('^ Ответ от .+ к .+:') then
-    local mynick, egonick = text:match('^ Ответ от (.+) к (.+):')
+  if textID:match('^ Ответ от .+ к .+:') then
+    local mynick, egonick = textID:match('^ Ответ от (.+) к (.+):')
     if mynick == sInfo.nick then
       pInfo.info.dayPM = pInfo.info.dayPM + 1
       pInfo.info.weekPM = pInfo.info.weekPM + 1
     end
     if sInfo.isSupport == false then sInfo.isSupport = true end
   end
-  if text:find("(%A)-[0-9][0-9]") or text:find("(%A)-[0-9]") then
-    local ky, kx = text:match("(%A)-(%d+)")
+  if textID:find("(%A)-[0-9][0-9]") or textID:find("(%A)-[0-9]") then
+    local ky, kx = textID:match("(%A)-(%d+)")
     if getKVNumber(ky) ~= nil and kx ~= nil and ky ~= nil and tonumber(kx) < 25 and tonumber(kx) > 0 then
       kvCoord.ny = ky
       kvCoord.nx = kx
@@ -2868,47 +2869,55 @@ function sampevents.onServerMessage(color, text)
     end
   end
   -- Саппортский /sduty
-  if text:match('Рабочий день начат') and color == -1 then
+  if textID:match('Рабочий день начат') and color == -1 then
     sInfo.isSupport = true
   end
-  if text:match('Рабочий день окончен') and color == -1 then sInfo.isSupport = false end
+  if textID:match('Рабочий день окончен') and color == -1 then sInfo.isSupport = false end
   ---------
-  if text:match("Вы поменяли пули на резиновые") then
+  if textID:match("Вы поменяли пули на резиновые") then
     sInfo.tazer = true
   end
-  if text:match("Вы поменяли пули на обычные") then
+  if textID:match("Вы поменяли пули на обычные") then
     sInfo.tazer = false
   end
-  if text:match(".+ выгнал вас из организации. Причина: .+") then
+  if textID:match(".+ выгнал вас из организации. Причина: .+") then
     pInfo.settings.rank = 0
     sInfo.isWorking = false
     logger.debug('Вас уволили. Ранг обнулился')
   end
-  if text:match(".+ назначил Вас .+%[.+%]") then
+  if textID:match(".+ назначил Вас .+%[.+%]") then
     if sInfo.isWorking == true then
-      pInfo.settings.rank = tonumber(select(3, text:match("(.+) назначил Вас (.+)%[(.+)%]$")))
+      pInfo.settings.rank = tonumber(select(3, textID:match("(.+) назначил Вас (.+)%[(.+)%]$")))
       logger.debug('Вас повысили. Ранг: '..pInfo.settings.rank)
     end
   end
-  if color == -1713456726 and text:find('^  .-%: .- %[тел%: %d+%]$') then
-    local frac, nick, _ = text:match('^  (.-)%: (.-) %[тел%: (%d+)%]$')
+  if color == -1713456726 and textID:find('^  .-%: .- %[тел%: %d+%]$') then
+    local frac, nick, _ = textID:match('^  (.-)%: (.-) %[тел%: (%d+)%]$')
   end
-  if color == -169954390 and text:find('^ .-%[ID%: %d+%]') then
-    local nick, _ = text:match('^ (.-)%[ID%: (%d+)%]')
+  if color == -169954390 and textID:find('^ .-%[ID%: %d+%]') then
+    local nick, _ = textID:match('^ (.-)%[ID%: (%d+)%]')
   end
-  if color == -169954390 and text:find('^ .- | ID%: %d+ | Level%: %d+$') then
-    local nick, id, lvl = text:match('^ (.-) | ID%: (%d+) | Level%: (%d+)$')
+  if color == -169954390 and textID:find('^ .- | ID%: %d+ | Level%: %d+$') then
+    local nick, id, lvl = textID:match('^ (.-) | ID%: (%d+) | Level%: (%d+)$')
   end
   -- Рация фракции
-  if color == -1920073984 then
+  if color == 33357768 or color == -1920073984 then
+    if pInfo.settings.color_r and textID:match('%S+%: .+') then
+      local nick = textID:match('(%S+)%: .+'):gsub(" ", "")
+      local id = sampGetPlayerIdByNickname(nick)
+      if id then
+        text = text:gsub(nick, ("{%s}%s [%s]{%s}"):format(("%06X"):format(bit.band(sampGetPlayerColor(id), 0xFFFFFF)), nick, id, ("%06X"):format(bit.rshift(color, 8))))
+      end
+    end
+
     if sInfo.isWorking == false then
       sInfo.isWorking = true
       logger.info("Проверка прошла успешно, рабочий день начат.")
     end
     lua_thread.create(function()
-      local tt = rusLower(text)
+      local tt = rusLower(textID)
       if tt:match("наряд") or tt:match('местоположение') or tt:match('понижен') or tt:match('уволен') or tt:match('комиссован') or tt:match('занесён') or tt:match('выговор') or tt:match('предупреждение') then
-        pushradioLog(text)
+        pushradioLog(textID)
       end
     end)
   end
@@ -2918,12 +2927,12 @@ function sampevents.onServerMessage(color, text)
       sInfo.isWorking = true
       logger.info("Проверка прошла успешно, рабочий день начат.")
     end
-    if text:match("^ %[.+%] .+ %w+_%w+:") then
-      local frac, rank, name, surname = text:match("^ %[(.+)%] (.+) (%w+)_(%w+):")
+    if textID:match("^ %[.+%] .+ %w+_%w+:") then
+      local frac, rank, name, surname = textID:match("^ %[(.+)%] (.+) (%w+)_(%w+):")
       data.players[#data.players + 1] = { nick = tostring(name.."_"..surname), rank = tostring(rank), fraction = tostring(frac) }
     end
-    if text:find("^ %[.-%] .- .-%: .-, разрешите въезд на вашу территорию, .-$") then
-      local frac, rank, nick, fracto, reason = text:match("^ %[(.-)%] (.-) (.-)%: (.-), разрешите въезд на вашу территорию, (.-)$")
+    if textID:find("^ %[.-%] .- .-%: .-, разрешите въезд на вашу территорию, .-$") then
+      local frac, rank, nick, fracto, reason = textID:match("^ %[(.-)%] (.-) (.-)%: (.-), разрешите въезд на вашу территорию, (.-)$")
       logger.debug(frac.." | "..nick.." | "..rank.." | "..fracto.." | "..reason)
       if (pInfo.settings.rank >= 12 or DEBUG_MODE) and rusLower(fracto) == rusLower(sInfo.fraction) then
         punkeyActive = 5
@@ -2935,7 +2944,7 @@ function sampevents.onServerMessage(color, text)
     end
     table.insert(data.departament, text)
   end
-  if text:find('Посылать сообщение в %/d можно раз в 10 секунд%!') then
+  if textID:find('Посылать сообщение в %/d можно раз в 10 секунд%!') then
     if punkey[5].text ~= nil and punkey[5].time > os.time() - 20 then
       punkeyActive = 5
       punkey[5].time = os.time()
@@ -2947,16 +2956,17 @@ function sampevents.onServerMessage(color, text)
   end
   -- Пасспорт
   if color == -169954390 then
-    if text:match("Имя: .+") then
-      local name = text:match("Имя: (.+)")
+    if textID:match("Имя: .+") then
+      local name = textID:match("Имя: (.+)")
       playersAddCounter = #data.players + 1
       data.players[playersAddCounter] = { nick = name }
     end
-    if text:match("Фракция: .+  Должность: .+") then
-      local frac, rk = text:match("Фракция: (.+)  Должность: (.+)")
+    if textID:match("Фракция: .+  Должность: .+") then
+      local frac, rk = textID:match("Фракция: (.+)  Должность: (.+)")
       data.players[playersAddCounter] = { nick = data.players[playersAddCounter].nick, rank = rk, fraction = frac }
     end
   end
+  return {color, text}
 end
 
 function onScriptTerminate(scr, quitGame)
@@ -4034,9 +4044,9 @@ imgui_windows.main = function(menu)
       imgui.Spacing()
       if sampIsPlayerConnected(data.functions.playerid.v) then
         imgui.Text(u8:encode('Вывод: '..localVars("punaccept", "blag", {
-          ['frac'] = data.functions.frac.v,
+          ['frac'] = u8:decode(data.functions.frac.v),
           ['id'] = sampGetPlayerNickname(data.functions.playerid.v):gsub("_", " "),
-          ['reason'] = data.functions.search.v
+          ['reason'] = u8:decode(data.functions.search.v)
         })))
       else
         imgui.Text(u8 ("Игрок с ID %s не подключен к серверу"):format(data.functions.playerid.v))
@@ -4353,11 +4363,12 @@ imgui_windows.main = function(menu)
     local chatconsole = imgui.ImBool(pInfo.settings.chatconsole)
     local doklad = imgui.ImBool(pInfo.settings.autodoklad)
     local hud = imgui.ImBool(pInfo.settings.hud)
+    local color_r = imgui.ImBool(pInfo.settings.color_r)
     local inputhelper = imgui.ImBool(pInfo.settings.inputhelper)
-    local tagbuffer = imgui.ImBuffer(tostring(pInfo.settings.tag), 256)
-    local googlebuffer = imgui.ImBuffer(tostring(pInfo.settings.gcode), 256)
-    local clistbuffer = imgui.ImBuffer(tostring(pInfo.settings.clist), 256)
-    local passbuffer = imgui.ImBuffer(tostring(pInfo.settings.password), 256)
+    local tagbuffer = imgui.ImBuffer(tostring(u8:encode(pInfo.settings.tag)), 256)
+    local googlebuffer = imgui.ImBuffer(tostring(u8:encode(pInfo.settings.gcode)), 256)
+    local clistbuffer = imgui.ImBuffer(tostring(u8:encode(pInfo.settings.clist)), 256)
+    local passbuffer = imgui.ImBuffer(tostring(u8:encode(pInfo.settings.password)), 256)
     ----------
     imgui.PushStyleColor(imgui.Col.ChildWindowBg, imgui.ImVec4(0.06, 0.05, 0.07, 1.00))
     imgui.Columns(2, _, false)
@@ -4479,6 +4490,12 @@ imgui_windows.main = function(menu)
       filesystem.save(pInfo, 'config.json')
     end
     imgui.SameLine(); imgui.Text(u8 'Включить InputHelper под строкой ввода'); imgui.SameLine(); imgui.TextDisabled(u8'(Авторы: teekyuu, DarkP1xel)');
+    ------------
+    if imgui.ToggleButton(u8 'color_r##1', color_r) then
+      pInfo.settings.color_r = color_r.v;
+      filesystem.save(pInfo, 'config.json')
+    end
+    imgui.SameLine(); imgui.Text(u8 'Цветные сообщения в рации')
     ------------
     imgui.Spacing()
     imgui.Separator()
@@ -5412,6 +5429,26 @@ function getcolorname(color)
   return string.format('{%s}[|||]{FFFFFF}', color)
 end
 
+function argb_to_rgba(argb)
+  local a, r, g, b = explode_argb(argb)
+  return join_argb(r, g, b, a)
+end
+
+function explode_argb(argb)
+  local a = bit.band(bit.rshift(argb, 24), 0xFF)
+  local r = bit.band(bit.rshift(argb, 16), 0xFF)
+  local g = bit.band(bit.rshift(argb, 8), 0xFF)
+  local b = bit.band(argb, 0xFF)
+  return a, r, g, b
+end
+
+function join_argb(a, r, g, b)
+  local argb = b
+  argb = bit.bor(argb, bit.lshift(g, 8))
+  argb = bit.bor(argb, bit.lshift(r, 16))
+  argb = bit.bor(argb, bit.lshift(a, 24))
+  return argb
+end
 
 function patch_samp_time_set(enable)
   if enable and default == nil then
@@ -5720,6 +5757,7 @@ filesystem.performOld = function(filename, tab)
   end
   return tab
 end
+
 function drawMembersPlayer(table)
 	-- ID  Nick  Rank  Status  AFK  Dist
 	local nickname = sampGetPlayerNickname(table.mid)
@@ -6032,7 +6070,6 @@ function secToTime(sec)
   return string.format("%02d:%02d:%02d", math.floor(hour) ,  minute - (math.floor(hour) * 60), second)
 end
 
-
 function getZones(zone)
   local names = {
     ["SUNMA"] = "Bayside Marina",
@@ -6216,6 +6253,12 @@ function getZones(zone)
   }
   if names[zone] == nil then return "Не определено" end
   return names[zone]
+end
+
+function sampGetPlayerIdByNickname(nick)
+  local _, myid = sampGetPlayerIdByCharHandle(playerPed)
+  if tostring(nick) == sampGetPlayerNickname(myid) then return myid end
+  for i = 0, 1000 do if sampIsPlayerConnected(i) and sampGetPlayerNickname(i) == tostring(nick) then return i end end
 end
 
 function getweaponname(weapon)
