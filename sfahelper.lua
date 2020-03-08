@@ -174,7 +174,7 @@ pInfo = {
     autologin = false,
     password = "",
     gauth = false,
-    color_r = false,
+    color_r = true,
     gcode = "",
     requests = true
   },
