@@ -8,7 +8,7 @@ script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
 script_version("1.6233")
 SCRIPT_ASSEMBLY = "1.52-release3"
-LAST_BUILD = "March 11, 2020 14:48:25"
+LAST_BUILD = "March 11, 2020 14:56:45"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
