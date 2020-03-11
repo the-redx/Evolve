@@ -2,12 +2,12 @@
 -- Licensed under MIT License
 -- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.52-release
+-- Version 1.52-release2
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.6231")
-SCRIPT_ASSEMBLY = "1.52-release"
+script_version("1.6232")
+SCRIPT_ASSEMBLY = "1.52-release2"
 LAST_BUILD = "March 8, 2020 22:27:00"
 DEBUG_MODE = true
 --------------------------------------------------------------------
@@ -91,7 +91,8 @@ window = {
   ['members'] = { bool = imgui.ImBool(false), cursor = true, draw = true } ,
   ['addtable'] = { bool = imgui.ImBool(false), cursor = true, draw = true },
   ['hud'] = { bool = imgui.ImBool(false), cursor = false, draw = true },
-  ['binder'] = { bool = imgui.ImBool(false), cursor = false, draw = false }
+  ['binder'] = { bool = imgui.ImBool(false), cursor = false, draw = false },
+  ["updater"] = { bool = imgui.ImBool(false), cursor = true, draw = true }
 }
 screenx, screeny = getScreenResolution()
 
@@ -716,10 +717,10 @@ function main()
     changeWeapons()
     sendDataToServer_Timer(600) -- В секундах
     --- Иницилизируем сокет
-    if pInfo.settings.socket and lsocket then
-      socketClient = websocket.client.copas({timeout = 2})
-      lua_thread.create(connectSocket)
-    end
+    -- if pInfo.settings.socket and lsocket then
+    --   socketClient = websocket.client.copas({timeout = 2})
+    --   lua_thread.create(connectSocket)
+    -- end
     ------------------
     logger.trace(("Пользователь успешно авторизован на сервере (Недельный онлайн: %d, Дневной онлайн: %d, Затрачено: %.3fs)"):format(pInfo.info.weekOnline, pInfo.info.dayOnline, os.clock() - mstime))
     if pInfo.settings.hud == true then window['hud'].bool.v = true end
@@ -2279,6 +2280,35 @@ function sendDataToServer_Timer(time)
   end)
 end
 
+function goupdate()
+  wait(250)
+  local dlstatus = require('moonloader').download_status
+  local goupdatestatus = false
+  downloadUrlToFile(updatelink, thisScript().path,
+    function(id, status, p1, p2)
+      if status == dlstatus.STATUS_DOWNLOADINGDATA then
+        print(string.format('Загружено %d из %d.', p1, p2))
+      elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
+        logger.info('Загрузка обновления успешно завершена')
+        atext('Обновление завершено. Просмотреть список изменений: /shupd')
+        goupdatestatus = true
+        lua_thread.create(function()
+          wait(500)
+          reloadScriptsParam = true
+          thisScript():reload()
+        end)
+      end
+      if status == dlstatus.STATUSEX_ENDDOWNLOAD then
+        if goupdatestatus == false then
+          logger.warn('Обновление прошло неудачно')
+          atext('Обновление прошло неудачно. Запускаю устаревшую версию..')
+          complete = true
+        end
+      end
+    end
+  )
+end
+
 -- Автообновление
 function autoupdate(json_url)
   logger.debug("Проверяем наличие обновлений. Очередь: "..tostring(asyncQueue))
@@ -2309,37 +2339,12 @@ function autoupdate(json_url)
       end
       logger.debug('Версия на сервере: '..tostring(updateversion))
       if updateversion > thisScript().version or (DEBUG_MODE and not found) then
-        lua_thread.create(function()
-          atext('Обнаружено обновление. Пытаюсь обновиться c "'..SCRIPT_ASSEMBLY..'" на "'..updateversiontext..'"')
-          logger.info("Обнаружено обновление. Версия: "..updateversiontext)
-          wait(250)
-          local dlstatus = require('moonloader').download_status
-          downloadUrlToFile(updatelink, thisScript().path,
-            function(id, status, p1, p2)
-              if status == dlstatus.STATUS_DOWNLOADINGDATA then
-                print(string.format('Загружено %d из %d.', p1, p2))
-              elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
-                logger.info('Загрузка обновления успешно завершена')
-                atext('Обновление завершено. Просмотреть список изменений: /shupd')
-                goupdatestatus = true
-                lua_thread.create(function()
-                  wait(500)
-                  reloadScriptsParam = true
-                  thisScript():reload()
-                end)
-              end
-              if status == dlstatus.STATUSEX_ENDDOWNLOAD then
-                if goupdatestatus == nil then
-                  logger.warn('Обновление прошло неудачно')
-                  atext('Обновление прошло неудачно. Запускаю устаревшую версию..')
-                  complete = true
-                end
-              end
-            end
-          )
-          return
-        end)
-      else logger.info("Доступных обновлений нет") complete = true end
+        atext('Обнаружено обновление SFA-Helper. Выберите необходимое действие в окне.')
+        imgui.Process = true
+        window['updater'].bool.v = true
+        isUpdateAvialible = true
+        logger.info("Обнаружено обновление. Версия: "..updateversiontext)
+      else logger.info('Доступных обновлений нет.'); complete = true end
       asyncQueue = false 
     else
       logger.warn("Ответ был получен с ошибкой")
@@ -2811,7 +2816,7 @@ function sampevents.onServerMessage(color, text)
       elseif color == -86 then -- Сел в вертолет на ЛСа
         if isCharInArea2d(PLAYER_PED, 2720.00 + 150, -2448.29 + 150, 2720.00 - 150, -2448.29 - 150, false) then
           punkeyActive = 3
-          punkey[3].text = localVars("autopost", "startp")
+          punkey[3].text = localVars("autopost", "startp", {})
           punkey[3].time = os.time()
           dtext(("Нажмите {139904}%s{FFFFFF} для оповещения об начале поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))         
         end
@@ -2828,7 +2833,7 @@ function sampevents.onServerMessage(color, text)
     if pInfo.settings.autodoklad == true then
       local materials = tonumber(textID:match("На складе LSA (%d+)/300000 материалов"))
       punkeyActive = 3
-      punkey[3].text = localVars("autopost", "endp")
+      punkey[3].text = localVars("autopost", "endp", {})
       punkey[3].time = os.time()
       dtext(("Нажмите {139904}%s{FFFFFF} для оповещения в рацию об окончании поставок"):format(table.concat(rkeys.getKeysName(config_keys.punaccept.v), " + ")))
     end
@@ -3060,6 +3065,14 @@ function imgui.OnDrawFrame()
         if imgui.MenuItem(u8 'Изменение отыгровок') then data.imgui.menu = 33 end
         if imgui.MenuItem(u8 'Настройки худа') then clearparams(); data.imgui.menu = 36 end
         if imgui.MenuItem(u8 'Экспорт настроек') then clearparams(); data.imgui.menu = 35 end
+        if imgui.MenuItem(u8 'Обновление') then
+          if isUpdateAvialible ~= nil then
+            window['main'].bool.v = false
+            window['updater'].bool.v = true
+          else
+            dtext('Нет доступных обновлений!')
+          end
+        end
         if imgui.MenuItem(u8 'Перезагрузить скрипт') then data.imgui.menu = 34 end
         imgui.EndMenu()
       end
@@ -3197,6 +3210,15 @@ function imgui.OnDrawFrame()
       imgui.Spacing()
       imgui.InputTextMultiline('##intextmulti', data.shpora.inputbuffer, imgui.ImVec2(-1, -1))
     end
+    imgui.End()
+  end
+  if window['updater'].bool.v then
+    imgui.SetNextWindowSize(imgui.ImVec2(700, 290), imgui.Cond.FirstUseEver)
+    imgui.SetNextWindowPos(imgui.ImVec2(screenx / 2, screeny / 2), imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+    imgui.Begin(u8('SFA-Helper | Обновление'), window['updater'].bool, imgui.WindowFlags.NoCollapse + imgui.WindowFlags.NoResize + imgui.WindowFlags.AlwaysAutoResize)
+    -----
+    imgui_windows.updater()
+    -----
     imgui.End()
   end
   if window['binder'].bool.v then
@@ -4365,9 +4387,9 @@ imgui_windows.main = function(menu)
     local hud = imgui.ImBool(pInfo.settings.hud)
     local color_r = imgui.ImBool(pInfo.settings.color_r)
     local inputhelper = imgui.ImBool(pInfo.settings.inputhelper)
-    local tagbuffer = imgui.ImBuffer(tostring(u8:encode(pInfo.settings.tag)), 256)
+    local tagbuffer = imgui.ImBuffer(tostring(pInfo.settings.tag ~= nil and u8:encode(pInfo.settings.tag) or ""), 256)
+    local clistbuffer = imgui.ImBuffer(tostring(pInfo.settings.clist ~= nil and u8:encode(pInfo.settings.clist) or ""), 256)
     local googlebuffer = imgui.ImBuffer(tostring(u8:encode(pInfo.settings.gcode)), 256)
-    local clistbuffer = imgui.ImBuffer(tostring(u8:encode(pInfo.settings.clist)), 256)
     local passbuffer = imgui.ImBuffer(tostring(u8:encode(pInfo.settings.password)), 256)
     ----------
     imgui.PushStyleColor(imgui.Col.ChildWindowBg, imgui.ImVec4(0.06, 0.05, 0.07, 1.00))
@@ -4376,7 +4398,11 @@ imgui_windows.main = function(menu)
     imgui.BeginChild('##1', imgui.ImVec2(380, 180), imgui.WindowFlags.AlwaysAutoResize)
     imgui.Text(u8:encode(string.format('Введите ваш Тег %s', pInfo.settings.tag ~= nil and "(Текущий: "..pInfo.settings.tag..")" or "")))
     if imgui.InputText('##tag', tagbuffer) then
-      pInfo.settings.tag = u8:decode(tagbuffer.v)
+      if(#tostring(tagbuffer.v) > 0) then
+        pInfo.settings.tag = u8:decode(tagbuffer.v)
+      else
+        pInfo.settings.tag = nil
+      end
     end
     imgui.SameLine()
     if imgui.Button(u8'Удалить тег') then
@@ -4385,7 +4411,11 @@ imgui_windows.main = function(menu)
     imgui.Spacing()
     imgui.Text(u8:encode(string.format('Введите ваш клист %s', pInfo.settings.clist ~= nil and "(Текущий: /clist "..pInfo.settings.clist..")" or "")))
     if imgui.InputText('##clist', clistbuffer) then
-      pInfo.settings.clist = u8:decode(clistbuffer.v)
+      if(#tostring(clistbuffer.v) > 0) then
+        pInfo.settings.clist = u8:decode(clistbuffer.v)
+      else
+        pInfo.settings.clist = nil
+      end
     end
     imgui.SameLine()
     if imgui.Button(u8'Удалить клист') then
@@ -4774,6 +4804,32 @@ imgui_windows.main = function(menu)
     if imgui.Button(u8'Удалить клист') then
       camouflage.clist = nil
     end
+  end
+end
+
+imgui_windows.updater = function()
+  imgui.Text(u8('Вышло обновление скрипта SFA-Helper! Что бы обновиться нажмите кнопку внизу. Список изменений:'))
+  imgui.Spacing()
+  imgui.Separator()
+  imgui.Spacing()
+  -- imgui.BeginChild("uuupdate", imgui.ImVec2(690, 200))
+  -- for line in ttt:gmatch('[^\r\n]+') do
+  --   imgui.TextWrapped(line)
+  -- end
+  -- imgui.EndChild()
+  imgui.Spacing()
+  imgui.Separator()
+  imgui.Spacing()
+  imgui.PushItemWidth(305)
+  if imgui.Button(u8("Обновить"), imgui.ImVec2(339, 25)) then
+    lua_thread.create(goupdate)
+    window['updater'].bool.v = false
+  end
+  imgui.SameLine()
+  if imgui.Button(u8("Отложить обновление"), imgui.ImVec2(339, 25)) then
+    window['updater'].bool.v = false
+    complete = true
+    dtext("Если вы захотите установить обновление, перейдите в {954F4F}/sh - Настройки - Обновление")
   end
 end
 
@@ -5223,8 +5279,10 @@ function localVars(category, subcategory, args)
       local pos = pInfo.settings.sex == 1 and 2 or 3
       local text = cat[pos]
       if text ~= nil then
-        for k, v in pairs(args) do
-          text = text:gsub('{'..k..'}', v)
+        if args ~= nil then
+          for k, v in pairs(args) do
+            text = text:gsub('{'..k..'}', v)
+          end
         end
         return text
       end
