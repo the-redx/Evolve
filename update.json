@@ -3,12 +3,24 @@
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.lua",
         "version":"1.6232",
 		"versiontext":"1.52-release2",
-		"testers":["Edward_Franklin", "Eduardo_Carmone", "Jonathan_Belin", "Archer_Belin"]
+		"testers":["Edward_Franklin", "Eduardo_Carmone", "Jonathan_Belin", "Archer_Belin"],
+		"updates": [
+			"Была изменена система синхронизации данных, повышена производительность;",
+			"Добавлен цветной чат. Активировать можно в /sh - Настройки;",
+			"Пофикшен баг с крашем скрипта",
+			"Изменена система обновлений"лен цветной чат. Активировать можно в ``/sh - Настройки``;
+		]
     },
     "sfahelpernew":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/dist/sfahelper.luac",
-        "version":"1.6231",
-		"versiontext":"1.52-release"
+        "version":"1.6232",
+		"versiontext":"1.52-release2",
+		"updates": [
+			"Была изменена система синхронизации данных, повышена производительность;",
+			"Добавлен цветной чат. Активировать можно в /sh - Настройки;",
+			"Пофикшен баг с крашем скрипта",
+			"Изменена система обновлений"лен цветно
+		]
     },
     "admintools":{
         "url":"https://raw.githubusercontent.com/the-redx/Evolve/master/dist/admintools.luac",

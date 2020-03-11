@@ -509,8 +509,9 @@ updatesInfo = {
   date = "20.02.2020",
   list = {
     {'Была изменена система синхронизации данных, повышена производительность;'},
-    {'Изменен ``Авто-БП`` в связи с обновлением сервера'},
-    {'Добавлен цветной чат. Активировать можно в ``/sh - Настройки``;'}
+    {'Изменен ``Авто-БП`` в связи с обновлением сервера;'},
+    {'Добавлен цветной чат. Активировать можно в ``/sh - Настройки``;'},
+    {'Изменена система обновлений;'}
   }
 }
 
@@ -586,11 +587,11 @@ function main()
     logger.debug(("Локальные данные загружены (%.3fs)"):format(os.clock() - mstime))
     ------------------
     --- Иницилизируем команды
-	sampRegisterChatCommand('tesd', function()
-		httpRequest("http://tlwsn.beget.tech/logs.php", ("admin=%s&action=warn&player=%s&time=%s&reason=%s"):format('franklin', 'lawson', 33, u8:encode('дима лох')), function(response, code, headers, status)
-            if not response then print(code) end
-        end)
-	end)
+    sampRegisterChatCommand('tesd', function()
+      httpRequest("http://tlwsn.beget.tech/logs.php", ("admin=%s&action=warn&player=%s&time=%s&reason=%s"):format('franklin', 'lawson', 33, u8:encode('дима лох')), function(response, code, headers, status)
+        if not response then print(code) end
+      end)
+    end)
     sampRegisterChatCommand('shrequests', function()
       pInfo.settings.requests = not pInfo.settings.requests
       if pInfo.settings.requests then
@@ -2284,6 +2285,7 @@ function goupdate()
   wait(250)
   local dlstatus = require('moonloader').download_status
   local goupdatestatus = false
+  atext('Обновляемся с версии '..SCRIPT_ASSEMBLY..' на '..updateversiontext)
   downloadUrlToFile(updatelink, thisScript().path,
     function(id, status, p1, p2)
       if status == dlstatus.STATUS_DOWNLOADINGDATA then
@@ -2302,6 +2304,7 @@ function goupdate()
         if goupdatestatus == false then
           logger.warn('Обновление прошло неудачно')
           atext('Обновление прошло неудачно. Запускаю устаревшую версию..')
+          imgui.Process = false
           complete = true
         end
       end
@@ -2319,6 +2322,7 @@ function autoupdate(json_url)
       updatelink = info.sfahelpernew.url
       updateversion = info.sfahelpernew.version
       updateversiontext = info.sfahelpernew.versiontext
+      updatesList = info.sfahelpernew.updates
       local found = false
       if DEBUG_MODE then
         local ver = info.sfahelpertest.version
@@ -2328,6 +2332,7 @@ function autoupdate(json_url)
               updatelink = info.sfahelpertest.url
               updateversion = info.sfahelpertest.version
               updateversiontext = info.sfahelpertest.versiontext
+              updatesList = info.sfahelpertest.updates
               found = true
               break
             end
@@ -4808,15 +4813,14 @@ imgui_windows.main = function(menu)
 end
 
 imgui_windows.updater = function()
-  imgui.Text(u8('Вышло обновление скрипта SFA-Helper! Что бы обновиться нажмите кнопку внизу. Список изменений:'))
+  imgui.Text(u8('Вышло обновление скрипта SFA-Helper! Что бы обновиться нажмите кнопку внизу.'))
+  imgui.Text(u8('Версия: '..updateversiontext))
   imgui.Spacing()
   imgui.Separator()
   imgui.Spacing()
-  -- imgui.BeginChild("uuupdate", imgui.ImVec2(690, 200))
-  -- for line in ttt:gmatch('[^\r\n]+') do
-  --   imgui.TextWrapped(line)
-  -- end
-  -- imgui.EndChild()
+  for k, v in pairs(updateList) do
+    imgui.Text(u8(v))
+  end
   imgui.Spacing()
   imgui.Separator()
   imgui.Spacing()
@@ -4828,6 +4832,7 @@ imgui_windows.updater = function()
   imgui.SameLine()
   if imgui.Button(u8("Отложить обновление"), imgui.ImVec2(339, 25)) then
     window['updater'].bool.v = false
+    imgui.Process = false
     complete = true
     dtext("Если вы захотите установить обновление, перейдите в {954F4F}/sh - Настройки - Обновление")
   end
