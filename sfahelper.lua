@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.52-release3
+-- Version 1.53-beta1
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.6233")
-SCRIPT_ASSEMBLY = "1.52-release3"
-LAST_BUILD = "March 11, 2020 14:56:45"
+script_version("1.6321")
+SCRIPT_ASSEMBLY = "1.53-beta1"
+LAST_BUILD = "March 11, 2020 14:48:25"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
