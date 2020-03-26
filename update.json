@@ -22,11 +22,11 @@
 		]
 	},
 	"admintools": {
-		"url": "https://raw.githubusercontent.com/the-redx/Evolve/master/dist/admintools.luac",
+		"url": "https://raw.githubusercontent.com/the-redx/Evolve/master/admintools.luac",
 		"version": "2.3"
 	},
 	"activity": {
-		"url": "https://raw.githubusercontent.com/the-redx/Evolve/master/dist/activity.luac",
+		"url": "https://raw.githubusercontent.com/the-redx/Evolve/master/activity.luac",
 		"version": "1.71"
 	}
 }
