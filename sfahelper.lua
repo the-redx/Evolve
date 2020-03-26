@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.53-beta1
+-- Version 1.53-beta2
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.6321")
-SCRIPT_ASSEMBLY = "1.53-beta1"
-LAST_BUILD = "March 11, 2020 14:48:25"
+script_version("1.6322")
+SCRIPT_ASSEMBLY = "1.53-beta2"
+LAST_BUILD = "March 26, 2020 21:19:35"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -505,13 +505,10 @@ complete = false
 -- Лог обновлений
 updatesInfo = {
   version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
-  type = "Фикс", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "20.02.2020",
+  type = "Плановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
+  date = "26.03.2020",
   list = {
-    {'Была изменена система синхронизации данных, повышена производительность;'},
-    {'Изменен ``Авто-БП`` в связи с обновлением сервера;'},
-    {'Добавлен цветной чат. Активировать можно в ``/sh - Настройки``;'},
-    {'Изменена система обновлений;'}
+    {'Обновлена система обновлений, хехехехеее;'}
   }
 }
 
@@ -542,7 +539,7 @@ function main()
     logger.debug(("Иницилизация настроек (%.3fs)"):format(os.clock() - mstime))
     complete = false
     ------
-    autoupdate("https://raw.githubusercontent.com/the-redx/Evolve/master/update.json")
+    autoupdate()
     while complete ~= true do wait(0) end
     logger.debug(("Проверка обновлений (%.3fs)"):format(os.clock() - mstime))
     complete = false
@@ -2285,8 +2282,8 @@ function goupdate()
   wait(250)
   local dlstatus = require('moonloader').download_status
   local goupdatestatus = false
-  atext('Обновляемся с версии '..SCRIPT_ASSEMBLY..' на '..updateversiontext)
-  downloadUrlToFile(updatelink, thisScript().path,
+  atext('Обновляемся с версии '..SCRIPT_ASSEMBLY..' на '..updateData.vertext)
+  downloadUrlToFile(updateData.link, thisScript().path,
     function(id, status, p1, p2)
       if status == dlstatus.STATUS_DOWNLOADINGDATA then
         print(string.format('Загружено %d из %d.', p1, p2))
@@ -2313,50 +2310,58 @@ function goupdate()
 end
 
 -- Автообновление
-function autoupdate(json_url)
+function autoupdate()
+  local updateUrl = string.format("https://raw.githubusercontent.com/the-redx/Evolve/%s/update.json", DEBUG_MODE and "develop" or "master")
+
   logger.debug("Проверяем наличие обновлений. Очередь: "..tostring(asyncQueue))
   asyncQueue = true
-  httpRequest(json_url, nil, function(response, code, headers, status)
+  httpRequest(updateUrl, nil, function(response, code, headers, status)
     if response then
       local info = decodeJson(response)
-      updatelink = info.sfahelpernew.url
-      updateversion = info.sfahelpernew.version
-      updateversiontext = info.sfahelpernew.versiontext
-      updatesList = info.sfahelpernew.updates
+
+      updateData = {
+        link = info.sfahelper.url,
+        ver = info.sfahelper.version,
+        vertext = info.sfahelper.versiontext,
+        list = info.sfahelper.updates,
+      }
+
+      --- Анти-пиздинг скрипта
       local found = false
       if DEBUG_MODE then
-        local ver = info.sfahelpertest.version
-        if ver > thisScript().version then
-          for k, v in ipairs(info.sfahelpertest.testers) do
+        if updateData.ver > thisScript().version then
+          for k, v in ipairs(info.sfahelper.testers) do
             if v == sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(playerPed))) then
-              updatelink = info.sfahelpertest.url
-              updateversion = info.sfahelpertest.version
-              updateversiontext = info.sfahelpertest.versiontext
-              updatesList = info.sfahelpertest.updates
               found = true
               break
             end
           end
         else found = true end
+
         if not found then
           dtext('У Вас обнаружена тестовая версия, хотя вы не являетесь тестером. Откатываемся...')
+          goupdate()
+          return
         end
       end
-      logger.debug('Версия на сервере: '..tostring(updateversion))
-      if updateversion > thisScript().version or (DEBUG_MODE and not found) then
+
+      logger.debug('Версия на сервере: '..tostring(updateData.vertext))
+      if updateData.ver > thisScript().version then
         atext('Обнаружено обновление SFA-Helper. Выберите необходимое действие в окне.')
         imgui.Process = true
         window['updater'].bool.v = true
         isUpdateAvialible = true
-        logger.info("Обнаружено обновление. Версия: "..updateversiontext)
-      else logger.info('Доступных обновлений нет.'); complete = true end
-      asyncQueue = false 
+        logger.info("Обнаружено обновление. Версия: "..updateData.vertext)
+      else
+        logger.info('Доступных обновлений нет.')
+        complete = true
+      end
     else
       logger.warn("Ответ был получен с ошибкой")
-      asyncQueue = false
       atext('Не удалось проверить обновления')
       complete = true      
     end
+    asyncQueue = false
   end)
 end
 
@@ -4814,11 +4819,11 @@ end
 
 imgui_windows.updater = function()
   imgui.Text(u8('Вышло обновление скрипта SFA-Helper! Что бы обновиться нажмите кнопку внизу.'))
-  imgui.Text(u8('Версия: '..updateversiontext))
+  imgui.Text(u8('Версия: '..updateData.vertext))
   imgui.Spacing()
   imgui.Separator()
   imgui.Spacing()
-  for k, v in pairs(updatesList) do
+  for k, v in pairs(updateData.list) do
     imgui.Text(v)
   end
   imgui.Spacing()
