@@ -1,9 +1,8 @@
 {
-	"sfahelpertest": {
-		"url": "https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.lua",
-		"version": "1.6321",
+	"sfahelper": {
+		"url": "https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.luac",
+		"version": "1.6233",
 		"versiontext": "1.52-release3",
-		"testers": ["Edward_Franklin", "Eduardo_Carmone", "Jonathan_Belin", "Archer_Belin"],
 		"updates": [
 			"Была изменена система синхронизации данных, повышена производительность;",
 			"Добавлен цветной чат. Активировать можно в sh - Настройки;",
@@ -12,7 +11,7 @@
 		]
 	},
 	"sfahelpernew": {
-		"url": "https://raw.githubusercontent.com/the-redx/Evolve/master/dist/sfahelper.luac",
+		"url": "https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.luac",
 		"version": "1.6233",
 		"versiontext": "1.52-release3",
 		"updates": [
