@@ -1,13 +1,10 @@
 {
 	"sfahelper": {
 		"url": "https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.luac",
-		"version": "1.6233",
-		"versiontext": "1.52-release3",
+		"version": "1.6331",
+		"versiontext": "1.53-release1",
 		"updates": [
-			"Была изменена система синхронизации данных, повышена производительность;",
-			"Добавлен цветной чат. Активировать можно в sh - Настройки;",
-			"Пофикшен баг с крашем скрипта",
-			"Изменена система обновлений"
+			"Изменена система обновлений;"
 		]
 	},
 	"sfahelpernew": {
