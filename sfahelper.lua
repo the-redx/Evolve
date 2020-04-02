@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.53-beta2
+-- Version 1.53-release1
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.6322")
-SCRIPT_ASSEMBLY = "1.53-beta2"
-LAST_BUILD = "March 26, 2020 21:19:35"
+script_version("1.6331")
+SCRIPT_ASSEMBLY = "1.53-release1"
+LAST_BUILD = "April 03, 2020 00:44:25"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -506,9 +506,9 @@ complete = false
 updatesInfo = {
   version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
   type = "Плановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "26.03.2020",
+  date = "03.04.2020",
   list = {
-    {'Обновлена система обновлений, хехехехеее;'}
+    {'Фикс системы обновлений;'}
   }
 }
 
@@ -588,15 +588,6 @@ function main()
       httpRequest("http://tlwsn.beget.tech/logs.php", ("admin=%s&action=warn&player=%s&time=%s&reason=%s"):format('franklin', 'lawson', 33, u8:encode('дима лох')), function(response, code, headers, status)
         if not response then print(code) end
       end)
-    end)
-    sampRegisterChatCommand('shrequests', function()
-      pInfo.settings.requests = not pInfo.settings.requests
-      if pInfo.settings.requests then
-        atext('Запросы к серверу успешно включены!')
-      else
-        atext('Запросы к серверу выключены!')
-        dtext('Внимание! Отключение запросов может помешать работе некоторых модулей')
-      end
     end)
     sampRegisterChatCommand('shmask', cmd_shmask)
     sampRegisterChatCommand('mon', cmd_mon)
@@ -2228,52 +2219,6 @@ function sendDataToServer_Timer(time)
         fraction = sInfo.fraction,
        rank = pInfo.settings.rank
       }))
-    end
-    while true do wait(1000)
-	  while sInfo.fraction == "no" do wait(1000) end
-      if pInfo.settings.requests then
-        -- Отправка онлайна
-        if request_data.last_online < os.time() - time + 10 then
-          local players = {}
-          for i = 0, 1000 do
-            if sampIsPlayerConnected(i) then
-              table.insert(players, {
-                id = i,
-                nick = sampGetPlayerNickname(i),
-                score = sampGetPlayerScore(i),
-                ping = sampGetPlayerPing(i)
-              })
-            end
-          end
-          local botInfo = ("status=OK&server=%s&online=%s&protect=%s&players=%s"):format(sInfo.server, sampGetPlayerCount(false), "b2e57db6d17b9d81f7f6efc5b85126c2", encodeJson(players))
-          request_data.last_online = os.time()
-          -----
-          logger.trace(botInfo)
-          httpRequest("https://sfahelper.herokuapp.com/setBot", botInfo, function(response, code, headers, status)
-            if not response then
-              logger.error("sendDataToServer: "..code)
-            else
-              logger.trace(u8:decode(response))
-              logger.info('Данные синхронизированы с сервером')
-            end
-          end)
-        end
-        -- Members фракции
-        if request_data.updated ~= 0 and request_data.last_request < os.time() - time and request_data.updated > os.time() - time * 2 then
-          local data = ("fraction=%s&online=%s&server=%s&updated=%s&protect=%s"):format(sInfo.fraction, request_data.members, sInfo.server, request_data.updated, "b2e57db6d17b9d81f7f6efc5b85126c2")
-          request_data.updated = 0
-          request_data.last_request = os.time()
-          httpRequest("https://sfahelper.herokuapp.com/members", data, function(response, code, headers, status)
-            if not response then
-              logger.error("sendDataToServer: "..code)
-              logger.error('Params: '..data)
-            else
-              logger.trace(u8:decode(response))
-              logger.info('Данные синхронизированы с сервером')
-            end
-          end)
-        end
-      end
     end
   end)
 end
