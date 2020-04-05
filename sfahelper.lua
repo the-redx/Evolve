@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.53-release1
+-- Version 1.54-release1
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.6331")
-SCRIPT_ASSEMBLY = "1.53-release1"
-LAST_BUILD = "April 03, 2020 00:44:25"
+script_version("1.6431")
+SCRIPT_ASSEMBLY = "1.54-release1"
+LAST_BUILD = "April 06, 2020 01:50:00"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -176,8 +176,7 @@ pInfo = {
     password = "",
     gauth = false,
     color_r = true,
-    gcode = "",
-    requests = true
+    gcode = ""
   },
   ranknames = {'Рядовой', 'Ефрейтор', 'Мл.Сержант', 'Сержант', 'Ст.Сержант', 'Старшина', 'Прапорщик', 'Мл.Лейтенант', 'Лейтенант', 'Ст.Лейтенант', 'Капитан', 'Майор', 'Подполковник', 'Полковник', 'Генерал'},
   gov = {},
@@ -449,7 +448,21 @@ watchList = {}
 selectRadio = { id = 0, title = "", volume = 0.6, url = "", stream = 0 }
 changeText = { id = 0, sex = 0, values = {} }
 spectate_list = {}
-newsInfo = {}
+newsInfo = {
+  "Хотите пометить сектор не имея карты с квадратами? Используйте: /setkv [квадрат]",
+  "С помощью команды /watch вы можете следить за другими бойцами",
+  "Меню взаимодействия с игроком можно вызвать с помощью Таргета и зажатия клавиши 'Колёсико мышки'",
+  "В нашем биндере есть специальные тэги, с помощью которых можно создать любой бинд!",
+  "Специальная функция 'Авто-доклады' поможет вам навсегда забыть про любые доклады",
+  "Хотите поставить свои отыгровки или доклады? Вы можете сделать это в /sh - Настройки - Настройки отыгровок",
+  "Не нравится обычный мемберс? У нас три мемберса на любой вкус! Используйте: /members [0-2]",
+  "При помощи сочетания клавиш 'Alt + ПКМ над игроком' вы можете вызвать Target Menu",
+  "При помощи тэга '@id' вы можете вывести полный ник игрока в чате или даже в команде",
+  "При помощи тэга '#id' вы можете вывести РП ник игрока в чате или даже в команде",
+  "В Настройках вы можете настроить свой худ под любой вкус",
+  "Надоело скучное серверное радио? В нашем радио есть огромный набор радиостанций (/shradio)",
+  "Все ещё печатаете устав на листочке? У нас шпоры! (/sh - Шпоры)"
+}
 adminsList = {}
 zoness = {}
 tCarsName = {"Landstalker", "Bravura", "Buffalo", "Linerunner", "Perrenial", "Sentinel", "Dumper", "Firetruck", "Trashmaster", "Stretch", "Manana", "Infernus",
@@ -506,9 +519,14 @@ complete = false
 updatesInfo = {
   version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
   type = "Плановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
-  date = "03.04.2020",
+  date = LAST_BUILD,
   list = {
-    {'Фикс системы обновлений;'}
+    {'Убрана команда ``/addbl`` из-за ненадобности и лагов;'},
+    {'Убраны лишние команды из сборки;'}.
+    {'В меню слежки возвращена проверка на игрока в стриме;'},
+    {'Таймер подсказок увеличен до 20-25 минут, подсказки убраны из сервера;'},
+    {'Раздел с отправкой гос волны теперь доступен с 12 ранга;'},
+    {'Версии ниже 1.4 больше не поддерживаются;'}
   }
 }
 
@@ -529,12 +547,7 @@ function main()
     complete = false
     ------
     filesystem.path('moonloader/SFAHelper/accounts/'..sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(playerPed))))
-    local isDefined = doesDirectoryExist('moonloader\\SFAHelper\\accounts')
     filesystem.init(filesystem.path())
-    if not isDefined then
-      -- Переносим файлы из версии < 1.4
-      filesystem.movefiles(filesystem.path(), 'moonloader/SFAHelper', { "config.json", "keys.json", "posts.json", "punishlog.json" })
-    end
     while complete ~= true do wait(0) end
     logger.debug(("Иницилизация настроек (%.3fs)"):format(os.clock() - mstime))
     complete = false
@@ -542,11 +555,6 @@ function main()
     autoupdate()
     while complete ~= true do wait(0) end
     logger.debug(("Проверка обновлений (%.3fs)"):format(os.clock() - mstime))
-    complete = false
-    ------
-    loadPermissions("https://docs.google.com/spreadsheets/d/1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y/export?format=tsv&id=1qmpQvUCoWEBYfI3VqFT3_08708iLaSKPfa-A6QaHw_Y&gid=1568566199") -- remove
-    while complete ~= true do wait(0) end
-    logger.debug(("Загрузка прав доступа (%.3fs)"):format(os.clock() - mstime))
     complete = false
     ------------------
     --- Загружаем конфиги
@@ -584,11 +592,6 @@ function main()
     logger.debug(("Локальные данные загружены (%.3fs)"):format(os.clock() - mstime))
     ------------------
     --- Иницилизируем команды
-    sampRegisterChatCommand('tesd', function()
-      httpRequest("http://tlwsn.beget.tech/logs.php", ("admin=%s&action=warn&player=%s&time=%s&reason=%s"):format('franklin', 'lawson', 33, u8:encode('дима лох')), function(response, code, headers, status)
-        if not response then print(code) end
-      end)
-    end)
     sampRegisterChatCommand('shmask', cmd_shmask)
     sampRegisterChatCommand('mon', cmd_mon)
     sampRegisterChatCommand('setkv', cmd_setkv)
@@ -613,7 +616,6 @@ function main()
     sampRegisterChatCommand('lec', cmd_lecture)
     sampRegisterChatCommand('reconnect', cmd_reconnect)
     sampRegisterChatCommand('createpost', cmd_createpost)
-    sampRegisterChatCommand('addbl', cmd_addbl)
     sampRegisterChatCommand('vig', cmd_vig)
     sampRegisterChatCommand('match', cmd_match)
     sampRegisterChatCommand('contract', cmd_contract)
@@ -626,7 +628,6 @@ function main()
       filesystem.save(pInfo, 'config.json')
     end)
     --- Команды, для которых было лень создавать функции
-    sampRegisterChatCommand('shnews', function() window['main'].bool.v = true; data.imgui.menu = 44 end)
     sampRegisterChatCommand('shnote', function() window['shpora'].bool.v = not window['shpora'].bool.v end)
     sampRegisterChatCommand('shradio', function() window['main'].bool.v = true; data.imgui.menu = 3 end)
     sampRegisterChatCommand('sfahelper', function() window['main'].bool.v = not window['main'].bool.v end)
@@ -704,12 +705,6 @@ function main()
     --- Иницилизируем различные таймеры
     secoundTimer()
     changeWeapons()
-    sendDataToServer_Timer(600) -- В секундах
-    --- Иницилизируем сокет
-    -- if pInfo.settings.socket and lsocket then
-    --   socketClient = websocket.client.copas({timeout = 2})
-    --   lua_thread.create(connectSocket)
-    -- end
     ------------------
     logger.trace(("Пользователь успешно авторизован на сервере (Недельный онлайн: %d, Дневной онлайн: %d, Затрачено: %.3fs)"):format(pInfo.info.weekOnline, pInfo.info.dayOnline, os.clock() - mstime))
     if pInfo.settings.hud == true then window['hud'].bool.v = true end
@@ -783,23 +778,12 @@ function main()
           if v ~= nil and sampIsPlayerConnected(v.id) then
             local string = ""
             local color = ("%06X"):format(bit.band(sampGetPlayerColor(v.id), 0xFFFFFF))
-            string = ("{%s}%s [%s]{FFFFFF}"):format(color, v.nick, v.id) -- temp
-
-            -- local result, ped = sampGetCharHandleBySampPlayerId(v.id)
-            -- if doesCharExist(ped) then
-            --   local mx, my, mz = getCharCoordinates(PLAYER_PED)
-            --   local cx, cy, xz = getCharCoordinates(ped)
-            --   local distance = ("%0.2f"):format(getDistanceBetweenCoords3d(mx, my, mz,cx, cy, xz))
-            --   local forma = "Нет"
-            --   if sampGetFraktionBySkin(v.id) == "Army" then
-            --     local skin = getCharModel(ped)
-            --     if skin == 252 then forma = "Голый"
-            --     else forma = "Да" end
-            --   end
-            --   string = ("{%s}%s [%s]{ffffff} - {00BF80}Форма: %s{FFFFFF} - {00BF80}Dist: %s"):format(color, v.nick, v.id, forma, distance)
-            -- else
-            --   string = ("{%s}%s [%s]{FFFFFF} - {ec3737}No stream"):format(color, v.nick, v.id)
-            -- end
+            local result, ped = sampGetCharHandleBySampPlayerId(v.id)
+            if doesCharExist(ped) then
+              string = ("{%s}%s [%s]{ffffff} - {00BF80}In stream"):format(color, v.nick, v.id)
+            else
+              string = ("{%s}%s [%s]{FFFFFF} - {ec3737}No stream"):format(color, v.nick, v.id)
+            end
             count = count + 1
             renderFontDrawText(watchFont, string, pInfo.settings.watchX, pInfo.settings.watchY + (count * checkerheight), -1)
             watchList[#watchList + 1] = string
@@ -863,6 +847,7 @@ function main()
       --- Обновляем некоторые переменные
       local cx, cy, cz = getCharCoordinates(PLAYER_PED)
       local zcode = getNameOfZone(cx, cy, cz)
+      if zcode == nil then logger.debug(zcode) end
       playerZone = getZones(zcode)
       sInfo.armour = getCharArmour(PLAYER_PED)
       sInfo.health = getCharHealth(PLAYER_PED)
@@ -922,32 +907,6 @@ function cmd_match(args)
   playerRadar = addSpriteBlipForContactPoint(px, py, pz, 14)
   atext(('Маркер установлен на игрока %s[%d]'):format(sampGetPlayerNickname(id), id))
   atext('Чтобы убрать маркер, введите команду /match ещё раз')
-end
-
--- Добавление в ЧС
-function cmd_addbl(args)
-  if sInfo.blPermissions == false then dtext('Для работы с данной командой необходима привязка!') return end
-  if sInfo.server ~= "185.169.134.67:7777" then dtext('Данная команда не доступна для вашего сервера') return end
-  if #args == 0 then
-    dtext('Введите: /addbl [playerid/nick] [степень (1-4)] [доказательства] [причина]')
-    dtext('Для вноса игрока в ЧС без доказательств, введите \'-\' в соответствующее поле')
-    return
-  end
-  local argSt = string.split(args, " ", 4)
-  if argSt[1] == nil then dtext('Неверный ID игрока!') return end
-  if argSt[3] == nil or argSt[4] == nil then dtext("Неверные параметры!") return end
-  local pid = tonumber(argSt[1])
-  local type = tonumber(argSt[2])
-  if type == nil or type < 1 or type > 4 then dtext('Неверные параметры!') return end
-  if sInfo.playerid == pid or sInfo.nick == argSt[1] then dtext('Вы не можете внести себя в ЧС!') return end
-  if pid ~= nil then
-    if sampIsPlayerConnected(pid) then
-      argSt[1] = sampGetPlayerNickname(pid)
-    end
-  end
-  if argSt[3] == "-" then argSt[3] = "Будут внесены позже" end
-  atext(("Внос в ЧС: [Ник: %s] [Степень: %s] [Док-ва: %s] [Причина: %s]"):format(argSt[1], type, argSt[3], argSt[4]))
-  sendGoogleMessage("blacklist", argSt[1], argSt[3], type, argSt[4], os.time())
 end
 
 -- Очистка чата
@@ -1882,15 +1841,10 @@ function secoundTimer()
       -- Таймер новостей
       if newsTimer <= 0 then
         if newsTimer == 0 and #newsInfo > 0 then
-          local adversites = {}
-          for k, v in ipairs(newsInfo) do
-            if v.rep == true and v.endtime > os.time() then table.insert(adversites, v) end
-          end
-          local rand = math.random(1, #adversites)
-          dtext(("%s."):format(adversites[rand].message))
-          --dtext(("Author: %s%s"):format(adversites[rand].author, adversites[rand].verified and " {228B22}(Подтвержден){FFFFFF}" or ""))
+          local rand = math.random(1, #newsInfo)
+          dtext(("%s."):format(newsInfo[rand]))
         end
-        newsTimer = math.random(900, 1200) -- раз в 15-20 минут
+        newsTimer = math.random(1200, 1500) -- раз в 20-25 минут
       end
       newsTimer = newsTimer - 1
       ----------==============----------
@@ -2125,30 +2079,6 @@ function loadFiles()
   end)
 end
 
--- Старая загрузка полномочий
-function loadPermissions(table_url)
-  local nick = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(playerPed)))
-  logger.trace("Проверяем права доступа. Очередь: "..tostring(asyncQueue))
-  asyncQueue = true
-  httpRequest(table_url, nil, function(response, code, headers, status)
-    if response then
-      for line in response:gmatch('[^\r\n]+') do
-        if line:match("^blacklist\t"..nick.."$") then
-          sInfo.blPermissions = true
-        end
-      end
-      logger.trace("Права пользователей успешно загружены")
-      complete = true
-      asyncQueue = false
-      return
-    else
-      logger.trace("Права пользователей не загружены")
-      complete = true
-      asyncQueue = false
-      return
-    end
-  end)
-end
 
 function pushradioLog(text)
   local result = {}
@@ -2172,55 +2102,6 @@ function pushradioLog(text)
   end
   table.insert(punishjson, result)
   filesystem.save(punishjson, "punishlog.json")
-end
-
--- Загрузка новостей
-function loadNews(url)
-  logger.debug("Загружаем свежие новости. Очередь: "..tostring(asyncQueue))
-  asyncQueue = true
-  httpRequest(url, nil, function(response, code, headers, status)
-    if response then
-      logger.trace(response)
-      local info = decodeJson(response)
-      if info.success then
-        local unread = 0
-        for k, v in ipairs(info.message) do
-          local unr = false
-          if v.rep == false and pInfo.settings.newsload < tonumber(v.id) then
-            unread = unread + 1
-            unr = true
-          end
-          table.insert(newsInfo, { rep = v.rep, unread = unr, id = tonumber(v.id), startt = v.startt, message = u8:decode(v.message), endtime = v.endt, verified = v.verified, author = v.author })
-        end
-        logger.info('Загружено '..#info.message..' новостей. Дата синхронизации: '..info.time)
-        if unread > 0 then
-          dtext('У Вас '..unread..' новых сообщений. Подробнее: /shnews')
-        end
-      else logger.warn('Ошибка сервера: '..info.message) end 
-      complete = true
-      asyncQueue = false 
-    else
-      logger.warn("Ответ был получен с ошибкой")
-      asyncQueue = false
-      complete = true      
-    end
-  end) 
-end
-
-function sendDataToServer_Timer(time)
-  lua_thread.create(function()
-    wait(5000)
-    --- Загружаем новости из сервера
-    if pInfo.settings.requests then
-      loadNews("https://redx-dev.web.app/sfahelper?data="..encodeJson({
-        method = "news",
-        nick = sInfo.nick,
-        server = sInfo.server:gsub("%.", "_"),
-        fraction = sInfo.fraction,
-       rank = pInfo.settings.rank
-      }))
-    end
-  end)
 end
 
 function goupdate()
@@ -3005,7 +2886,7 @@ function imgui.OnDrawFrame()
         if imgui.MenuItem(u8 'Автодоклад с постов') then clearparams(); data.imgui.menu = 12 end -- + создание
         if imgui.MenuItem(u8 'Занять гос.волну') then clearparams(); data.imgui.menu = 13 end
         if imgui.MenuItem(u8 'Лог департамента') then clearparams(); data.imgui.menu = 14 end
-        if pInfo.settings.rank >= 14 or sInfo.nick == "Eduardo_Carmone" then
+        if pInfo.settings.rank >= 12 then
           if imgui.MenuItem(u8 'Отправить гос. волну') then clearparams(); data.imgui.menu = 15 end
         end
         if imgui.MenuItem(u8 'Панель слежки') then clearparams(); data.imgui.menu = 16 end
@@ -3791,32 +3672,6 @@ imgui_windows.main = function(menu)
           return
         end)
       else atext('Выберите нужныш шаблон для объявления!') end
-    end
-  elseif data.imgui.menu == 44 then
-    if newsImguiList == nil then
-      newsImguiList = {}
-      for i = #newsInfo, 1, -1 do
-        if newsInfo[i].rep == false then
-          table.insert(newsImguiList, newsInfo[i])
-          if newsInfo[i].id > pInfo.settings.newsload then
-            pInfo.settings.newsload = newsInfo[i].id
-            filesystem.save(pInfo, 'config.json')
-          end
-        end
-      end
-    end
-    for k, v in ipairs(newsImguiList) do
-      imgui.BeginChild('##child'..k, imgui.ImVec2(imgui.GetWindowWidth() - 25, 150), true, imgui.WindowFlags.AlwaysAutoResize)
-      imgui.TextColoredRGB(("От: %s%s"):format(v.author, v.verified and " {4885ed}(Подтвержден)" or ""))
-      imgui.SameLine(imgui.GetWindowWidth() - 225.0)
-      imgui.Text(u8'Отправлено: '..v.startt)
-      imgui.Separator()
-      local lines = string.split(v.message, '|')
-      for i = 1, #lines do
-        imgui.Text(u8(lines[i]))
-      end
-      imgui.Spacing()
-      imgui.EndChild()
     end
   elseif data.imgui.menu == 43 then
     imgui.PushItemWidth(500)
@@ -5698,26 +5553,6 @@ filesystem.save = function(table, file)
   if sfa then
     sfa:write(encodeJson(table))
     sfa:close()
-  end
-end
-filesystem.movefiles = function(to, from, files)
-  for i = 1, #files do
-    if doesFileExist(from..'/'..files[i]) then
-      local mfile = io.open(from..'/'..files[i], 'r')
-      if mfile then
-        logger.trace('Copying file from: '..from..'/'..files[i])
-        local filetext = mfile:read('*a')
-        if filetext ~= nil then
-          local tfile = io.open(to..'/'..files[i], 'w')
-          if tfile then
-            logger.trace('Copying file to: '..to..'/'..files[i])
-            tfile:write(filetext)
-            tfile:close()
-          end
-        end
-        mfile:close()
-      end
-    end
   end
 end
 filesystem.performOld = function(filename, tab)
