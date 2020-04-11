@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.54-release1
+-- Version 1.54-release2
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.6431")
-SCRIPT_ASSEMBLY = "1.54-release1"
-LAST_BUILD = "April 06, 2020 01:50:00"
+script_version("1.6432")
+SCRIPT_ASSEMBLY = "1.54-release2"
+LAST_BUILD = "April 11, 2020 20:50:45"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -526,7 +526,8 @@ updatesInfo = {
     {'В меню слежки возвращена проверка на игрока в стриме;'},
     {'Таймер подсказок увеличен до 20-25 минут, подсказки убраны из сервера;'},
     {'Раздел с отправкой гос волны теперь доступен с 12 ранга;'},
-    {'Версии ниже 1.4 больше не поддерживаются;'}
+    {'Версии ниже 1.4 больше не поддерживаются;'},
+    {'Пофикшено получение ранга из /stats'},
   }
 }
 
@@ -1043,32 +1044,33 @@ function cmd_stats(args)
     sampSendChat('/stats')
     while not sampIsDialogActive() do wait(0) end
     proverkk = sampGetDialogText()
-    local frakc = proverkk:match('.+Организация%:%s+(.+)%s+Ранг')
-    local rang = proverkk:match('.+Ранг%:%s+(.+)%s+Работа')
-    local sex = proverkk:match('.+Пол%:%s+(.+)')
-    sInfo.fraction = tostring(frakc)
+    local frakc = proverkk:match('Организация%s+(.-)\n')
+    local rank = proverkk:match('Должность%s+(%d) .-\n')
+    local sex = proverkk:match('Пол%s+(.-)\n')
+
+    --- Определяем пол
     if pInfo.settings.sex == nil then
       if sex == "Мужчина" then pInfo.settings.sex = 1
       elseif sex == "Женщина" then pInfo.settings.sex = 0
       else pInfo.settings.sex = 1 end
     end
+    logger.info(('Пол определен: %s'):format(pInfo.settings.sex == 1 and "Мужской" or "Женский"))
+
+    --- Определяем фракцию
+    sInfo.fraction = tostring(frakc)
     if sInfo.fraction == "nil" then sInfo.fraction = "no" end
     logger.info(('Фракция определена: %s'):format(sInfo.fraction))
-    logger.info(('Пол определен: %s'):format(pInfo.settings.sex == 1 and "Мужской" or "Женский"))
+    
+    --- Определяем ранг
     if rankings[sInfo.fraction] ~= nil then
-      for i = 1, #pInfo.ranknames do
-        if pInfo.ranknames[i] == rang then
-          pInfo.settings.rank = i
-          logger.info(('Ранг определен: %s[%d]'):format(rang, pInfo.settings.rank))
-          break
-        end
-        if rang == "Нет" then
-          logger.warn('Ранга нет в статистике')
-          break
-        end
-        if i == #pInfo.ranknames then
-          logger.warn('Ранг не определен')
-        end
+      rank = tonumber(rank)
+      if rank == 0 then
+        logger.warn('Ранга нет в статистике!')
+      elseif rank > #pInfo.ranknames then
+        logger.warn('Ранг не определен')
+      else
+        pInfo.settings.rank = rank
+        logger.info(('Ранг определен: %s[%d]'):format(pInfo.ranknames[rank], rank))
       end
     else
       logger.warn('Данная фракция не поддерживается скриптом. Некоторые функции могут быть недоступны')
@@ -2270,7 +2272,6 @@ end
 
 -- Авто-БП
 function sampevents.onShowDialog(dialogid, style, title, button1, button2, text)
-  --logger.trace(dialogid)
   if dialogid == 9653 and selectWarehouse >= 0 then
     lua_thread.create(function()
       wait(1)
