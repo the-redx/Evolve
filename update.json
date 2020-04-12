@@ -1,11 +1,10 @@
 {
 	"sfahelper": {
 		"url": "https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.luac",
-		"version": "1.6434",
-		"versiontext": "1.54-release4",
+		"version": "1.6435",
+		"versiontext": "1.54-release5",
 		"updates": [
-			"Изменено получение ранга из статистики в связи с обновлением;",
-			"Пофикшен баг с закрытием любого окна, перед /stats"
+			"Попытка номер 4;"
 		]
 	},
 	"sfahelpernew": {
