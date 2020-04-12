@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.54-release3
+-- Version 1.54-release4
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.6433")
-SCRIPT_ASSEMBLY = "1.54-release3"
-LAST_BUILD = "April 12, 2020 12:32:45"
+script_version("1.6434")
+SCRIPT_ASSEMBLY = "1.54-release4"
+LAST_BUILD = "April 12, 2020 13:32:45"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -1028,10 +1028,10 @@ end
 function cmd_stats(args)
   lua_thread.create(function()
     sampSendChat('/stats')
-    while not sampIsDialogActive() do wait(0) end
+    while not sampIsDialogActive() and sampGetCurrentDialogId() == 9901 do wait(0) end
     proverkk = sampGetDialogText()
     local frakc = trim1(proverkk:match('Организация%s+(.-)\n'))
-    local rank = trim1(proverkk:match('Должность%s+(%d) .-\n'))
+    local rank = trim1(proverkk:match('Должность%s+(%d+) .-\n'))
     local sex = trim1(proverkk:match('Пол%s+(.-)\n'))
 
     --- Определяем пол
@@ -1050,7 +1050,7 @@ function cmd_stats(args)
     --- Определяем ранг
     if rankings[sInfo.fraction] ~= nil then
       rank = tonumber(rank)
-      if rank == 0 then
+      if rank == nil or rank == 0 then
         logger.warn('Ранга нет в статистике!')
       elseif rank > #pInfo.ranknames then
         logger.warn('Ранг не определен')
@@ -2064,7 +2064,7 @@ function autoupdate()
       end
     else
       logger.warn("Ответ был получен с ошибкой")
-      atext('Не удалось проверить обновления')
+      dtext('Не удалось проверить обновления')
       complete = true      
     end
     asyncQueue = false
