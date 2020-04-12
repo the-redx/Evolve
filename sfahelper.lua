@@ -8,7 +8,7 @@ script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
 script_version("1.6432")
 SCRIPT_ASSEMBLY = "1.54-release2"
-LAST_BUILD = "April 11, 2020 20:50:45"
+LAST_BUILD = "April 12, 2020 11:20:45"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -40,7 +40,6 @@ local lbasexx, basexx     = pcall(require, 'basexx')
 local lsha1, sha1         = pcall(require, 'sha1')
 local lffi, ffi           = pcall(require, 'ffi')
 local lpie, pie           = pcall(require, 'imgui_piemenu')
-local lsocket, websocket  = pcall(require, 'websocket')
 ------------------
 encoding.default = 'CP1251'
 local u8 = encoding.UTF8
@@ -73,14 +72,6 @@ logger = {
     { name = "error", color = "8b0000", },
     { name = "fatal", color = "FF00FF", },
   }
-}
-
-socketInfo = {
-  active = false,
-  ip = 'ws://sfahelper.herokuapp.com',
-  map_hide = false,
-  chat = {},
-  actions = {}
 }
 
 -- Imgui переменные
@@ -150,7 +141,6 @@ pInfo = {
   settings = {
     newsload = 0,
     rank = 0,
-    socket = false,
     hud = true,
     hudX = screenx / 1.5,
     watchhud = true,
@@ -527,7 +517,7 @@ updatesInfo = {
     {'Таймер подсказок увеличен до 20-25 минут, подсказки убраны из сервера;'},
     {'Раздел с отправкой гос волны теперь доступен с 12 ранга;'},
     {'Версии ниже 1.4 больше не поддерживаются;'},
-    {'Пофикшено получение ранга из /stats'},
+    {'Изменено получение ранга из статистики в связи с обновлением;'},
   }
 }
 
@@ -623,11 +613,7 @@ function main()
     sampRegisterChatCommand('rpweap', cmd_rpweap)
     sampRegisterChatCommand('punishlog', cmd_punishlog)
     sampRegisterChatCommand('addtable', cmd_addtable)
-    sampRegisterChatCommand('shteam', function()
-      pInfo.settings.socket = not pInfo.settings.socket
-      atext('Сокет '..(pInfo.settings.socket and "включен" or "выключен"))
-      filesystem.save(pInfo, 'config.json')
-    end)
+    
     --- Команды, для которых было лень создавать функции
     sampRegisterChatCommand('shnote', function() window['shpora'].bool.v = not window['shpora'].bool.v end)
     sampRegisterChatCommand('shradio', function() window['main'].bool.v = true; data.imgui.menu = 3 end)
@@ -1044,9 +1030,9 @@ function cmd_stats(args)
     sampSendChat('/stats')
     while not sampIsDialogActive() do wait(0) end
     proverkk = sampGetDialogText()
-    local frakc = proverkk:match('Организация%s+(.-)\n')
-    local rank = proverkk:match('Должность%s+(%d) .-\n')
-    local sex = proverkk:match('Пол%s+(.-)\n')
+    local frakc = trim1(proverkk:match('Организация%s+(.-)\n'))
+    local rank = trim1(proverkk:match('Должность%s+(%d) .-\n'))
+    local sex = trim1(proverkk:match('Пол%s+(.-)\n'))
 
     --- Определяем пол
     if pInfo.settings.sex == nil then
@@ -1704,111 +1690,6 @@ function changeWeapons()
   end)
 end
 
-function parseSocket(res)
-  logger.trace('parseSocket()')
-  if res.data then
-    -- Чат, обновление информации о тиммейтах, ...
-  end
-  -----
-  if res.act then
-    -- Добавление, изменение, изгнание из группы, предложение что-то сделать
-  end
-  --[[
-    socketInfo = {
-      active = false,
-      ip = 'ws://sfahelper.herokuapp.com',
-      map_hide = false,
-      chat = {},
-      actions = {}
-    }
-  ]]
-end
-
-function updateSocket()
-  while socketInfo.active do
-    wait(0)
-    local unix_time = os.clock()
-    local request = {
-      action = 'get',
-      nick = sInfo.nick,
-      server = sInfo.server,
-      time = unix_time
-    }
-    request.data = { health = getCharHealth(playerPed), armour = getCharArmour(playerPed) }
-    if getActiveInterior() == 0 and not socketInfo.map_hide then
-      local x, y, z = getCharCoordinates(playerPed)
-      request.data.pos = {x = x, y = y, z = z}
-      request.data.heading = getCharHeading(playerPed)
-    end
-    -- Здесь ещё будем отправлять мемберс и прочую фигню, которая висит на redx-dev
-    if #socketInfo.actions > 0 then
-      request.act = socketInfo.actions
-      socketInfo.actions = {}
-    end
-    logger.trace('REQUEST: '..encodeJson(request))
-    local ok = socketClient:send(encodeJson(request))
-    if ok then
-      local message, opcode = socketClient:receive()
-      if message then
-        local response = decodeJson(message)
-        logger.trace(('RESPONSE: %s | PING: Client(0s) -> Server(%0.3fs) -> Client (%0.3fs)'):format(message, response.time, os.clock() - unix_time))
-        if response.code == "OK" then
-          parseSocket(response)
-        else logger.warn(response.message) end
-      else
-        loogger.trace("WebSocket: Ответ не был получен")
-      end
-    else
-      dtext('Соединение с сервером прервано')
-      disconnectSocket()
-    end
-  end
-end
-
-function disconnectSocket()
-  if socketInfo.active == false then return end
-  socketInfo.active = false
-  socketClient:close()
-end
-
-function connectSocket()
-  logger.debug('connectSocket')
-  if socketInfo.active == true then 
-    dtext('Вы уже подключены к серверу!')
-    return false
-  end
-  local connected, err = socketClient:connect(socketInfo.ip, 'echo')
-  if not connected then
-    logger.trace('not connected')
-    dtext('Не удалось установить связь с сервером')
-    return false
-  end
-  local ok = socketClient:send(encodeJson({ action = 'auth', nick = sInfo.nick, server = sInfo.server }))
-  if ok then
-    local message, opcode = socketClient:receive()
-    if message then
-      if message == "OK" then
-        dtext('Связь с сервером установлена')
-        socketInfo.active = true
-        updateSocket()
-      else
-        dtext('У вас нет доступа для взаимодействия с сервером')
-        pInfo.settings.socket = false
-        socketClient:close()
-        return false
-      end
-    else
-      dtext('Ошибка соединения с сервером')
-      socketClient:close()
-      return false
-    end
-  else
-    dtext('Ошибка соединения с сервером')
-    socketClient:close()
-    return false
-  end
-end
-
 function secoundTimer()
   lua_thread.create(function()
     local updatecount = 0
@@ -2155,21 +2036,18 @@ function autoupdate()
       }
 
       --- Анти-пиздинг скрипта
-      local found = false
       if DEBUG_MODE then
-        if updateData.ver > thisScript().version then
-          for k, v in ipairs(info.sfahelper.testers) do
-            if v == sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(playerPed))) then
-              found = true
-              break
-            end
+        local checked = false
+        local nickname = sampGetPlayerNickname(select(2, sampGetPlayerIdByCharHandle(playerPed)))
+        for k, v in ipairs(info.sfahelper.testers) do
+          if v == nickname then
+            checked = true
+            break
           end
-        else found = true end
+        end
 
-        if not found then
-          dtext('У Вас обнаружена тестовая версия, хотя вы не являетесь тестером. Откатываемся...')
-          goupdate()
-          return
+        if checked == false then
+          DEBUG_MODE = false
         end
       end
 
@@ -2816,9 +2694,6 @@ function onScriptTerminate(scr, quitGame)
     if radioStream ~= nil then bass.BASS_StreamFree(radioStream) end
     if not quitGame and reloadScriptsParam == false then
       showCursor(false)
-      if pInfo.settings.socket and socketInfo.active then
-        disconnectSocket()
-      end
       logger.fatal(string.format('Завершение скрипта. Причина: ', quitGame == true and "Выход из игры" or "Принудительное завершение / Краш"))
       logger.fatal("Для восстановния работы используйте Ctrl + R, либо перезайдите в игру")
     end
@@ -5880,6 +5755,10 @@ function additionArray(table, to)
     else to[k] = v end
   end
   return to
+end
+
+function trim1(s)
+  return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
 --- Определяет расстояние между двумя точками
