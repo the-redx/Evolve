@@ -1,8 +1,8 @@
 {
 	"sfahelper": {
 		"url": "https://raw.githubusercontent.com/the-redx/Evolve/develop/sfahelper.lua",
-		"version": "1.6432",
-		"versiontext": "1.54-release2",
+		"version": "1.6433",
+		"versiontext": "1.54-release3",
 		"testers": ["Edward_Franklin", "Eduardo_Carmone", "Jonathan_Belin", "Archer_Belin"],
 		"updates": [
 			"Изменено получение ранга из статистики в связи с обновлением;"

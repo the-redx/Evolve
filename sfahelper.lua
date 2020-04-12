@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.54-release2
+-- Version 1.54-release3
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.6432")
-SCRIPT_ASSEMBLY = "1.54-release2"
-LAST_BUILD = "April 12, 2020 11:20:45"
+script_version("1.6433")
+SCRIPT_ASSEMBLY = "1.54-release3"
+LAST_BUILD = "April 12, 2020 12:32:45"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -5758,6 +5758,7 @@ function additionArray(table, to)
 end
 
 function trim1(s)
+  s = tostring(s)
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
