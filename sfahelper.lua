@@ -2,13 +2,13 @@
 -- Licensed under MIT License
 -- Copyright (c) 2020 redx
 -- https://github.com/the-redx/Evolve
--- Version 1.54-release4
+-- Version 1.54-release5
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.6434")
-SCRIPT_ASSEMBLY = "1.54-release4"
-LAST_BUILD = "April 12, 2020 13:32:45"
+script_version("1.6435")
+SCRIPT_ASSEMBLY = "1.54-release5"
+LAST_BUILD = "April 12, 2020 16:54:25"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -1028,7 +1028,7 @@ end
 function cmd_stats(args)
   lua_thread.create(function()
     sampSendChat('/stats')
-    while not sampIsDialogActive() and sampGetCurrentDialogId() == 9901 do wait(0) end
+    while not sampIsDialogActive() or sampGetCurrentDialogId() ~= 9901 do wait(0) end
     proverkk = sampGetDialogText()
     local frakc = trim1(proverkk:match('Организация%s+(.-)\n'))
     local rank = trim1(proverkk:match('Должность%s+(%d+) .-\n'))
