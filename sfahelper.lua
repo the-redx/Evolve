@@ -1907,7 +1907,7 @@ function loadFiles()
       dtext('Устанавливаем необходимые библиотеки...')
       for k, v in pairs(direct) do if not doesDirectoryExist("moonloader/lib/"..v) then createDirectory("moonloader/lib/"..v) end end
       for k, v in pairs(files) do
-        if not doesFileExist(v) then
+        if not (doesFileExist('moonloader/lib/'..v) and v:find(".dll")) then
           local copas_download_status = 'proccess'
           downloadUrlToFile('https://raw.githubusercontent.com/the-redx/Evolve/master/lib/'..v, 'moonloader/lib/'..v, function(id, status, p1, p2)
             if status == dlstatus.STATUS_DOWNLOADINGDATA then
