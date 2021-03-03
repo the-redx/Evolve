@@ -1,11 +1,12 @@
 {
 	"sfahelper": {
 		"url": "https://raw.githubusercontent.com/the-redx/Evolve/develop/sfahelper.lua",
-		"version": "1.6435",
-		"versiontext": "1.54-release5",
+		"version": "1.65",
+		"versiontext": "1.65",
 		"testers": ["Edward_Franklin", "Eduardo_Carmone", "Jonathan_Belin", "Archer_Belin"],
 		"updates": [
-			"Попытка номер 4"
+			"Фикс зависания скрипта во время скачивания библиотек",
+			"Обновлены функции для 12+"
 		]
 	},
 	"admintools": {

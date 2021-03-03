@@ -1,14 +1,13 @@
--- This file is a SFA-Helper project
--- Licensed under MIT License
--- Copyright (c) 2020 redx
+-- This file is a SFA-Helper project.
+-- © 2019-2021 Illia Illiashenko (illiashenko.dev). All rights reserved.
 -- https://github.com/the-redx/Evolve
--- Version 1.54-release5
+-- Version 1.65
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin' })
-script_version("1.6435")
-SCRIPT_ASSEMBLY = "1.54-release5"
-LAST_BUILD = "April 12, 2020 16:54:25"
+script_version("1.65")
+SCRIPT_ASSEMBLY = "1.65"
+LAST_BUILD = "March 4, 2020 00:34:35"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -508,16 +507,11 @@ complete = false
 -- Лог обновлений
 updatesInfo = {
   version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
-  type = "Плановое обновление", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
+  type = "Фикс", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
   date = LAST_BUILD,
   list = {
-    {'Убрана команда ``/addbl`` из-за ненадобности и лагов;'},
-    {'Убраны лишние команды из сборки;'},
-    {'В меню слежки возвращена проверка на игрока в стриме;'},
-    {'Таймер подсказок увеличен до 20-25 минут, подсказки убраны из сервера;'},
-    {'Раздел с отправкой гос волны теперь доступен с 12 ранга;'},
-    {'Версии ниже 1.4 больше не поддерживаются;'},
-    {'Изменено получение ранга из статистики в связи с обновлением;'},
+    {'Фикс зависания скрипта во время скачивания библиотек;'},
+    {'Обновлены функции для 12+;'},
   }
 }
 
@@ -1913,23 +1907,25 @@ function loadFiles()
       dtext('Устанавливаем необходимые библиотеки...')
       for k, v in pairs(direct) do if not doesDirectoryExist("moonloader/lib/"..v) then createDirectory("moonloader/lib/"..v) end end
       for k, v in pairs(files) do
-        local copas_download_status = 'proccess'
-        downloadUrlToFile('https://raw.githubusercontent.com/the-redx/Evolve/master/lib/'..v, 'moonloader/lib/'..v, function(id, status, p1, p2)
-          if status == dlstatus.STATUS_DOWNLOADINGDATA then
-            copas_download_status = 'proccess'
-            print(string.format('Загружено %d килобайт из %d килобайт.', p1, p2))
-          elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
-            copas_download_status = 'succ'
-          elseif status == 64 then
-            copas_download_status = 'failed'
+        if not doesFileExist(v) then
+          local copas_download_status = 'proccess'
+          downloadUrlToFile('https://raw.githubusercontent.com/the-redx/Evolve/master/lib/'..v, 'moonloader/lib/'..v, function(id, status, p1, p2)
+            if status == dlstatus.STATUS_DOWNLOADINGDATA then
+              copas_download_status = 'proccess'
+              print(string.format('Загружено %d килобайт из %d килобайт.', p1, p2))
+            elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
+              copas_download_status = 'succ'
+            elseif status == 64 then
+              copas_download_status = 'failed'
+            end
+          end)
+          while copas_download_status == 'proccess' do wait(0) end
+          if copas_download_status == 'failed' then
+            dtext('Не удалось загрузить библиотеку '..v)
+            reloadScriptsParam = true
+            thisScript():unload()
+            return
           end
-        end)
-        while copas_download_status == 'proccess' do wait(0) end
-        if copas_download_status == 'failed' then
-          dtext('Не удалось загрузить библиотеку '..v)
-          reloadScriptsParam = true
-          thisScript():unload()
-          return
         end
       end
       reloadScriptsParam = true    
@@ -4533,7 +4529,7 @@ imgui_windows.addtable = function()
   elseif data.combo.addtable.v == 2 then
     imgui.InputText(u8 'Причина', data.addtable.reason)
   elseif data.combo.addtable.v == 3 then
-    imgui.InputText(u8 'Тип КС (1,2)', data.addtable.param2)
+    imgui.InputText(u8 'Тип КС (1,2,3)', data.addtable.param2)
     imgui.InputText(u8 'Взвод', data.addtable.reason)
   elseif data.combo.addtable.v == 4 then
     imgui.InputText(u8 'Тип выговора (1 - обычный, 2 - строгий)', data.addtable.param2)
@@ -4568,7 +4564,7 @@ imgui_windows.addtable = function()
 
           elseif data.combo.addtable.v == 3 then
             if nickname ~= "" and nickname ~= nil and reason ~= nil and reason ~= "" and param2 ~= "" and param2 ~= nil then
-              if tonumber(param2) ~= nil and (tonumber(param2) == 1 or tonumber(param2) == 2) then
+              if tonumber(param2) ~= nil and (tonumber(param2) == 1 or tonumber(param2) == 2 or tonumber(param2) == 3) then
                 atext(("Контракт: [Ник: %s] [Тип КС: %s] [Взвод: %s]"):format(nickname, param2, reason))
                 sendGoogleMessage("contract", nickname, _, param2, reason, os.time())
               else atext('Неверный тип КС') end
@@ -4992,8 +4988,10 @@ function sendGoogleMessage(type, name, param1, param2, reason, time)
     local date1 = os.date("*t", time)
     local date2 = os.date("*t", time+(604800*tonumber(param2)))
     date = ("%d.%d.%d - %d.%d.%d"):format(date1.day, date1.month, date1.year, date2.day, date2.month, date2.year)
-    if tonumber(param2) == 2 then param1 = 4
-    else param1 = 3 end
+    if tonumber(param2) == 1 then param1 = 3
+    elseif tonumber(param2) == 2 then param1 = 4
+    elseif tonumber(param2) == 3 then param1 = 6
+    else param1 = 0 end
     url = url..("&type=%s&who=%s&param1=%s&date=%s&reason=%s&param2=1"):format(type, name, encodeURI(u8:encode(param1)), date, encodeURI(u8:encode(reason)))
   elseif type == "reprimand" then
     local date1 = os.date("*t", time)
