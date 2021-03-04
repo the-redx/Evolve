@@ -1,12 +1,13 @@
 {
 	"sfahelper": {
 		"url": "https://raw.githubusercontent.com/the-redx/Evolve/develop/sfahelper.lua",
-		"version": "1.653",
-		"versiontext": "1.653",
+		"version": "1.654",
+		"versiontext": "1.654",
 		"testers": ["Edward_Franklin", "Eduardo_Carmone", "Jonathan_Belin", "Archer_Belin"],
 		"updates": [
-			"Фикс зависания скрипта во время скачивания библиотек",
-			"Обновлена функция /addtable"
+			"В /addtable (Раздел 'Контракт') добавлен новый тип контракта",
+			"Была пофикшена загрузка библиотек",
+			"Был пофикшен /members 1-2 и /abp"
 		]
 	},
 	"admintools": {

@@ -1,12 +1,12 @@
 -- This file is a SFA-Helper project.
 -- © 2019-2021 Illia Illiashenko (illiashenko.dev). All rights reserved.
 -- https://github.com/the-redx/Evolve
--- Version 1.653
+-- Version 1.654
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin', 'Thomas_Lawson' })
-script_version("1.653")
-LAST_BUILD = "March 4, 2020 18:58:54"
+script_version("1.654")
+LAST_BUILD = "March 4, 2020 21:03:24"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -509,8 +509,9 @@ updatesInfo = {
   type = "Фикс", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
   date = LAST_BUILD,
   list = {
-    {'Фикс зависания скрипта во время скачивания библиотек;'},
-    {'Обновлены функции для 12+;'},
+    {'В /addtable (Раздел "Контракт") добавлен новый тип контракта;'},
+    {'Была пофикшена загрузка библиотек;'},
+    {'Был пофикшен /members 1-2 и /abp'},
   }
 }
 
@@ -1166,12 +1167,8 @@ function cmd_checkrank(arg)
   sampAddChatMessage('Загрузка данных...', 0xFFFF00)
   logger.trace("Отправляем асинхронку. Очередь: "..tostring(asyncQueue))
   asyncQueue = true
-  httpRequest(updatelink, nil, function(response, code, headers, status)
-    logger.debug(response)
-    logger.debug(code)
-    logger.debug(headers)
-    logger.debug(status)
 
+  httpRequest(updatelink, nil, function(response, code, headers, status)
     if response then
       tempFiles.ranks = {}
       -- Регулярка для парсинга строчек, т.к. в запросе все приходит в 1 строчке
@@ -1188,6 +1185,7 @@ function cmd_checkrank(arg)
       cmd_checkrank(arg)
     else
       logger.trace("Ответ был получен с ошибкой")
+      logger.trace(response, code, headers, status)
       asyncQueue = false
     end
   end)
@@ -1915,7 +1913,7 @@ function loadFiles()
           downloadUrlToFile('https://raw.githubusercontent.com/the-redx/Evolve/master/lib/'..v, 'moonloader/lib/'..v, function(id, status, p1, p2)
             if status == dlstatus.STATUS_DOWNLOADINGDATA then
               copas_download_status = 'proccess'
-              print(string.format('Загружено %d килобайт из %d килобайт.', p1, p2))
+              print(string.format('Загружено %d из %d.', p1, p2))
             elseif status == dlstatus.STATUS_ENDDOWNLOADDATA then
               copas_download_status = 'succ'
             elseif status == 64 then
