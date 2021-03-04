@@ -1,12 +1,12 @@
 -- This file is a SFA-Helper project.
 -- © 2019-2021 Illia Illiashenko (illiashenko.dev). All rights reserved.
 -- https://github.com/the-redx/Evolve
--- Version 1.651
+-- Version 1.652
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin', 'Thomas_Lawson' })
-script_version("1.651")
-LAST_BUILD = "March 4, 2020 18:44:54"
+script_version("1.652")
+LAST_BUILD = "March 4, 2020 18:58:54"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -4985,12 +4985,20 @@ function sendGoogleMessage(type, name, param1, param2, reason, time)
     url = url..("&type=%s&who=%s&reason=%s&param1=1&param2=1&date=%s"):format(type, name, encodeURI(u8:encode(reason)), date)
   elseif type == "contract" then
     local date1 = os.date("*t", time)
-    local date2 = os.date("*t", time+(604800*tonumber(param2)))
-    date = ("%d.%d.%d - %d.%d.%d"):format(date1.day, date1.month, date1.year, date2.day, date2.month, date2.year)
-    if tonumber(param2) == 1 then param1 = 3
-    elseif tonumber(param2) == 2 then param1 = 4
-    elseif tonumber(param2) == 3 then param1 = 6
+    local date2 = os.date("*t", time)
+
+    if tonumber(param2) == 1 then
+      param1 = 3
+      date2 = os.date("*t", time+(604800))
+    elseif tonumber(param2) == 2 then
+      param1 = 4
+      date2 = os.date("*t", time+(604800 * 2))
+    elseif tonumber(param2) == 3 then
+      param1 = 5
+      date2 = os.date("*t", time+(604800 * 2))
     else param1 = 0 end
+
+    date = ("%d.%d.%d - %d.%d.%d"):format(date1.day, date1.month, date1.year, date2.day, date2.month, date2.year)
     url = url..("&type=%s&who=%s&param1=%s&date=%s&reason=%s&param2=1"):format(type, name, encodeURI(u8:encode(param1)), date, encodeURI(u8:encode(reason)))
   elseif type == "reprimand" then
     local date1 = os.date("*t", time)
