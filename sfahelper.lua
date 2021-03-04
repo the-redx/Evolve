@@ -1,13 +1,12 @@
 -- This file is a SFA-Helper project.
 -- © 2019-2021 Illia Illiashenko (illiashenko.dev). All rights reserved.
 -- https://github.com/the-redx/Evolve
--- Version 1.65.1
+-- Version 1.651
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin', 'Thomas_Lawson' })
-script_version("1.65.1")
-script_version_number(1.651)
-LAST_BUILD = "March 4, 2020 14:35:54"
+script_version("1.651")
+LAST_BUILD = "March 4, 2020 18:50:54"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -2048,7 +2047,7 @@ function autoupdate()
       end
 
       logger.debug('Версия на сервере: '..tostring(updateData.vertext))
-      if updateData.ver > thisScript().version_num then
+      if updateData.ver > thisScript().version then
         atext('Обнаружено обновление SFA-Helper. Выберите необходимое действие в окне.')
         imgui.Process = true
         window['updater'].bool.v = true
@@ -5324,7 +5323,7 @@ function loggerInit()
       ' ================================================================',
       '   SFA-Helper version '..thisScript().version..' for SA-MP 0.3.7 loaded.',
       '   Last build: '..LAST_BUILD,
-      '   Developers: '..table.concat(script.authors, ', '),
+      '   Developers: Edward_Franklin, Thomas_Lawson',
       '   Copyright 2019-'..os.date("%Y")..' Illia Illiashenko. All rights reserved.',
       ' ================================================================'
     }
