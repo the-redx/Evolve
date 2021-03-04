@@ -1,11 +1,11 @@
 -- This file is a SFA-Helper project.
 -- © 2019-2021 Illia Illiashenko (illiashenko.dev). All rights reserved.
 -- https://github.com/the-redx/Evolve
--- Version 1.652
+-- Version 1.653
 
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin', 'Thomas_Lawson' })
-script_version("1.652")
+script_version("1.653")
 LAST_BUILD = "March 4, 2020 18:58:54"
 DEBUG_MODE = true
 --------------------------------------------------------------------
@@ -1625,8 +1625,7 @@ function cmd_reconnect(args)
     return
   end
 	lua_thread.create(function()
-		sampSetGamestate(5)
-		sampDisconnectWithReason()
+		sampDisconnectWithReason(quit)
 		wait(args * 1000) 
     sampSetGamestate(1)
     return
