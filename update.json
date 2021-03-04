@@ -1,23 +1,12 @@
 {
 	"sfahelper": {
 		"url": "https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.luac",
-		"version": "1.6435",
-		"versiontext": "1.54-release5",
+		"version": "1.654",
+		"versiontext": "1.654",
 		"updates": [
-			"Попытка номер 4;"
-		]
-	},
-	"sfahelpernew": {
-		"url": "https://raw.githubusercontent.com/the-redx/Evolve/master/sfahelper.luac",
-		"version": "1.6431",
-		"versiontext": "1.54-release1",
-		"updates": [
-			"Убрана команда /addbl из-за ненадобности и лагов;",
-			"Убраны лишние команды из сборки;",
-			"В меню слежки возвращена проверка на игрока в стриме;",
-			"Таймер подсказок увеличен до 20-25 минут;",
-			"Раздел с отправкой гос волны теперь доступен с 12 ранга;",
-			"Версии ниже 1.4 больше не поддерживаются;"
+			"В /addtable (Раздел 'Контракт') добавлен новый тип контракта",
+			"Была пофикшена загрузка библиотек",
+			"Был пофикшен /members 1-2 и /abp"
 		]
 	},
 	"admintools": {
