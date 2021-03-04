@@ -6,7 +6,7 @@
 script_name("SFA-Helper")
 script_authors({ 'Edward_Franklin', 'Thomas_Lawson' })
 script_version("1.651")
-LAST_BUILD = "March 4, 2020 18:50:54"
+LAST_BUILD = "March 4, 2020 18:44:54"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -5324,7 +5324,7 @@ function loggerInit()
       '   SFA-Helper version '..thisScript().version..' for SA-MP 0.3.7 loaded.',
       '   Last build: '..LAST_BUILD,
       '   Developers: Edward_Franklin, Thomas_Lawson',
-      '   Copyright 2019-'..os.date("%Y")..' Illia Illiashenko. All rights reserved.',
+      '   Copyright 2019-2021 Illia Illiashenko. All rights reserved.',
       ' ================================================================'
     }
     for i = 1, #textArray do
