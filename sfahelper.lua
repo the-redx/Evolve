@@ -1167,6 +1167,11 @@ function cmd_checkrank(arg)
   logger.trace("ќтправл€ем асинхронку. ќчередь: "..tostring(asyncQueue))
   asyncQueue = true
   httpRequest(updatelink, nil, function(response, code, headers, status)
+    logger.debug(response)
+    logger.debug(code)
+    logger.debug(headers)
+    logger.debug(status)
+
     if response then
       tempFiles.ranks = {}
       -- –егул€рка дл€ парсинга строчек, т.к. в запросе все приходит в 1 строчке
