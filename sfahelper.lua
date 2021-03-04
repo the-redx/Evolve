@@ -5324,7 +5324,7 @@ function loggerInit()
       ' ================================================================',
       '   SFA-Helper version '..thisScript().version..' for SA-MP 0.3.7 loaded.',
       '   Last build: '..LAST_BUILD,
-      '   Developers: '..table.concat(script.authors', '),
+      '   Developers: '..table.concat(script.authors, ', '),
       '   Copyright 2019-'..os.date("%Y")..' Illia Illiashenko. All rights reserved.',
       ' ================================================================'
     }
