@@ -1,13 +1,13 @@
 -- This file is a SFA-Helper project.
 -- © 2019-2021 Illia Illiashenko (illiashenko.dev). All rights reserved.
 -- https://github.com/the-redx/Evolve
--- Version 1.65
+-- Version 1.65.1
 
 script_name("SFA-Helper")
-script_authors({ 'Edward_Franklin' })
-script_version("1.65")
-SCRIPT_ASSEMBLY = "1.65"
-LAST_BUILD = "March 4, 2020 00:34:35"
+script_authors({ 'Edward_Franklin', 'Thomas_Lawson' })
+script_version("1.65.1")
+script_version_number(1.651)
+LAST_BUILD = "March 4, 2020 14:35:54"
 DEBUG_MODE = true
 --------------------------------------------------------------------
 require 'lib.moonloader'
@@ -506,7 +506,7 @@ complete = false
 
 -- Лог обновлений
 updatesInfo = {
-  version = SCRIPT_ASSEMBLY .. (DEBUG_MODE and " (тестовая)" or ""),
+  version = thisScript().version .. (DEBUG_MODE and " (тестовая)" or ""),
   type = "Фикс", -- Плановое обновление, Промежуточное обновление, Внеплановое обновление, Фикс
   date = LAST_BUILD,
   list = {
@@ -639,7 +639,7 @@ function main()
     --- Хелпер загружен
     atext(script.this.name..' успешно загружен (/sh)')
     if DEBUG_MODE then
-      atext('Вы используете тестовую версию - '..SCRIPT_ASSEMBLY)
+      atext('Вы используете тестовую версию - '..thisScript().version)
     end
     --- Обновляем онлайн
     local day = os.date("%d.%m.%y")
@@ -1987,7 +1987,7 @@ function goupdate()
   wait(250)
   local dlstatus = require('moonloader').download_status
   local goupdatestatus = false
-  atext('Обновляемся с версии '..SCRIPT_ASSEMBLY..' на '..updateData.vertext)
+  atext('Обновляемся с версии '..thisScript().version..' на '..updateData.vertext)
   downloadUrlToFile(updateData.link, thisScript().path,
     function(id, status, p1, p2)
       if status == dlstatus.STATUS_DOWNLOADINGDATA then
@@ -2048,7 +2048,7 @@ function autoupdate()
       end
 
       logger.debug('Версия на сервере: '..tostring(updateData.vertext))
-      if updateData.ver > thisScript().version then
+      if updateData.ver > thisScript().version_num then
         atext('Обнаружено обновление SFA-Helper. Выберите необходимое действие в окне.')
         imgui.Process = true
         window['updater'].bool.v = true
@@ -5322,10 +5322,10 @@ function loggerInit()
     local text = ''
     local textArray = {
       ' ================================================================',
-      '   SFA-Helper version '..SCRIPT_ASSEMBLY..' for SA-MP 0.3.7 loaded.',
+      '   SFA-Helper version '..thisScript().version..' for SA-MP 0.3.7 loaded.',
       '   Last build: '..LAST_BUILD,
-      '   Developers: Edward_Franklin, Thomas_Lawson',
-      '   Copyright (c) 2019, redx',
+      '   Developers: '..table.concat(script.authors', '),
+      '   Copyright 2019-'..os.date("%Y")..' Illia Illiashenko. All rights reserved.',
       ' ================================================================'
     }
     for i = 1, #textArray do
