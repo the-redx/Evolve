@@ -3,7 +3,7 @@
 		"url": "https://raw.githubusercontent.com/the-redx/Evolve/develop/sfahelper.lua",
 		"version": "1.654",
 		"versiontext": "1.654",
-		"testers": ["Edward_Franklin", "Eduardo_Carmone", "Jonathan_Belin", "Archer_Belin"],
+		"testers": ["Edward_Franklin", "Eduardo_Carmone", "Jonathan_Belin", "Archer_Belin", "Darius_Rockefeller"],
 		"updates": [
 			"В /addtable (Раздел 'Контракт') добавлен новый тип контракта",
 			"Была пофикшена загрузка библиотек",
